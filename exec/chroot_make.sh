@@ -83,11 +83,12 @@ error()
 }
 
 # Read command-line parameters:
-while getopts 'a:d:D:i:r:l:yh' OPT ; do
+while getopts 'a:d:D:i:r:l:R:yh' OPT ; do
 	case $OPT in
 		a) ARCH=$OPTARG ;;
 		d) CHROOTDIR=$OPTARG ;;
 		D) DISTRO=$OPTARG ;;
+        R) RELEASE=$OPTARG ;;
 		i) INSTALLDEBS_EXTRA=$OPTARG ;;
 		r) REMOVEDEBS_EXTRA=$OPTARG ;;
 		l) LOCALDEBS=$OPTARG ;;
@@ -124,7 +125,7 @@ if [ "$DISTRO" = 'Debian' ]; then
 INCLUDEDEBS="ca-certificates"
 
 # Packages to install after upgrade (space separated):
-INSTALLDEBS="default-jre-headless pypy locales"
+INSTALLDEBS="default-jre-headless pypy python3 fp-compiler locales"
 # For C# support add: mono-runtime libmono-system2.0-cil
 # However running mono within chroot still gives errors...
 
@@ -153,7 +154,7 @@ if [ "$DISTRO" = 'Ubuntu' ]; then
 INCLUDEDEBS="software-properties-common"
 
 # Packages to install after upgrade (space separated):
-INSTALLDEBS="default-jre-headless pypy locales"
+INSTALLDEBS="default-jre-headless pypy python3 fp-compiler locales"
 # For C# support add: mono-mcs mono-devel
 # However running mono within chroot still gives errors...
 
