@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# 标准运行脚本，重定向标准输入和标准输出到文件中
+# 你可以以这个脚本为范例来写其他的运行脚本
+#
+# 用法：$0 <testin> <progout> <commands...>
+
+TESTIN="$1"; shift
+PROGOUT="$1"
+
+exec "$@" < "$TESTIN" > "$PROGOUT"

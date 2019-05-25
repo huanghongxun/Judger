@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# Java 编译器脚本
+# 生成一个可执行的脚本来使得运行 java 程序和本地程序一致
+
+DEST="$1"; shift
+MEMLIMIT="$1"; shift
+MAINSOURCE="$1"
+
+MEMSTACK=65536
+MEMJVM=65536
+MEMRESERVED=$((MEMSTACK + MEMJVM))
+
+if [ -z "$ENTRY_POINT" ]; then
+    MAINCLASS="Main"
+else
+    MAINCLASS="$ENTRY_POINT"
+fi
+
+javac -encoding UTF-8 -sourcepath . -d . "$@"
+EXITCODE=$?
+[ "$EXITCODE" -ne 0 ] && exit $EXITCODE
+
+# Check if entry point exists
+javap "$MAINCLASS" > /dev/null
+EXITCODE=$?
+[ "$EXITCODE" -ne 0 ] && exit $EXITCODE
+
+MEMLIMITJAVA = $((MEMLIMIT - MEMRESERVED))
+
+cat > "$DEST" <<EOF
+#!/bin/sh
+# Detect dirname and change dir to prevent class not found errors.
+if [ "\${0%/*}" != "\$0" ]; then
+	cd "\${0%/*}"
+fi
+
+exec java -DONLINE_JUDGE -Dfile.encoding=UTF-8 -XX:+UseSerialGC -Xss${MEMSTACK}k -Xms${MEMLIMITJAVA}k -Xmx${MEMLIMITJAVA}k '$MAINCLASS' "\$@"
+EOF
+
+chmod a+x "$DEST"
+exit 0

@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# Python 3 编译器脚本（CPython）
+
+DEST="$1" ; shift
+MEMLIMIT="$1" ; shift
+MAINSOURCE="${ENTRY_POINT:-$1}"
+
+# 导入 expectsuccess 函数
+. "$JUDGE_UTILS/utils.sh"
+
+# 检查 python 代码的语法，以便抛出 CE
+expectsuccess python3 -m py_compile "$@"
+rm -f -- *.pyc
+
+if [ ! -r "$MAINSOURCE" ]; then
+    error "Entry point or main source is not readable"
+fi
+
+cat > "$DEST" <<EOF
+#!/bin/sh
+
+if [ "\${0%/*}" != "\$0" ]; then
+	cd "\${0%/*}"
+fi
+
+export HOME=/what/the/fuck
+export ONLINE_JUDGE=1
+
+# 这里不编译 python 代码
+exec python3 "$MAINSOURCE" "\$@"
+EOF
+
+chmod a+x "$DEST"
+exit 0

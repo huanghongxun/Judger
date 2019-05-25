@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Pascal 编译器脚本
+
+DEST="$1" ; shift
+MEMLIMIT="$1" ; shift
+MAINSOURCE="$1"
+
+if [ -n "$ENTRY_POINT" ]; then
+	MAINSOURCE="$ENTRY_POINT"
+else
+	# Fpc only accepts a single source file, and will detect and compile
+	# unit dependencies itself. Let's try to autodetect the main program.
+	NUMSOURCES=0
+	for i in "$@" ; do
+		NUMSOURCES=$((NUMSOURCES+1))
+		if grep -E '^[[:space:]]*program[[:space:]]+[A-Za-z_0-9]+([[:space:]]*\([[:space:]]*[A-Za-z_0-9]+[[:space:]]*,[[:space:]]*[A-Za-z_0-9]+[[:space:]]*\))?[[:space:]]*;' "$i" >/dev/null ; then
+			FOUND="$i"
+		fi
+	done
+	if [ $NUMSOURCES = 1 ]; then
+		true # Skip this case.
+	elif [ -n "$FOUND" ]; then
+		echo "Using '$FOUND' as main program file."
+		MAINSOURCE="$FOUND"
+	else
+		echo "Warning: could not detect main program file, using '$MAINSOURCE'."
+	fi
+fi
+
+fpc -dONLINE_JUDGE -viwn -O2 -Sg -XS -o"$DEST" "$MAINSOURCE"
+exitcode=$?
+
+# clean created object files:
+rm -f "$DEST.o"
+
+exit $exitcode

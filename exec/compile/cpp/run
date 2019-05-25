@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# C++ 编译器脚本
+
+DEST="$1"; shift
+MEMLIMIT="$1"; shift
+
+g++-8 -x c++ -DONLINE_JUDGE -fopenmp -march=native -std=c++17 -Wall -Wextra -O2 -static -o "$DEST" "$@" -lpthread -lm
+exit $?

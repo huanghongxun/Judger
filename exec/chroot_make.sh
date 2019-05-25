@@ -3,7 +3,7 @@
 # Script to generate a basic chroot environment with a Java JRE
 # to allow for Java programs to run in a chroot.
 #
-# This script downloads and installs a Debian or Ubuntu base system.
+# This script downloads and installs a Ubuntu base system.
 # Minimum requirements: a Linux system with glibc >= 2.3, wget, ar and
 # a POSIX shell in /bin/sh. About 335/610 MB disk space is needed. It
 # must be run as root and will install the debootstrap package.
@@ -25,17 +25,15 @@ trap cleanup EXIT
 # Default directory where to build the chroot tree:
 CHROOTDIR=""
 
-# Fallback Debian and release (codename) to bootstrap (note: overriden right below):
-DISTRO="Debian"
-RELEASE="stretch"
+# Fallback Linux distribution and release (codename) to bootstrap (note: overriden right below):
+DISTRO="Ubuntu"
+RELEASE="xenial"
 
 # List of possible architectures to install chroot for:
-DEBIAN_ARCHLIST="amd64,arm64,armel,armhf,i386,mips,mips64el,mipsel,ppc64el,s390x"
 UBUNTU_ARCHLIST="amd64,arm64,armhf,i386,powerpc,ppc64el,s390x"
 
-# If host system is Debian or Ubuntu, use its release and architecture by default
-if [ "x$(lsb_release -i -s || true)" = 'xDebian' ] || \
-   [ "x$(lsb_release -i -s || true)" = 'xUbuntu' ]; then
+# If host system is Ubuntu, use its release and architecture by default
+if [ "x$(lsb_release -i -s || true)" = 'xUbuntu' ]; then
 	DISTRO="$(lsb_release -i -s)"
 	if [ "x$(lsb_release -c -s)" != "xsid" ]; then
 		RELEASE="$(lsb_release -c -s)"
@@ -49,13 +47,11 @@ usage()
 {
 	cat <<EOF
 Usage: $0 [options]...
-Creates a chroot environment with Java JRE support using the
-Debian or Ubuntu GNU/Linux distribution.
+Creates a chroot environment using Ubuntu.
 Options:
   -a <arch>   Machine archicture to use.
   -d <dir>    Directory where to build the chroot environment.
-  -D <distro> Linux distribution to use: 'Debian' or 'Ubuntu'.
-  -R <releas> Linux release to use: 'stretch' for 'Debian', 'xenial' for 'Ubuntu'.
+  -R <releas> Ubuntu release to use: 'xenial', 'bionic'.
   -i <debs>   List of extra package names to install (comma separated).
   -r <debs>   List of extra package names to remove (comma separated).
   -l <debs>   List of local package files to install (comma separated).
@@ -63,13 +59,12 @@ Options:
   -h          Display this help.
 This script must be run as root, <chrootdir> is the non-existing
 target location of the chroot (unless '-y' is specified). If the host
-runs Debian/Ubuntu, the host architecture and release are used.
+runs Ubuntu, the host architecture and release are used.
 Available architectures:
-Debian: $DEBIAN_ARCHLIST
 Ubuntu: $UBUNTU_ARCHLIST
 
 Variables:
-  $DEBMIRROR            apt mirror, Debian or Ubuntu mirror, corresponding to the Linux distribution.
+  $DEBMIRROR            Ubuntu apt mirror.
   $DEBPROXY             caching proxy for apt-get.
 EOF
 }
@@ -83,11 +78,10 @@ error()
 }
 
 # Read command-line parameters:
-while getopts 'a:d:D:i:r:l:R:yh' OPT ; do
+while getopts 'a:d:i:r:l:R:yh' OPT ; do
 	case $OPT in
 		a) ARCH=$OPTARG ;;
 		d) CHROOTDIR=$OPTARG ;;
-		D) DISTRO=$OPTARG ;;
         R) RELEASE=$OPTARG ;;
 		i) INSTALLDEBS_EXTRA=$OPTARG ;;
 		r) REMOVEDEBS_EXTRA=$OPTARG ;;
@@ -107,10 +101,6 @@ if [ -n "$SHOWHELP" ]; then
 	exit 0
 fi
 
-if [ "$DISTRO" != 'Debian' ] && [ "$DISTRO" != 'Ubuntu' ]; then
-	error "Invalid distribution specified, only 'Debian' and 'Ubuntu' are supported."
-fi
-
 if [ "$(id -u)" != 0 ]; then
     echo "Warning: you probably need to run this program as root."
 fi
@@ -118,43 +108,11 @@ fi
 [ -z "$CHROOTDIR" ] && error "No chroot directory given or default known."
 [ -z "$ARCH" ]      && error "No architecture given or detected."
 
-# Various settings that can be tweaked, specific per distribution:
-if [ "$DISTRO" = 'Debian' ]; then
-
-# Packages to include during bootstrap process (comma separated):
-INCLUDEDEBS="ca-certificates"
-
-# Packages to install after upgrade (space separated):
-INSTALLDEBS="default-jre-headless pypy python3 fp-compiler locales"
-# For C# support add: mono-runtime libmono-system2.0-cil
-# However running mono within chroot still gives errors...
-
-# Packages to remove after upgrade (space separated):
-REMOVEDEBS=""
-
-# Which debootstrap package to install on non-Debian systems:
-[ -z "$DEBOOTDEB" ] && DEBOOTDEB="debootstrap_1.0.89_all.deb" # Debian stretch
-
-# The Debian mirror/proxy below can be passed as environment
-# variables; if none are given the following defaults are used.
-
-# Debian mirror. deb.debian.org will pick the 'closest'.
-[ -z "$DEBMIRROR" ] && DEBMIRROR="http://deb.debian.org/debian"
-
-# A local caching proxy to use for apt-get,
-# (typically an install of aptcacher-ng), for example:
-#DEBPROXY="http://aptcacher-ng.example.com:3142/"
-[ -z "$DEBPROXY" ] && DEBPROXY=""
-
-fi
-
-if [ "$DISTRO" = 'Ubuntu' ]; then
-
 # Packages to include during bootstrap process (comma separated):
 INCLUDEDEBS="software-properties-common"
 
 # Packages to install after upgrade (space separated):
-INSTALLDEBS="default-jre-headless pypy python3 fp-compiler locales"
+INSTALLDEBS="curl golang rustc xz-utils default-jdk-headless pypy python3 clang ruby scala libboost-all-dev gcc gcc-8 g++ g++-8 gcc-multilib g++-multilib fp-compiler valgrind locales"
 # For C# support add: mono-mcs mono-devel
 # However running mono within chroot still gives errors...
 
@@ -162,22 +120,19 @@ INSTALLDEBS="default-jre-headless pypy python3 fp-compiler locales"
 REMOVEDEBS=""
 
 # Which debootstrap package to install on non-Ubuntu systems:
-# This is only used when the default distro changed from Debian to
-# Ubuntu. The version below corresponds to Ubuntu 16.04 Xenial.
+# The version below corresponds to Ubuntu 18.04.2 LTS.
 [ -z "$DEBOOTDEB" ] && DEBOOTDEB="debootstrap_1.0.114ubuntu1_all.deb"
 
-# The Debian mirror/proxy below can be passed as environment
+# The Ubuntu mirror/proxy below can be passed as environment
 # variables; if none are given the following defaults are used.
 
 # Ubuntu mirror, modify to match closest mirror
-[ -z "$DEBMIRROR" ] && DEBMIRROR="http://mirrors.tuna.tsinghua.edu.cn/ubuntu/"
+[ -z "$DEBMIRROR" ] && DEBMIRROR="https://mirrors.ustc.edu.cn/ubuntu/"
 
 # A local caching proxy to use for apt-get,
 # (typically an install of aptcacher-ng), for example:
 #DEBPROXY="http://aptcacher-ng.example.com:3142/"
 [ -z "$DEBPROXY" ] && DEBPROXY=""
-
-fi
 
 INSTALLDEBS="$INSTALLDEBS $(echo $INSTALLDEBS_EXTRA | tr , ' ')"
 REMOVEDEBS=" $REMOVEDEBS  $(echo $REMOVEDEBS_EXTRA  | tr , ' ')"
@@ -250,7 +205,7 @@ echo "Running debootstrap to install base system, this may take a while..."
 
 # shellcheck disable=SC2086
 eval $BOOTSTRAP_COMMAND $INCLUDEOPT $EXCLUDEOPT \
-	--variant=minbase --arch "$ARCH" "$RELEASE" "$CHROOTDIR" "$DEBMIRROR"
+	--variant=minbase --arch "$ARCH" "$RELEASE" "$CHROOTDIR" "http://mirrors.aliyun.com/ubuntu"
 
 rm -f "$CHROOTDIR/etc/resolv.conf"
 cp /etc/resolv.conf /etc/hosts /etc/hostname "$CHROOTDIR/etc" || true
@@ -258,38 +213,7 @@ cp /etc/ssl/certs/ca-certificates.crt "$CHROOTDIR/etc/ssl/certs/" || true
 cp -r /usr/share/ca-certificates/* "$CHROOTDIR/usr/share/ca-certificates" || true
 cp -r /usr/local/share/ca-certificates/* "$CHROOTDIR/usr/local/share/ca-certificates" || true
 
-if [ "$DISTRO" = 'Debian' ]; then
-cat > "$CHROOTDIR/etc/apt/sources.list" <<EOF
-# Different releases (incl. optional security repository):
-# Stable ($RELEASE)
-deb $DEBMIRROR			$RELEASE		main
-deb http://security.debian.org	$RELEASE/updates	main
-# Testing
-#deb $DEBMIRROR			testing		main
-#deb http://security.debian.org	testing/updates	main
-# Unstable
-#deb $DEBMIRROR			unstable	main
-EOF
-fi
-if [ "$DISTRO" = 'Ubuntu' ]; then
-cat > "$CHROOTDIR/etc/apt/sources.list" <<EOF
-deb $DEBMIRROR $RELEASE main
-deb $DEBMIRROR $RELEASE universe
-deb $DEBMIRROR $RELEASE-updates main
-deb $DEBMIRROR $RELEASE-updates universe
-deb $DEBMIRROR $RELEASE-security main
-deb $DEBMIRROR $RELEASE-security universe
-EOF
-fi
 
-cat > "$CHROOTDIR/etc/apt/apt.conf" <<EOF
-APT::Get::Assume-Yes "true";
-APT::Get::Force-Yes "false";
-APT::Get::Purge "true";
-APT::Install-Recommends "false";
-Acquire::Retries "3";
-Acquire::PDiffs "false";
-EOF
 
 # Add apt proxy settings if desired
 if [ -n "$DEBPROXY" ]; then
@@ -327,13 +251,31 @@ locales	locales/locales_to_be_generated	multiselect
 locales	locales/default_environment_locale	select	None
 EOF
 
-if [ "$DISTRO" = 'Ubuntu' ]; then
 # Disable upstart init scripts(so upgrades work), we don't need to actually run
 # any services in the chroot, so this is fine.
 # Refer to: http://ubuntuforums.org/showthread.php?t=1326721
 chroot "$CHROOTDIR" /bin/sh -c "dpkg-divert --local --rename --add /sbin/initctl"
 chroot "$CHROOTDIR" /bin/sh -c "ln -s /bin/true /sbin/initctl"
-fi
+
+# Support mirrors over SSL.
+chroot "$CHROOTDIR" /bin/sh -c "apt-get update && apt-get install apt-transport-https"
+
+cat > "$CHROOTDIR/etc/apt/sources.list" <<EOF
+deb $DEBMIRROR $RELEASE main restricted universe multiverse
+deb $DEBMIRROR $RELEASE-security main restricted universe multiverse
+deb $DEBMIRROR $RELEASE-updates main restricted universe multiverse
+deb $DEBMIRROR $RELEASE-backports main restricted universe multiverse
+EOF
+
+cat > "$CHROOTDIR/etc/apt/apt.conf" <<EOF
+APT::Get::Assume-Yes "true";
+APT::Get::Force-Yes "false";
+APT::Get::Purge "true";
+APT::Install-Recommends "false";
+Acquire::Retries "3";
+Acquire::PDiffs "false";
+EOF
+
 
 # Upgrade the system, and install/remove packages as desired
 chroot "$CHROOTDIR" /bin/sh -c "apt-get update && apt-get dist-upgrade"
@@ -350,6 +292,15 @@ fi
 chroot "$CHROOTDIR" /bin/sh -c "apt-get remove --purge $REMOVEDEBS"
 chroot "$CHROOTDIR" /bin/sh -c "apt-get autoremove --purge"
 chroot "$CHROOTDIR" /bin/sh -c "apt-get clean"
+
+# Install D-lang compiler suite
+chroot "$CHROOTDIR" /bin/sh -c "curl -fsS https://dlang.org/install.sh | bash -s dmd"
+
+# Install testlib
+wget "https://github.com/MikeMirzayanov/testlib/blob/master/testlib.h" -P "$CHROOTDIR/usr/include"
+
+# Clean temp directory
+chroot "$CHROOTDIR" /bin/sh -c "rm -r /tmp/*"
 
 # Remove unnecessary setuid bits
 chroot "$CHROOTDIR" /bin/sh -c "chmod a-s /usr/bin/wall /usr/bin/newgrp \

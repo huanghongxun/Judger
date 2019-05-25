@@ -1,0 +1,9 @@
+[submodule "ext/glog"]
+	path = ext/glog
+	url = https://github.com/google/glog
+[submodule "ext/SimpleAmqpClient"]
+	path = ext/SimpleAmqpClient
+	url = https://github.com/alanxz/SimpleAmqpClient
+[submodule "ext/googletest"]
+	path = ext/googletest
+	url = https://github.com/google/googletest

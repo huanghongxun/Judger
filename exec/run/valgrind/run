@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# 内存检查脚本
+#
+# 用法：$0 <testin> <progout> <commands...>
+
+TESTIN="$1"; shift
+PROGOUT="$1"
+
+exec valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-fs=1 "$@" < "$TESTIN" > "$PROGOUT"
