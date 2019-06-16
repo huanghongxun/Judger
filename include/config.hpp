@@ -31,7 +31,9 @@ extern int script_file_limit;
  */
 extern filesystem::path EXEC_DIR;
 
-extern filesystem::path COMPILE_DIR;
+extern filesystem::path CACHE_DIR;
+
+extern filesystem::path RUN_DIR;
 
 extern filesystem::path CHROOT_DIR;
 

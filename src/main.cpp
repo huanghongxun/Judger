@@ -92,7 +92,9 @@ int main(int argc, const char* argv[]) {
         ("clients", po::value<size_t>(), "set number of single thread judge clients to be kept")
         ("client", po::value<vector<cpuset>>(), "run a judge client which cpuset is given")
         ("exec-dir", po::value<string>(), "set the default predefined executables for falling back")
-        ("compile-dir", po::value<string>(), "set the directory to store compiled programs")
+        ("cache-dir", po::value<string>(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
+        ("run-dir", po::value<string>(), "set the directory to run user programs, store compiled user program")
+        ("chroot-dir", po::value<string>(), "set the chroot directory")
         ("help", "display this help text")
         ("version", "display version of this application");
     // clang-format on
@@ -127,8 +129,16 @@ int main(int argc, const char* argv[]) {
         judge::EXEC_DIR = filesystem::path(vm.at("exec-dir").as<string>());
     }
 
-    if (vm.count("compile-dir")) {
-        judge::COMPILE_DIR = filesystem::path(vm.at("compile-dir").as<string>());
+    if (vm.count("cache-dir")) {
+        judge::CACHE_DIR = filesystem::path(vm.at("cache-dir").as<string>());
+    }
+
+    if (vm.count("run-dir")) {
+        judge::RUN_DIR = filesystem::path(vm.at("run-dir").as<string>());
+    }
+
+    if (vm.count("chroot-dir")) {
+        judge::CHROOT_DIR = filesystem::path(vm.at("chroot-dir").as<string>());
     }
 
     if (vm.count("enable-sicily")) {

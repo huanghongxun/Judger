@@ -12,5 +12,7 @@ int script_file_limit;
 int PROC_LIMIT;
 
 filesystem::path EXEC_DIR;
-filesystem::path COMPILE_DIR;
+filesystem::path CACHE_DIR;
+filesystem::path RUN_DIR;
+filesystem::path CHROOT_DIR;
 }  // namespace judge
