@@ -27,7 +27,7 @@ CHROOTDIR=""
 
 # Fallback Linux distribution and release (codename) to bootstrap (note: overriden right below):
 DISTRO="Ubuntu"
-RELEASE="xenial"
+RELEASE="disco" # Ubuntu 19.04
 
 # List of possible architectures to install chroot for:
 UBUNTU_ARCHLIST="amd64,arm64,armhf,i386,powerpc,ppc64el,s390x"
@@ -112,7 +112,7 @@ fi
 INCLUDEDEBS="software-properties-common"
 
 # Packages to install after upgrade (space separated):
-INSTALLDEBS="curl golang rustc xz-utils default-jdk-headless pypy python3 clang ruby scala libboost-all-dev gcc gcc-8 g++ g++-8 gcc-multilib g++-multilib fp-compiler valgrind locales"
+INSTALLDEBS="curl golang rustc xz-utils default-jdk-headless pypy python3 clang ruby scala libboost-all-dev cmake libgtest-dev gcc gcc-9 g++ g++-9 gcc-multilib g++-multilib fp-compiler valgrind locales"
 # For C# support add: mono-mcs mono-devel
 # However running mono within chroot still gives errors...
 
@@ -120,7 +120,7 @@ INSTALLDEBS="curl golang rustc xz-utils default-jdk-headless pypy python3 clang 
 REMOVEDEBS=""
 
 # Which debootstrap package to install on non-Ubuntu systems:
-# The version below corresponds to Ubuntu 18.04.2 LTS.
+# The version below supports Ubuntu version up to Ubuntu 19.04.
 [ -z "$DEBOOTDEB" ] && DEBOOTDEB="debootstrap_1.0.114ubuntu1_all.deb"
 
 # The Ubuntu mirror/proxy below can be passed as environment
@@ -276,7 +276,6 @@ Acquire::Retries "3";
 Acquire::PDiffs "false";
 EOF
 
-
 # Upgrade the system, and install/remove packages as desired
 chroot "$CHROOTDIR" /bin/sh -c "apt-get update && apt-get dist-upgrade"
 chroot "$CHROOTDIR" /bin/sh -c "apt-get clean"
@@ -296,8 +295,18 @@ chroot "$CHROOTDIR" /bin/sh -c "apt-get clean"
 # Install D-lang compiler suite
 chroot "$CHROOTDIR" /bin/sh -c "curl -fsS https://dlang.org/install.sh | bash -s dmd"
 
+# Install gtest
+chroot "$CHROOTDIR" /bin/sh -c "cd /usr/src/gtest; cmake .; make; cp *.a /usr/lib; ln -s /usr/lib/libgtest.a /usr/local/lib/gtest/libgtest.a; ln -s /usr/lib/libgtest_main.a /usr/local/lib/gtest/libgtest_main.a"
+
 # Install testlib
 wget "https://github.com/MikeMirzayanov/testlib/blob/master/testlib.h" -P "$CHROOTDIR/usr/include"
+
+# Install oclint
+wget "https://github.com/oclint/oclint/releases/download/v0.13.1/oclint-0.13.1-x86_64-linux-4.4.0-112-generic.tar.gz" -P "$CHROOTDIR/tmp"
+tar -C "$CHROOTDIR/tmp/" -xzf "$CHROOTDIR/tmp/oclint-0.13.1-x86_64-linux-4.4.0-112-generic.tar.gz" 
+cp "$CHROOTDIR/tmp/oclint-0.13.1/bin/oclint*" "$CHROOTDIR/usr/local/bin/"
+cp -rp "$CHROOTDIR/tmp/oclint-0.13.1/lib/*" "$CHROOTDIR/usr/local/lib/"
+# cp -rp "$CHROOTDIR/tmp/oclint-0.13.1/include/*" "$CHROOTDIR/usr/local/include/"
 
 # Clean temp directory
 chroot "$CHROOTDIR" /bin/sh -c "rm -r /tmp/*"

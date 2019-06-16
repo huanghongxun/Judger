@@ -1,0 +1,28 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) runguard",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/runguard/bin/runguard",
+            "args": ["--user", "judge", "--group", "judge"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb and add better child debugging",
+                    "text": "-enable-pretty-printing -gdb-set detach-on-fork off",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

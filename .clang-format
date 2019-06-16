@@ -1,0 +1,8 @@
+BasedOnStyle: Google
+IndentWidth: 4
+AccessModifierOffset: -4
+AlignAfterOpenBracket: Align
+AlignTrailingComments: true
+AllowShortBlocksOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+ColumnLimit: 0

@@ -25,3 +25,8 @@ error()
     >&2 echo "Error: $*"
     exit 1
 }
+
+RESULT_ERROR = 1
+RESULT_AC = 42
+RESULT_WA = 43
+RESULT_PE = 44

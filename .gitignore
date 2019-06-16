@@ -32,3 +32,7 @@
 *.app
 
 .vscode/ipch
+
+# CMake
+build
+bin

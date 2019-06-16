@@ -7,3 +7,15 @@
 [submodule "ext/googletest"]
 	path = ext/googletest
 	url = https://github.com/google/googletest
+[submodule "ext/fmt"]
+	path = ext/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "ext/json"]
+	path = ext/json
+	url = https://github.com/nlohmann/json
+[submodule "ext/ormpp"]
+	path = ext/ormpp
+	url = https://github.com/qicosmos/ormpp.git
+[submodule "ext/iguana"]
+	path = ext/iguana
+	url = https://github.com/qicosmos/iguana.git

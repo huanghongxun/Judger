@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# Makefile 编译脚本
+# 这允许出题人通过 Makefile 来自定义任何情况下的编译命令
+#
+# 如果有必要，你还可以选择通过为题目添加 Makefile 的方式
+# 来自定义编译命令而不使用自定义的编译脚本
+#
+# Makefile 必须允许设置 DEST，也就是 Makefile 中生成的
+# 唯一可执行文件名必须为 $DEST
+
+export DEST="$1"; shift
+MEMLIMIT="$1"; shift
+
+# 编译脚本运行在 /judge/compile 下，详见 compile.sh
+make
+exit $?

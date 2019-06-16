@@ -1,6 +1,13 @@
 #!/bin/sh
-
+#
 # C++ 编译器脚本
+#
+# 用法：$0 <dest> <memlimit> <source files...> <extra compile flags...>
+#
+# <dest> 编译生成的可执行文件路径
+# <memlimit> 评测时限
+# <source files...> 参与编译的源代码
+# <extra compile flags...> 提供给编译器的参数
 
 DEST="$1"; shift
 MEMLIMIT="$1"; shift

@@ -2,17 +2,22 @@
 #
 # 评测提交的脚本
 #
-# 用法：$0 <std.in> <std.out> <timelimit> <workdir> <run> <compare>
+# 用法：$0 <std.in> <std.out> <timelimit> <chrootdir> <workdir> <run-uuid> <run> <compare>
 #
 # <std.in>       标准输入数据文件的绝对路径
 # <std.out>      标准输出数据文件的绝对路径
 # <timelimit>    运行时间限制，格式为 %d:%d，如 1:3 表示测试点时间限制
 #                为 1s，如果运行时间超过 3s 则结束程序
+# <chrootdir>    子环境
 # <workdir>      程序的工作文件夹，为了保证安全，请务必将运行路径设置
 #                为空文件夹，特别是保证不可以包含标准输出文件
+# <run-uuid>     运行的 uuid，用于索引运行文件夹位置
 # <run>          运行程序的脚本的绝对路径
-# <compare>      比较程序/脚本的绝对路径
+# <compare>      比较程序/脚本文件夹的绝对路径
 # <compare-args> 比较程序的参数
+#
+# 必须包含的环境变量：
+# "RUNGUARD"     runguard 的路径
 #
 # 默认的比较脚本都可以放在配置服务中
 
@@ -22,16 +27,6 @@ trap 'cleanup ; error' EXIT
 cleanup ()
 {
     # 删除创建过的文件
-    if [ "$WORKDIR" ]; then
-        if [ -f "$WORKDIR/testdata.in" ]; then
-            rm -f "$WORKDIR/testdata.in"
-            ln -s "$TESTIN" "$WORKDIR/testdata.in"
-        fi
-        if [ -f "$WORKDIR/testdata.out" ]; then
-            rm -f "$WORKDIR/testdata.out"
-            ln -s "$TESTOUT" "$WORKDIR/testdata.out"
-        fi
-    fi
 
     if [ -s runguard.err ]; then
         echo "************* runguard error *************" >> system.out
@@ -83,13 +78,17 @@ else
     export VERBOSE=$LOG_ERR
 fi
 
+GAINROOT="sudo -n"
+PROGRAM="compile/program"
 
-
+[ $# -ge 4] || error "not enough arguments"
 
 TESTIN="$1"; shift
 TESTOUT="$1"; shift
 TIMELIMIT="$1"; shift
+CHROOTDIR="$1"; shift
 WORKDIR="$1"; shift
+RUN_UUID="$1"; shift
 RUN_SCRIPT="$1"
 COMPARE_SCRIPT="$2"
 COMPARE_ARGS="$3"
@@ -105,41 +104,60 @@ fi
 [ -x "$RUN_SCRIPT" ] || error "Run script does not exist"
 [ -x "$RUNGUARD" ] || error "runguard does not exist"
 
-cd "$WORKDIR"
+chmod a+x "$WORKDIR"
 
-chmod a+x "$WORKDIR" "$WORKDIR/run"
+# 检查运行脚本
+
+RUNDIR="$WORKDIR/run-$RUN_UUID"
+mkdir -p "$RUNDIR"
+chmod a+rwx "$RUNDIR"
+
+cd "$RUNDIR"
+
 touch judge.out
 touch program.out program.err
 touch program.meta runguard.err
 touch compare.meta compare.err
 
-cp "$TESTIN" "./testdata.in"
+mkdir -p "$RUNDIR/run" # 运行的临时文件都在这里
+mkdir -p "$RUNDIR/work"
+mkdir -p "$RUNDIR/work/judge"
+mkdir -p "$RUNDIR/work/compare"
+mkdir -p "$RUNDIR/merged"
+mount -t overlayfs overlayfs -o lowerdir="$WORKDIR/compile",upperdir="$RUNDIR/run" "$RUNDIR/work/judge"
+mount -t overlayfs overlayfs -o lowerdir="$COMPARE_SCRIPT" "$RUNDIR/work/compare"
+mount -t overlayfs overlayfs -o lowerdir="$CHROOTDIR",upperdir="$RUNDIR/work" "$RUNDIR/merged"
+chmod a-wx "$RUNDIR/work/compare"
 
-# 检查运行脚本
-cp -p "$RUN_SCRIPT" ./run
-chmod a+rx ./run
+# 将测试数据复制到 chroot 文件夹中
+cp "$TESTIN" "$RUNDIR/run/testdata.in"
 
-runcheck ./run testdata.in program.out \
+runcheck "$RUN_SCRIPT" "$RUNDIR/run/testdata.in" "$RUNDIR/run/program.out" \
     $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
-    --nproc=$PROCLIMIT \
-    --no-core --streamsize=$FILELIMIT \
+    --root "$CHROOTDIR" \
+    --work /judge \
+    --nproc $PROCLIMIT \
+    --no-core-dumps \
+    --streamsize $FILELIMIT \
     --user "$RUNUSER" \
     --group "$RUNGROUP" \
     --cpu-time $TIMELIMIT \
     --wall-time $TIMELIMIT \
     --memory-limit $MEMLIMIT \
     --file-limit $FILELIMIT \
-    --stderr program.err \
+    --standard-error-file program.err \
     --outmeta program.meta -- \
-    "$PREFIX/$PROGRAM" 2>runguard.err
+    "/judge/program" 2>runguard.err
 
 # 比较选手程序输出
 logmsg $LOG_INFO "Comparing output"
-cp "$TESTOUT" "$WORKDIR/testdata.out"
+cp "$TESTOUT" "$RUNDIR/run/testdata.out"
 
 exitcode=0
 runcheck \
     $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
+    --root "$CHROOTDIR" \
+    --work "/judge" \
     --user "$RUNUSER" \
     --group "$RUNGROUP" \
     --memory-limit $SCRIPTMEMLIMIT \
@@ -147,6 +165,16 @@ runcheck \
     --file-limit $SCRIPTFILELIMIT \
     --outmeta compare.meta \
     -- \
-    "$COMPARE_SCRIPT" testdata.in program.out testdata.out > compare.tmp 2>&1
+    "/compare/run" testdata.in program.out testdata.out > compare.tmp 2>&1
+
+# 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/run-$uuid 中，因此删除挂载点即可。
+umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
+umount -f "$RUNDIR/work/compare" >/dev/null 2>&1  || /bin/true
+umount -f "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
+rm -rf "$RUNDIR/run"
+rm -rf "$RUNDIR/merged"
+rm -rf "$RUNDIR/work"
+# RUNDIR 还剩下 compare.meta, compare.tmp, program.meta, program.err, system.out, runguard.err 供评测客户端检查
+# RUNDIR 由评测客户端删除
 
 logmsg $LOG_DEBUG "checking compare script exit-status: $exitcode"
