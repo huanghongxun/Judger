@@ -173,7 +173,7 @@ void update_user(configuration &sicily, bool solved, const submission &submit) {
             int accepted, ac_time, submissions;
             tie(accepted, ac_time, submissions) = rows[0];
             if (accepted == 0) {
-                puts("Update Non-ac Submissions");
+                LOG(INFO) << "Update Non-ac Submissions";
 
                 sicily.db.query<std::tuple<>>(
                     "UPDATE ranklist SET accepted=?,ac_time=?,submissions=? WHERE uid=? AND cid=? AND pid=?",

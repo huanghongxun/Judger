@@ -1,6 +1,7 @@
 #include "cgroup.hpp"
 
 #include <glog/logging.h>
+#include <fmt/core.h>
 #include <libcgroup.h>
 #include <signal.h>
 #include <stdexcept>
@@ -39,20 +40,20 @@ void cgroup_guard::init() {
 
 void cgroup_ctrl::add_value(const std::string &name, int64_t value) {
     cgroup_exception::ensure(
-        format("cgroup_add_value_int64({}, {})", name, value),
+        fmt::format("cgroup_add_value_int64({}, {})", name, value),
         cgroup_add_value_int64(ctrl, name.c_str(), value));
 }
 
 void cgroup_ctrl::add_value(const std::string &name, string value) {
     cgroup_exception::ensure(
-        format("cgroup_add_value_string({}, {})", name, value),
+        fmt::format("cgroup_add_value_string({}, {})", name, value),
         cgroup_add_value_string(ctrl, name.c_str(), value.c_str()));
 }
 
 int64_t cgroup_ctrl::get_value_int64(const std::string &name) {
     int64_t value;
     cgroup_exception::ensure(
-        format("cgroup_get_value_int64({})", name),
+        fmt::format("cgroup_get_value_int64({})", name),
         cgroup_get_value_int64(ctrl, name.c_str(), &value));
     return value;
 }
@@ -61,7 +62,7 @@ cgroup_guard::cgroup_guard(const std::string &cgroup_name) {
     cg = cgroup_new_cgroup(cgroup_name.c_str());
     if (!cg)
         throw cgroup_exception(
-            format("cgroup_new_cgroup({})", cgroup_name),
+            fmt::format("cgroup_new_cgroup({})", cgroup_name),
             cgroup_get_last_errno());
 }
 
@@ -71,7 +72,7 @@ cgroup_guard::~cgroup_guard() {
 
 void cgroup_guard::create_cgroup(int ignore_ownership) {
     cgroup_exception::ensure(
-        format("cgroup_create_cgroup({})", ignore_ownership),
+        fmt::format("cgroup_create_cgroup({})", ignore_ownership),
         cgroup_create_cgroup(cg, ignore_ownership));
 }
 
@@ -79,7 +80,7 @@ cgroup_ctrl cgroup_guard::add_controller(const std::string &name) {
     struct cgroup_controller *cg_controller = cgroup_add_controller(cg, name.c_str());
     if (cg_controller == nullptr)
         throw cgroup_exception(
-            format("cgroup_add_controller({})", name),
+            fmt::format("cgroup_add_controller({})", name),
             cgroup_get_last_errno());
     return {cg_controller};
 }
@@ -88,7 +89,7 @@ cgroup_ctrl cgroup_guard::get_controller(const std::string &name) {
     struct cgroup_controller *cg_controller = cgroup_get_controller(cg, name.c_str());
     if (cg_controller == nullptr)
         throw cgroup_exception(
-            format("cgroup_get_controller({})", name),
+            fmt::format("cgroup_get_controller({})", name),
             cgroup_get_last_errno());
     return {cg_controller};
 }

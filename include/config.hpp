@@ -114,7 +114,7 @@ struct client_task {
     variant<test_case_task, compilation_task> task;
 };
 
-struct judge_result {
+struct task_result {
     static constexpr long ID = 1;
     
     unsigned judge_id;

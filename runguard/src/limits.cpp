@@ -1,5 +1,6 @@
 #include "limits.hpp"
 #include <glog/logging.h>
+#include <fmt/core.h>
 #include <grp.h>
 #include <libcgroup.h>
 #include <signal.h>
@@ -15,32 +16,28 @@ using namespace std;
 void cgroup_create(const struct runguard_options &opt) {
     cgroup_guard cg(opt.cgroupname);
 
-    // Set up the memory restrictions
+    // 初始化 memory 资源管控器
     cgroup_ctrl ctrl = cg.add_controller("memory");
 
     int64_t memory_limit = opt.memory_limit;
     if (memory_limit < 0) memory_limit = RLIM_INFINITY;
 
-    // RAM limit and RAM+swap limit are the same,
-    // so no swapping can occur.
+    // 将 RAM 和 RAM+交换 的大小限制设为一样可以强制不发生交换
     ctrl.add_value("memory.limit_in_bytes", opt.memory_limit);
     ctrl.add_value("memory.memsw.limit_in_bytes", opt.memory_limit);
 
-    // Set up CPU restrictions; we pin the task to a specific set of
-    // cpus. We also give it exclusive access to those cores.
-    // And set no limits on memory nodes.
     if (!opt.cpuset.empty()) {
+        // 设置选手程序能使用的 CPU（我们必须让这些程序独占 CPU 以避免时间计量不准确
         cgroup_ctrl cpuset_ctrl = cg.add_controller("cpuset");
 
-        // To make a cpuset exclusive, some additional setup
-        // outside of judger required
-
+        // TODO: cpuset.mems 需要被设置为对应的 NUMA 以避免跨 NUMA 导致内存访问慢
         cpuset_ctrl.add_value("cpuset.mems", "0");
         cpuset_ctrl.add_value("cpuset.cpus", opt.cpuset);
     } else {
         LOG(INFO) << "cpuset undefined";
     }
 
+    // 我们要统计选手程序的运行时间
     cg.add_controller("cpuacct");
 
     cg.create_cgroup(1);
@@ -134,9 +131,14 @@ void set_restrictions(const struct runguard_options &opt) {
     // set root directory and change working directory
     if (!opt.chroot_dir.empty()) {
         if (chroot(opt.chroot_dir.c_str()) != 0)
-            throw system_error(errno, generic_category(), format("unable to chroot to {}", opt.chroot_dir));
+            throw system_error(errno, generic_category(), fmt::format("unable to chroot to {}", opt.chroot_dir));
         if (chdir("/") != 0)
             throw system_error(errno, generic_category(), "unable to chdir to / in chroot");
+        
+        if (!opt.work_dir.empty()) {
+            if (chdir(opt.work_dir.c_str()) != 0)
+                throw system_error(errno, generic_category(), "unable to chdir to workdir in chroot");
+        }
 
         LOG(INFO) << "chrooted to directory " << opt.chroot_dir;
     }

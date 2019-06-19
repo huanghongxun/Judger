@@ -19,26 +19,28 @@ void start_client(const cpu_set_t &set, const string &execcpuset, message::queue
     if (ret < 0) throw std::system_error();
 }
 
-static void judge(unsigned judge_id, judge::server::submission &submit, const judge::message::test_case_task &task, const string &execcpuset, message::queue &result_queue) {
+static void judge(judge::message::client_task &client_task, judge::server::submission &submit, const judge::message::test_case_task &task, const string &execcpuset, message::queue &result_queue) {
 
 }
 
-static void compile(unsigned judge_id, judge::server::submission &submit, const judge::message::compilation_task &task, const string &execcpuset, message::queue &result_queue) {
+static void compile(judge::message::client_task &client_task, judge::server::submission &submit, const judge::message::compilation_task &task, const string &execcpuset, message::queue &result_queue) {
     auto program = reinterpret_cast<judge::server::program *>(task.program);
     filesystem::path workdir;  // TODO: workdir for cached and not cached.
 
     try {
         program->fetch(workdir);
         program->compile(execcpuset, workdir, CHROOT_DIR);
-        judge::message::judge_result result = {
-            .judge_id = judge_id,
-            .type = 0,
+        judge::message::task_result result = {
+            .judge_id = client_task.judge_id,
+            .id = client_task.id,
+            .type = client_task.type,
             .status = judge::status::COMPILATION_SUCCEEDED};
         result_queue.send_as_pod(result);
     } catch (exception &ex) {
-        judge::message::judge_result result = {
-            .judge_id = judge_id,
-            .type = 0,
+        judge::message::task_result result = {
+            .judge_id = client_task.judge_id,
+            .id = client_task.id,
+            .type = client_task.type,
             .status = judge::status::COMPILATION_ERROR};
         result_queue.send_as_pod(result);
     }
@@ -53,10 +55,10 @@ void client(const string &execcpuset, message::queue &testcase_queue, message::q
                 judge::server::submission &submit = judge::server::get_submission_by_judge_id(client_task.judge_id);
                 visit(overloaded{
                           [&](const judge::message::test_case_task &task) {
-                              judge(client_task.judge_id, submit, task, execcpuset, result_queue);
+                              judge(client_task, submit, task, execcpuset, result_queue);
                           },
                           [&](const judge::message::compilation_task &task) {
-                              compile(client_task.judge_id, submit, task, execcpuset, result_queue);
+                              compile(client_task, submit, task, execcpuset, result_queue);
                           }},
                       client_task.task);
             }

@@ -30,7 +30,12 @@ void server(message::queue &testcase_queue, message::queue &result_queue) {
                 auto &submit = submissions.at(judge_id);
                 auto &judge_server = judge_servers.at(submit.category);
                 if (task_result.type == judge::message::client_task::COMPILE_TYPE) {
-                    // 如果编译成功，则分发
+                    if (task_result.status == judge::status::COMPILATION_SUCCEEDED) {
+                        // 如果编译成功，则分发评测任务
+                    } else {
+                        // 否则评测结束，返回评测结果
+                        
+                    }
                 }
             }
         }
