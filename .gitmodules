@@ -13,9 +13,3 @@
 [submodule "ext/json"]
 	path = ext/json
 	url = https://github.com/nlohmann/json
-[submodule "ext/ormpp"]
-	path = ext/ormpp
-	url = https://github.com/qicosmos/ormpp.git
-[submodule "ext/iguana"]
-	path = ext/iguana
-	url = https://github.com/qicosmos/iguana.git
