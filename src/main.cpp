@@ -3,15 +3,16 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
 #include <iostream>
-#include <set>
 #include <regex>
+#include <set>
 #include <thread>
-#include "config.hpp"
-#include "msg_queue.hpp"
 #include "client/client.hpp"
+#include "common/msg_queue.hpp"
+#include "common/utils.hpp"
+#include "config.hpp"
+#include "server/moj/moj.hpp"
 #include "server/server.hpp"
 #include "server/sicily/sicily.hpp"
-#include "server/moj/moj.hpp"
 using namespace std;
 
 judge::message::queue testcase_queue, result_queue;
@@ -95,6 +96,7 @@ int main(int argc, const char* argv[]) {
         ("cache-dir", po::value<string>(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
         ("run-dir", po::value<string>(), "set the directory to run user programs, store compiled user program")
         ("chroot-dir", po::value<string>(), "set the chroot directory")
+        ("cache-random-data", po::value<size_t>(), "set the maximum number of cached generated random data, default to 100.")
         ("help", "display this help text")
         ("version", "display version of this application");
     // clang-format on
@@ -115,6 +117,11 @@ int main(int argc, const char* argv[]) {
     if (vm.count("help")) {
         cout << "JudgeSystem: Fetch submissions from server, judge them" << endl
              << "This app requires root privilege" << endl
+             << "Required Environment Variables:" << endl
+             << "\tRUNGUARD: location of runguard" << endl
+             << "\tSCRIPT_TIME_LIMIT: time limit for scripts in seconds" << endl
+             << "\tSCRIPT_MEM_LIMIT: memory limit for scripts in KB" << endl
+             << "\tSCRIPT_FILE_LIMIT: file limit for scripts in bytes" << endl
              << "Usage: " << argv[0] << " [options]" << endl;
         cout << desc << endl;
         return EXIT_SUCCESS;
@@ -127,6 +134,7 @@ int main(int argc, const char* argv[]) {
 
     if (vm.count("exec-dir")) {
         judge::EXEC_DIR = filesystem::path(vm.at("exec-dir").as<string>());
+        set_env("JUDGE_UTILS", judge::EXEC_DIR, true);
     }
 
     if (vm.count("cache-dir")) {
@@ -141,9 +149,13 @@ int main(int argc, const char* argv[]) {
         judge::CHROOT_DIR = filesystem::path(vm.at("chroot-dir").as<string>());
     }
 
+    if (vm.count("cache-random-data")) {
+        judge::MAX_RANDOM_DATA_NUM = vm["cache-random-data"].as<size_t>();
+    }
+
     if (vm.count("enable-sicily")) {
         auto sicily_servers = vm.at("enable-scicily").as<vector<string>>();
-        for (auto &sicily_server : sicily_servers) {
+        for (auto& sicily_server : sicily_servers) {
             auto sicily_judger = make_unique<judge::server::sicily::configuration>();
             sicily_judger->init(sicily_server);
             judge::server::register_judge_server(move(sicily_judger));
@@ -156,7 +168,7 @@ int main(int argc, const char* argv[]) {
 
     if (vm.count("enable-3")) {
         auto third_servers = vm.at("enable-3").as<vector<string>>();
-        for (auto &third_server : third_servers) {
+        for (auto& third_server : third_servers) {
             auto third_judger = make_unique<judge::server::moj::configuration>();
             third_judger->init(third_server);
             judge::server::register_judge_server(move(third_judger));

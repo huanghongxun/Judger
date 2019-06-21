@@ -1,4 +1,6 @@
 #pragma once
+#include <algorithm>
+#include <filesystem>
 
 template <typename ContainerT>
 void append(ContainerT &a, const ContainerT &b) {
@@ -19,6 +21,16 @@ StringT substr_after_last(const StringT str, char delim) {
         return str;
     else
         return str.substr(idx);
+}
+
+int count_directories_in_directory(const std::filesystem::path &dir) {
+    if (!std::filesystem::is_directory(dir))
+        return -1;
+    return std::count_if(std::filesystem::directory_iterator(dir), {}, (bool (*)(const std::filesystem::path &))std::filesystem::is_directory);
+}
+
+int random(int L, int R) {
+    return L + std::rand() / ((RAND_MAX + 1u) / (R - L));
 }
 
 template <typename T>

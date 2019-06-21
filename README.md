@@ -38,6 +38,71 @@
 └── include // judge-system 项目头文件
 ```
 
+## 运行目录结构
+本项目运行时需要提供
+* EXEC_DIR: 备用的 executable 本地目录，如果没有服务器能提供 executable，那么从这里根据 id 找可用的
+    ```
+    EXEC_DIR
+    ├── check // 测试执行的脚本
+    │   ├── standard // 标准和随机测试的辅助测试脚本
+    │   ├── static // 静态测试脚本
+    │   └── memory // 内存检查（输入数据标准或随机）的帮助脚本
+    ├── compare // 比较脚本
+    │   ├── diff-all // 精确比较，如果有空白字符差异则返回 PE
+    │   └── diff-ign-space // 忽略行末空格和文末空行的比较脚本，不会有 PE
+    ├── compile // 编译脚本
+    │   ├── c // C 语言程序编译脚本
+    │   ├── cpp // C++ 语言程序编译脚本
+    │   ├── make // Makefile 编译脚本
+    │   ├── cmake // CMake 编译脚本
+    │   └── ...
+    └── run // 运行脚本
+        └── standard // 标准运行脚本
+    ```
+* CACHE_DIR： 缓存目录，会缓存所有编译好的随机数据生成器、标准程序、生成的随机数据。
+    ```
+    CACHE_DIR
+    ├── sicily // category id
+    │   └── 1001 // problem id
+    │       ├── standard // 标准程序的缓存目录（代码和可执行文件）
+    │       ├── standard_data // 标准输入输出数据的缓存目录
+    │       ├── compare // 比较器
+    │       ├── random // 随机数据生成器的缓存目录（代码和可执行文件）
+    │       └── random_data // 随机输入输出数据的缓存目录
+    ├── moj
+    └── mcourse
+    ```
+* RUN_DIR: 运行目录，该目录会临时存储所有的选手程序代码、选手程序的编译运行结果
+    ```
+    RUN_DIR
+    ├── sicily // category id
+    │   └── 1001 // problem id
+    │       └── 5100001 // submission id
+    │           ├── compile // 选手程序的代码和编译目录
+    │           │   ├── main.cpp // 选手程序的主代码（示例）
+    │           │   ├── program // 选手程序的执行入口（可能是生成的运行脚本）
+    │           │   ├── compile.out // 编译器的输出
+    │           │   └── (Makefile) // 允许 Makefile
+    │           ├── run-[client_id] // 选手程序的运行目录，包含选手程序输出结果
+    │           │   ├── input // 输入数据
+    │           │   │   └── testdata.in // (标准)输入数据
+    │           │   ├── output // 输出数据（运行结束后才会复制进来）
+    │           │   │   └── testdata.out // (标准)输出数据
+    │           │   ├── program.out // 选手程序的 stdout 输出
+    │           │   ├── program.err // 选手程序的 stderr 输出
+    │           │   └── runguard.err // runguard 的错误输出
+    │           └── run-...
+    ├── moj
+    └── mcourse
+    ```
+* CHROOT_DIR: debootstrap 产生的 Linux 子系统环境。
+    ```
+    CHROOT_DIR
+    ├── usr
+    ├── bin
+    └── ...
+    ```
+
 ## 部署
 ### 配置 chroot
 无论是评测系统本身，还是选手程序，都需要 chroot 环境来模拟一个干净的 Linux 执行环境，我们通过 debootstrap 来产生一个完整的 Ubuntu 发行版环境。这有两个好处：获得的干净的 Linux 执行环境允许进行编译、运行操作，还可以支持 bash 脚本作为被评测的程序；允许评测系统和选手程序运行在和宿主机不同的发行版本上：比如宿主机是 Ubuntu 16.04 LTS，评测系统和选手程序可以运行在 Ubuntu 19.04 上（尽管内核版本必须和宿主机一致），这样我们就可以通过 apt 来获取最新的软件包，支持各大语言的最新编译环境和运行时，而且省了更换宿主机操作系统的麻烦。

@@ -7,6 +7,36 @@ namespace judge::server::moj {
 using namespace std;
 using namespace nlohmann;
 
+struct judge_report {
+
+    /**
+     * @brief submission id
+     */
+    unsigned sub_id;
+
+    /**
+     * @brief problem id
+     */
+    unsigned prob_id;
+
+    /**
+     * @brief grade
+     */
+    double grade;
+
+    /**
+     * @brief report
+     */
+    json report;
+
+    /**
+     * @brief whether judgement is complete
+     */
+    bool is_complete;
+};
+
+void to_json(json &j, const judge_report &report);
+
 struct error_report {
     string message;
 };
@@ -24,15 +54,17 @@ void to_json(json &j, const check_error_report &report);
  * https://gitlab.vmatrix.org.cn/Matrix/Judge/judge-system/wikis/%E6%8E%A5%E5%8F%A3/%E6%A3%80%E6%9F%A5%E5%99%A8/%E7%BC%96%E8%AF%91%E6%A3%80%E6%9F%A5/%E6%8A%A5%E5%91%8A
  */
 struct compile_check_report {
+    static constexpr int TYPE = 0;
+
     /**
      * @brief MOJ 编译任务的得分
      */
-    int grade;
+    double grade;
 
     /**
      * @brief MOJ 编译任务的总分
      */
-    int full_grade;
+    double full_grade;
 
     /**
      * @brief MOJ 编译任务是否通过
@@ -52,25 +84,27 @@ void to_json(json &j, const compile_check_report &report);
  * https://gitlab.vmatrix.org.cn/Matrix/Judge/judge-system/wikis/%E6%8E%A5%E5%8F%A3/%E6%A3%80%E6%9F%A5%E5%99%A8/%E9%9D%99%E6%80%81%E6%A3%80%E6%9F%A5/%E6%8A%A5%E5%91%8A
  */
 struct static_check_report {
+    static constexpr int TYPE = 4;
+
     /**
      * @brief MOJ 静态测试得分
      */
-    int grade;
+    double grade;
 
     /**
      * @brief MOJ 静态测试任务的总分
      */
-    int full_grade;
+    double full_grade;
 
     map<string, json> report;
 };
 
-void to_json(json &j, const compile_check_report &report);
+void to_json(json &j, const static_check_report &report);
 
 /**
  * @struct 随机测试点的评测结果
  */
-struct random_check_case_report {
+struct check_case_report {
     /**
      * @brief 评测结果
      * @see judge::status
@@ -96,22 +130,24 @@ struct random_check_case_report {
     string subout;
 };
 
-void to_json(json &j, const random_check_case_report &report);
+void to_json(json &j, const check_case_report &report);
 
 /**
  * @brief 随机测试反馈
  * https://gitlab.vmatrix.org.cn/Matrix/Judge/judge-system/wikis/%E6%8E%A5%E5%8F%A3/%E6%A3%80%E6%9F%A5%E5%99%A8/%E9%9A%8F%E6%9C%BA%E6%A3%80%E6%9F%A5/%E6%8A%A5%E5%91%8A
  */
 struct random_check_report {
+    static constexpr int TYPE = 2;
+
     /**
      * @brief MOJ 随机测试得分
      */
-    int grade;
+    double grade;
 
     /**
      * @brief MOJ 随机测试任务的总分
      */
-    int full_grade;
+    double full_grade;
 
     /**
      * @brief 选手程序通过的随机测试数据点数
@@ -126,10 +162,41 @@ struct random_check_report {
     /**
      * @brief 所有随机测试的评测结果
      */
-    vector<random_check_case_report> report;
+    vector<check_case_report> report;
 };
 
 void to_json(json &j, const random_check_report &report);
+
+struct standard_check_report {
+    static constexpr int TYPE = 3;
+
+    /**
+     * @brief MOJ 标准测试得分
+     */
+    double grade;
+
+    /**
+     * @brief MOJ 标准测试任务的总分
+     */
+    double full_grade;
+
+    /**
+     * @brief 选手程序通过的标准测试数据点数
+     */
+    int pass_cases;
+
+    /**
+     * @brief 标准测试总测试次数
+     */
+    int total_cases;
+
+    /**
+     * @brief 所有标准测试的评测结果（按顺序给出）
+     */
+    vector<check_case_report> report;
+};
+
+void to_json(json &j, const standard_check_report &report);
 
 struct memory_check_report_report {
     json valgrindoutput;
@@ -143,15 +210,17 @@ void to_json(json &j, const memory_check_report_report &report);
  * https://gitlab.vmatrix.org.cn/Matrix/Judge/judge-system/wikis/%E6%8E%A5%E5%8F%A3/%E6%A3%80%E6%9F%A5%E5%99%A8/%E5%86%85%E5%AD%98%E6%A3%80%E6%B5%8B/%E6%8A%A5%E5%91%8A
  */
 struct memory_check_report {
+    static constexpr int TYPE = 1;
+
     /**
      * @brief MOJ 内存测试得分
      */
-    int grade;
+    double grade;
 
     /**
      * @brief MOJ 内存测试任务的总分
      */
-    int full_grade;
+    double full_grade;
 
     /**
      * @brief 选手程序通过的内存测试数据点数
@@ -170,5 +239,33 @@ struct memory_check_report {
 };
 
 void to_json(json &j, const memory_check_report &report);
+
+struct gtest_check_report {
+    static constexpr int TYPE = 5;
+
+    string result;
+
+    /**
+     * @brief 
+     * 
+     */
+    int error_cases;
+
+    /**
+     * @brief 
+     * 
+     */
+    int disabled_cases;
+
+    /**
+     * @brief 评测用时
+     * 单位为妙
+     */
+    double time;
+
+    json report;
+};
+
+void to_json(json &j, const gtest_check_report &report);
 
 }  // namespace judge::server::moj

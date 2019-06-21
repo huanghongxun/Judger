@@ -28,7 +28,6 @@ constexpr int TIMELIMIT_ALL = 3;
 int walllimit = 0, cpulimit = 0;
 
 ofstream metafile;
-string metafile_path;
 int child_pid = -1;
 static volatile sig_atomic_t received_SIGCHLD = 0;
 static volatile sig_atomic_t received_signal = -1;
@@ -121,7 +120,7 @@ void summarize_cgroup(const runguard_options &opt, int exitcode,
     append_meta("exitcode", exitcode);
 
     if (received_signal != -1) {
-        append_meta("received_signal", received_signal);
+        append_meta("signal", received_signal);
     }
 
     double walldiff = (endtime.tv_sec - starttime.tv_sec) +
@@ -197,7 +196,7 @@ static void child_handler(int signal) {
 
 int runit(struct runguard_options opt) {
     set_terminate(runguard_terminate_handler);
-    metafile.open(metafile_path.c_str(), ofstream::out);
+    metafile.open(opt.metafile_path.c_str(), ofstream::out);
 
     {
         struct sigaction sigact;
@@ -368,21 +367,21 @@ int runit(struct runguard_options opt) {
                 exitcode = WEXITSTATUS(status);
             } else if (WIFSIGNALED(status)) {
                 // In linux, exitcode is no larger than 127.
-                int signal = WTERMSIG(status);
-                exitcode = signal + 128;
-                switch (signal) {
+                received_signal = WTERMSIG(status);
+                exitcode = received_signal + 128;
+                switch (received_signal) {
                     case SIGXCPU:
                         cpulimit |= TIMELIMIT_HARD;
                         LOG(WARNING) << "Time Limit Exceeded (hard limit)";
                         break;
                     default:
-                        LOG(WARNING) << "Command terminated with signal (" << signal << ", " << strsignal(signal) << ")";
+                        LOG(WARNING) << "Command terminated with signal (" << received_signal << ", " << strsignal(received_signal) << ")";
                         break;
                 }
             } else if (WIFSTOPPED(status)) {
-                int signal = WSTOPSIG(status);
-                exitcode = signal + 128;
-                LOG(WARNING) << "Command stopped with signal (" << signal << ", " << strsignal(signal) << ")";
+                received_signal = WSTOPSIG(status);
+                exitcode = received_signal + 128;
+                LOG(WARNING) << "Command stopped with signal (" << received_signal << ", " << strsignal(received_signal) << ")";
             } else {
                 throw runtime_error(fmt::format("unknown status: {:x}", status));
             }

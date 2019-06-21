@@ -20,4 +20,13 @@ void submission_fetcher::ack() {
     envelope = nullptr;
 }
 
+judge_result_reporter::judge_result_reporter(judge::server::moj::amqp &queue) : queue(queue) {
+    channel = AmqpClient::Channel::Create(queue.hostname, queue.port);
+}
+
+void judge_result_reporter::report(const string &message) {
+    AmqpClient::BasicMessage::ptr_t msg = AmqpClient::BasicMessage::Create(message);
+    channel->BasicPublish(queue.exchange, queue.routing_key, msg, true);
+}
+
 }  // namespace judge::server::moj

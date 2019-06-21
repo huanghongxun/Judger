@@ -1,6 +1,8 @@
 #pragma once
 
 #include <filesystem>
+#include "common/messages.hpp"
+#include "config.hpp"
 #include "server/problem.hpp"
 #include "server/status.hpp"
 
@@ -30,7 +32,14 @@ struct judge_server {
      * @brief 将提交返回给服务器
      * 该函数是阻塞的。评测系统不需要通过多线程来并发写服务器，因为 server 并不会因为
      * 评测过程而阻塞，获取提交和返回评测结果都能很快完成，因此 server 是单线程的。
+     * @param submit 该提交的信息
+     * @param task_results 评测结果
      */
-    virtual void summarize() = 0;
+    virtual void summarize(submission &submit, const vector<judge::message::task_result> &task_results) = 0;
+
+    /**
+     * @brief 获取服务器对应的 executable manager
+     */
+    virtual const executable_manager &get_executable_manager() const = 0;
 };
 }  // namespace judge::server

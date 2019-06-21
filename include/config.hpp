@@ -6,133 +6,96 @@
 namespace judge {
 using namespace std;
 
-/**
- * @brief 脚本最大运行时间
- * 单位为秒
- */
-extern int script_time_limit;
+enum error_codes {
+    E_SUCCESS = 0,
+    E_INTERNAL_ERROR = 2,
 
-/**
- * @brief 脚本最大运行内存占用
- * 单位为 KB
- */
-extern int script_mem_limit;
+    E_ACCEPTED = 42,
+    E_WRONG_ANSWER = 43,
+    E_PRESENTATION_ERROR = 44,
+    E_COMPILER_ERROR = 45,
+    E_RANDOM_GEN_ERROR = 46,
+    E_COMPARE_ERROR = 47,
+    E_RUNTIME_ERROR = 48,
+    E_FLOATING_POINT = 49,
+    E_SEG_FAULT = 50,
+    E_OUTPUT_LIMIT = 51,
+    E_TIME_LIMIT = 52,
+    E_MEM_LIMIT = 53,
+};
 
-/**
- * @brief 脚本最大写入字节数
- * 单位为字节
- */
-extern int script_file_limit;
+extern int MAX_RANDOM_DATA_NUM;
 
 /**
  * @brief 存放 executable 的路径，为项目根目录下的 exec 文件夹
  * 这个只是用来在无法查找到服务器提供的 executable 时的 fallback
  * @defaultValue 假设程序运行在项目根目录下的 bin 文件夹，因此 exec 文件夹在 ../exec
+ * 
+ * EXEC_DIR
+ * ├── check // 测试执行的脚本
+ * │   ├── standard // 标准和随机测试的辅助测试脚本
+ * │   ├── static // 静态测试脚本
+ * │   └── memory // 内存检查（输入数据标准或随机）的帮助脚本
+ * ├── compare // 比较脚本
+ * │   ├── diff-all // 精确比较，如果有空白字符差异则返回 PE
+ * │   └── diff-ign-space // 忽略行末空格和文末空行的比较脚本，不会有 PE
+ * ├── compile // 编译脚本
+ * │   ├── c // C 语言程序编译脚本
+ * │   ├── cpp // C++ 语言程序编译脚本
+ * │   ├── make // Makefile 编译脚本
+ * │   ├── cmake // CMake 编译脚本
+ * │   └── ...
+ * └── run // 运行脚本
+ *     └── standard // 标准运行脚本
  */
 extern filesystem::path EXEC_DIR;
 
+/**
+ * @brief 
+ * 
+ * CACHE_DIR
+ * ├── sicily // category id
+ * │   └── 1001 // problem id
+ * │       ├── standard // 标准程序的缓存目录（代码和可执行文件）
+ * │       ├── standard_data // 标准输入输出数据的缓存目录
+ * │       ├── random // 随机数据生成器的缓存目录（代码和可执行文件）
+ * │       └── random_data // 随机输入输出数据的缓存目录
+ * ├── moj
+ * └── mcourse
+ */
 extern filesystem::path CACHE_DIR;
 
+/**
+ * @brief 选手程序编译及运行的根目录
+ * RUN_DIR 的文件结构如下：
+ * 
+ * RUN_DIR
+ * ├── sicily // category id
+ * │   └── 1001 // problem id
+ * │       └── 5100001 // submission id
+ * │           ├── compile // 选手程序的代码和编译目录
+ * │           │   ├── main.cpp // 选手程序的主代码（示例）
+ * │           │   ├── program // 选手程序的执行入口（可能是生成的运行脚本）
+ * │           │   ├── compile.out // 编译器的输出
+ * │           │   └── (Makefile) // 允许 Makefile
+ * │           ├── run-[client_id] // 选手程序的运行目录，包含选手程序输出结果
+ * │           │   ├── input // 输入数据
+ * │           │   │   └── testdata.in // (标准)输入数据
+ * │           │   ├── output // 输出数据（运行结束后才会复制进来）
+ * │           │   │   └── testdata.out // (标准)输出数据
+ * │           │   ├── program.out // 选手程序的 stdout 输出
+ * │           │   ├── program.err // 选手程序的 stderr 输出
+ * │           │   └── runguard.err // runguard 的错误输出
+ * │           └── run-...
+ * ├── moj
+ * └── mcourse
+ */
 extern filesystem::path RUN_DIR;
 
-extern filesystem::path CHROOT_DIR;
-
-namespace message {
-
 /**
- * @brief 一个数据点评测任务
+ * @brief 配置好的 chroot 路径
+ * 必须是通过 exec/chroot_make.sh 创建的 chroot 环境
  */
-struct test_case_task {
-    static constexpr int TYPE = 0;
-
-    /**
-     * @brief 本测试点使用的 check script
-     * 不同的测试点可能有不同的 check script
-     * 对于 MemoryCheck，check script 需要选择 valgrind
-     * 对于 RandomCheck，check script 需要选择 random
-     */
-    char check_script[128];
-
-    /**
-     * @brief 本测试点使用的 compare script
-     * 不同测试点可能使用不同的 spj (?)
-     * 反正在这里标明就可以保证可扩展性了
-     */
-    char compare_script[128];
-};
-
-struct compilation_task {
-    static constexpr int TYPE = 1;
-
-    bool cache;
-
-    /**
-     * @brief 要编译的程序
-     * program 类自己负责处理编译任务，不需要我们来选择 compile script。
-     * raw pointer to judge::server::program
-     */
-    void *program;
-};
-
-struct client_task {
-    static constexpr long ID = 0;
-    static constexpr uint8_t COMPILE_ID = 0;
-    static constexpr uint8_t COMPILE_TYPE = 0;
-
-    /**
-     * @brief 评测 id
-     * 我们通过 get_submission_by_judge_id 来获取 submission 信息
-     */
-    unsigned judge_id;
-
-    /**
-     * @brief 本测试点的 id，不同的 type 的 id 不冲突
-     * 用于返回评测结果的时候统计
-     */
-    uint8_t id;
-
-    /**
-     * @brief 本测试点的类型
-     * 一道题的评测可以包含多种评测类型，每种评测类型都包含
-     * 设定的 check script 和 run
-     * 
-     * 这个类型由 judge_server 自行决定，比如对于 Sicily、Judge-System 3.0:
-     * 0: CompileCheck
-     * 1: MemoryCheck
-     * 2: RandomCheck
-     * 3: StandardCheck
-     * 4: StaticCheck
-     * 
-     * 对于 Judge-System 4.0：
-     * 0: CompileCheck
-     * 1: OtherCheck
-     * 
-     * 总之，0 必定是编译任务，其他必定是评测任务
-     */
-    uint8_t type;
-
-    variant<test_case_task, compilation_task> task;
-};
-
-struct task_result {
-    static constexpr long ID = 1;
-    
-    unsigned judge_id;
-
-    judge::status status;
-
-    /**
-     * @brief 本测试点的 id
-     * 用于返回评测结果的时候统计
-     */
-    uint8_t id;
-
-    /**
-     * @brief 本测试点的类型
-     * 一道题的评测可以包含多种评测类型，方便 judge_server 进行统计
-     */
-    uint8_t type;
-};
-}  // namespace message
+extern filesystem::path CHROOT_DIR;
 
 }  // namespace judge

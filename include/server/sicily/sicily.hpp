@@ -1,12 +1,13 @@
 #pragma once
 
-#include <dbng.hpp>
-#include <mysql.hpp>
 #include <unordered_map>
 #include "server/remote_server.hpp"
+#include "sql/dbng.hpp"
+#include "sql/mysql.hpp"
 
 namespace judge::server::sicily {
 using namespace std;
+using namespace ormpp;
 
 struct configuration : public judge_server {
     filesystem::path testdata;
@@ -15,6 +16,10 @@ struct configuration : public judge_server {
 
     local_executable_manager exec_mgr;
 
+    configuration();
+
+    string category() const override;
+
     /**
      * @brief 初始化数据库连接
      * @param 配置文件路径
@@ -22,6 +27,8 @@ struct configuration : public judge_server {
      * 数据库连接信息从环境变量中读取。
      */
     void init(const filesystem::path &config_path) override;
+
+    const executable_manager &get_executable_manager() const override;
 
     /**
      * @brief 获取一个提交
@@ -36,8 +43,10 @@ struct configuration : public judge_server {
      * @brief 将提交返回给服务器
      * 该函数是阻塞的。评测系统不需要通过多线程来并发写服务器，因为 server 并不会因为
      * 评测过程而阻塞，获取提交和返回评测结果都能很快完成，因此 server 是单线程的。
+     * @param submit 该提交的信息
+     * @param task_results 评测结果
      */
-    void send_judge_status() override;
+    void summarize(submission &submit, const vector<judge::message::task_result> &task_results) override;
 };
 
 }  // namespace judge::server::sicily

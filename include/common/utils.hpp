@@ -1,22 +1,30 @@
 #pragma once
 
+#include <fmt/core.h>
 #include <filesystem>
 #include <string>
 #include <vector>
 
-/**
- * @brief 读取文本文件的全部内容
- * @param path 文本文件路径
- * @return 文本文件的内容(没有指定编码)
- */
-std::string read_file_content(const std::filesystem::path &path);
+namespace std {
 
-/**
- * @brief 执行外部命令
- * @param argv 外部命令的路径 (argv[0]) 和 参数 (argv)
- * @return 外部命令的返回值，如果外部命令因为信号崩溃而没有返回码，则返回 -1
- */
-int exec_program(char **argv);
+std::string to_string(const std::filesystem::path &path) {
+    return path.string();
+}
+
+}  // namespace std
+
+namespace fmt {
+template <>
+struct formatter<std::filesystem::path> {
+    template <typename ParseContext>
+    constexpr auto parse(ParseContext &ctx) { return ctx.begin(); }
+
+    template <typename FormatContext>
+    auto format(const std::filesystem::path &p, FormatContext &ctx) {
+        return format_to(ctx.begin(), "{}", p.string());
+    }
+};
+}  // namespace fmt
 
 template <typename T>
 struct has_const_iterator {
@@ -61,16 +69,23 @@ struct is_container : std::integral_constant<bool, has_const_iterator<T>::value 
  * @param args 按顺序 to_string 转换为字符串并装入容器（如果 arg 本身为容器，则遍历这个容器将各个元素加入结果容器中）
  */
 template <typename ContainerT, typename Head, typename... Args>
-void to_string_list(ContainerT &cont, Head &&head, Args &&... args) {
+void to_string_list(ContainerT &cont, Head &head, Args &... args) {
     if constexpr (is_container<Head>::value) {
         for (auto &value : head)
-            cont.push_back(to_string(head));
+            cont.push_back(std::to_string(value));
     } else {
-        cont.push_back(to_string(head));
+        cont.push_back(std::to_string(head));
     }
     if constexpr (sizeof...(args) > 0)
         to_string_list(cont, args...);
 }
+
+/**
+ * @brief 执行外部命令
+ * @param argv 外部命令的路径 (argv[0]) 和 参数 (argv)
+ * @return 外部命令的返回值，如果外部命令因为信号崩溃而没有返回码，则返回 -1
+ */
+int exec_program(char **argv);
 
 /**
  * @brief 调用外部程序
@@ -90,7 +105,7 @@ int call_process(Args &&... args) {
     to_string_list(list, args...);
     char *argv[list.size() + 1];
     for (size_t i = 0; i < list.size(); ++i)
-        argv[i] = str_args[i].data();
+        argv[i] = list[i].data();
     argv[list.size()] = nullptr;
     return exec_program(argv);
 }
@@ -102,3 +117,11 @@ int call_process(Args &&... args) {
  * @return 环境变量的值，或者不存在时返回 def_value
  */
 std::string get_env(const std::string &key, const std::string &def_value);
+
+/**
+ * @brief 设置环境变量
+ * @param key 环境变量的键
+ * @param value 环境变量的值
+ * @param replace 若为真，则覆盖已有的环境变量值
+ */
+void set_env(const std::string &key, const std::string &value, bool replace = true);

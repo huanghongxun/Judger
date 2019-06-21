@@ -1,25 +1,14 @@
 #!/bin/sh
 #
-# 编译脚本
+# 编译 executable 的脚本
 #
-# 用法：$0 <compile_script> <chrootdir> <workdir> <memlimit> <source file...>
+# 用法：$0 <workdir>
 #
-# <compile_script>  编译的脚本
-# <chrootdir>       chroot directory
-# <workdir>         本次评测的工作文件夹，比如 /tmp/judger0/judging_5322222/
+# <cpuset_opt> 编译使用的 CPU 集合
+# <workdir> executable 的文件夹，比如 /tmp/cache/executable/cpp
 #                   编译生成的可执行文件在该文件夹中，编译器输出也在该文件夹中
-# <memlimit>        运行时可用的最大内存限制 (KB)
-# <source file...>  需要参与编译的源文件
 #
-# 评测系统通过调用不同的编译脚本来实现多语言支持。
-#
-# 编译脚本的调用参数格式为：
-#
-#   <compile_script> <dest> <memlimit> <source file...>
-#
-#   <dest>     可执行文件的文件名，如 main, main.jar
-#   <memlimit> 运行时可用的最大内存限制 (KB)
-#   <source file...>
+# 本脚本直接调用 executable 的 build 脚本进行编译
 #
 # 环境变量：
 #   $RUNGUARD
@@ -38,7 +27,6 @@ cleanexit ()
 {
     trap - EXIT
 
-    chmod go= "$WORKDIR/compile"
     logmsg $LOG_DEBUG "exiting, code = '$1'"
     exit $1
 }
@@ -78,17 +66,13 @@ else
     export VERBOSE=$LOG_ERR
 fi
 
-[ $# -ge 4 ] || error "Not enough arguments."
-COMPILE_SCRIPT="$1"; shift
-CHROOTDIR="$1"; shift
+[ $# -ge 1 ] || error "Not enough arguments."
 WORKDIR="$1"; shift
-MEMLIMIT="$1"; shift
 
 if [ ! -d "$WORKDIR" ] || [ ! -w "$WORKDIR" ] || [ ! -x "$WORKDIR" ]; then
     error "Work directory is not found or not writable: $WORKDIR"
 fi
 
-[ -x "$COMPILE_SCRIPT" ] || error "Compile script not found or not executable: $COMPILE_SCRIPT"
 [ -x "$RUNGUARD" ] || error "runguard not found or not executable: $RUNGUARD"
 
 cd "$WORKDIR"
@@ -96,16 +80,6 @@ mkdir -p "$WORKDIR/compile"
 chmod a+rwx "$WORKDIR/compile"
 cd "$WORKDIR/compile"
 touch compile.out compile.meta
-
-for src in "$@"; do
-    [ -r "$WORKDIR/compile/$src" ] || error "source file not found: $src"
-
-    chmod a+r "$WORKDIR/compile/$src"
-done
-
-if [ ! -z "$ENTRY_POINT" ]; then
-    ENVIRONMENT_VARS="-V ENTRY_POINT=$ENTRY_POINT"
-fi
 
 RUNDIR="$WORKDIR/run-compile"
 mkdir -p "$RUNDIR"
@@ -128,8 +102,8 @@ $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --wall-time $SCRIPTTIMELIMIT \
         --file-limit $SCRIPTFILELIMIT \
         --outmeta compile.meta \
-        $ENVIRONMENT_VARS -- \
-        "$COMPILE_SCRIPT" program "$MEMLIMIT" "$@" > compile.tmp 2>&1 || \
+        -- \
+        "./build" > compile.tmp 2>&1 || \
         exitcode=$?
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/compile 中，因此删除挂载点即可。
@@ -158,7 +132,7 @@ if [ $exitcode -ne 0 ]; then
 fi
 
 # 检查是否成功编译出程序
-if [ ! -f program ] || [ ! -x program ]; then
+if [ ! -f run ] || [ ! -x run ]; then
     echo "Compilation failed: executable is not created." > compile.out
     cat compile.tmp >> compile.out
     cleanexit ${E_COMPILER_ERROR:--1}

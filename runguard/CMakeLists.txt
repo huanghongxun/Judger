@@ -1,8 +1,8 @@
 project(runguard)
 cmake_minimum_required(VERSION 3.9.4)
 
-if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)
-  message(FATAL_ERROR "Insufficient gcc version, need 7.0 or higher")
+if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+  message(FATAL_ERROR "Insufficient gcc version, need 9.0 or higher")
 endif()
 
 set(CMAKE_BUILD_TYPE Debug)

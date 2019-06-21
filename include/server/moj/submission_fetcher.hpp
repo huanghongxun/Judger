@@ -1,7 +1,7 @@
 #pragma once
 
 #include "SimpleAmqpClient/SimpleAmqpClient.h"
-#include "server/moj/moj.hpp"
+#include "server/moj/config.hpp"
 
 namespace judge::server::moj {
 
@@ -14,6 +14,15 @@ private:
     AmqpClient::Channel::ptr_t channel;
     AmqpClient::Envelope::ptr_t envelope;
     string tag;
+};
+
+struct judge_result_reporter {
+    judge_result_reporter(amqp &queue);
+    void report(const string &message);
+
+private:
+    AmqpClient::Channel::ptr_t channel;
+    judge::server::moj::amqp queue;
 };
 
 }  // namespace judge::server::moj

@@ -1,8 +1,8 @@
 project(judge-system)
 cmake_minimum_required(VERSION 3.9.4)
 
-if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)
-  message(FATAL_ERROR "Insufficient gcc version, need 7.0 or higher")
+if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+  message(FATAL_ERROR "Insufficient gcc version, need 9.0 or higher")
 endif()
 
 set(CMAKE_BUILD_TYPE Debug)
@@ -10,6 +10,8 @@ set(CMAKE_BUILD_TYPE Debug)
 
 set(MATRIX_JUDGE_TARGET MatrixJudge)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+
+add_definitions(-DORMPP_ENABLE_MYSQL)
 
 #  CMake control options
 ################################################################################
@@ -23,9 +25,7 @@ option(BUILD_ENTRY "Build the Judge System main entry" OFF)
 ################################################################################
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/include")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/iguana/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/json/include")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/ormpp")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/SimpleAmqpClient/src")
 ################################################################################
 
@@ -39,18 +39,15 @@ file(GLOB ENTRY_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
 # Necessary libraries
 ################################################################################
 find_package(Threads REQUIRED)
-find_package(Boost 1.65)
+find_package(Boost COMPONENTS program_options 1.65)
 
 # Force to build Release version
 set(CMAKE_BUILD_TYPE_SAVED "${CMAKE_BUILD_TYPE}")
 set(CMAKE_BUILD_TYPE Release)
 
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/SimpleAmqpClient")
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/glog")
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt")
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/json")
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/ormpp")
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/iguana")
+  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/glog")
+  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt")
+  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/SimpleAmqpClient")
 
 set(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE_SAVED}")
 
@@ -118,8 +115,8 @@ if (BUILD_ENTRY)
     )
   target_link_libraries(${MATRIX_JUDGE_TARGET}
     glog
-    SimpleAmqpClient
     fmt
+    SimpleAmqpClient
     mysqlclient
     ${Boost_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}

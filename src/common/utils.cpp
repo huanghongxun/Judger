@@ -1,15 +1,7 @@
-#include "utils.hpp"
+#include "common/utils.hpp"
 #include <sys/wait.h>
 #include <unistd.h>
-#include <fstream>
 using namespace std;
-
-string read_file_content(filesystem::path const &path) {
-    ifstream fin(path.string());
-    string str((istreambuf_iterator<char>(fin)),
-               (istreambuf_iterator<char>()));
-    return str;
-}
 
 int exec_program(const char **argv) {
     // 使用 POSIX 提供的函数来实现外部程序调用
@@ -34,4 +26,8 @@ int exec_program(const char **argv) {
 string get_env(const string &key, const string &def_value) {
     char *result = getenv(key.c_str());
     return !result ? def_value : string(result);
+}
+
+void set_env(const string &key, const string &value, bool replace) {
+    setenv(key.c_str(), value.c_str(), replace);
 }

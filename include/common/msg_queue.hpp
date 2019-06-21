@@ -52,25 +52,25 @@ struct queue {
      * @param <T> 消息内容的类型，需要与同 type 的 recv 函数的 <T> 一致，且支持与 json 的转换
      */
     template <typename T>
-    envelope send_as_json(int type, T &&data, int flag = 0) {
+    envelope send_as_json(int type, const T &data, int flag = 0) {
         json j = data;  // convert to json
         return send_string(type, j, flag);
     }
 
     template <typename T>
-    envelope send_as_json(T &&data, int flag = 0) {
-        return send_as_json(T::ID, data, flag);
+    envelope send_as_json(const T &data, int flag = 0) {
+        return send_as_json(remove_reference_t<T>::ID, data, flag);
     }
 
     template <typename T>
-    envelope send_as_pod(int type, T &&data, int flag = 0) {
-        static_assert(is_trivially_copyable_v<T>, "T must be pod");
-        return send_message(&data, sizeof(T), type, flag);
+    envelope send_as_pod(int type, const T &data, int flag = 0) {
+        static_assert(is_trivially_copyable_v<remove_reference_t<T>>, "T must be trivially copyable");
+        return send_message(&data, sizeof(remove_reference_t<T>), type, flag);
     }
 
     template <typename T>
-    envelope send_as_pod(T &&data, int flag = 0) {
-        return send_as_pod(T::ID, data, flag);
+    envelope send_as_pod(const T &data, int flag = 0) {
+        return send_as_pod(remove_reference_t<T>::ID, data, flag);
     }
 
     envelope send_string(int type, string &&data, int flag);
@@ -130,13 +130,13 @@ private:
      * @brief 发送消息
      * 此函数为 msgsnd 的包装
      */
-    envelope send_message(const void *data, int len, int type, int flag);
+    envelope send_message(const void *data, size_t len, int type, int flag);
 
     /**
      * @brief 接收消息
      * 此函数为 msgrcv 的包装
      */
-    envelope recv_message(void *data, int len, int type, int flag) const;
+    envelope recv_message(void *data, size_t len, int type, int flag) const;
 
     /**
      * @brief 接收变长消息

@@ -1,11 +1,11 @@
-#include "msg_queue.hpp"
+#include "common/msg_queue.hpp"
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/types.h>
 #include <sstream>
 #include <system_error>
 #include <vector>
-#include "stl_utils.hpp"
+#include "common/stl_utils.hpp"
 
 namespace judge::message {
 using namespace std;
@@ -32,7 +32,7 @@ void queue::ack(envelope env) const {
     }
 }
 
-envelope queue::send_message(const void *data, int len, int type, int flag) {
+envelope queue::send_message(const void *data, size_t len, int type, int flag) {
     stringstream ss;
     ss << long(type);
 
@@ -52,7 +52,7 @@ envelope queue::send_message(const void *data, int len, int type, int flag) {
     return {true, actual_type};
 }
 
-envelope queue::recv_message(void *data, int len, int type, int flag) const {
+envelope queue::recv_message(void *data, size_t len, int type, int flag) const {
     if (msgrcv(id, data, len, type, flag) < 0) {
         if (errno == ENOMSG)
             return {false, 0};
@@ -64,7 +64,7 @@ envelope queue::recv_message(void *data, int len, int type, int flag) const {
         if (len < sizeof(long))
             throw runtime_error("Message cannot be acked");
         long actual_type = *(long *)data;
-        memmove(data, data + sizeof(long), len - sizeof(long));
+        memmove(data, (char *)data + sizeof(long), len - sizeof(long));
         return {actual_type};
     } else {
         return {type};
@@ -75,7 +75,7 @@ envelope queue::recv_var_message(vector<char> &data, int type, int flag) const {
     while (true) {
         auto flag = msgrcv(id, data.data(), data.size(), type, 0);
 
-        if (flag >= 0) return;
+        if (flag >= 0) break;
         if (errno == E2BIG) {
             data.resize(data.size() * 2);
         } else if (errno == ENOMSG) {

@@ -3,62 +3,90 @@
 #include <glog/logging.h>
 #include <stdlib.h>
 #include <fstream>
+#include <mutex>
 #include <stdexcept>
+#include "common/interprocess.hpp"
+#include "common/io_utils.hpp"
+#include "common/utils.hpp"
+#include "common/exceptions.hpp"
 #include "config.hpp"
-#include "utils.hpp"
 using namespace std;
-using namespace judge::server;
 
-executable::executable(const string &id, const filesystem::path &workdir, asset_uptr &&asset, const string &md5sum)
-    : asset(move(asset)), dir(workdir / "executable" / id), id(id), md5path(dir / "md5sum"), deploypath(dir / ".deployed"), buildpath(dir / "build"), runpath(dir / "run"), md5sum(md5sum) {
+namespace judge::server {
+
+compilation_error::compilation_error(const string &what)
+    : runtime_error(what) {}
+
+compilation_error::compilation_error(const char *what)
+    : runtime_error(what) {}
+
+executable::executable(const string &id, const fs::path &workdir, asset_uptr &&asset, const string &md5sum)
+    : dir(workdir / "executable" / id), runpath(dir / "compile" / "run"), id(assert_safe_path(id)), md5sum(md5sum), md5path(dir / "md5sum"), deploypath(dir / ".deployed"), buildpath(dir / "compile" / "build"), asset(move(asset)) {
 }
 
-void executable::compile(const string &cpuset, const filesystem::path &, const filesystem::path &chrootdir) {
-    if (!filesystem::is_directory(dir) ||
-        !filesystem::is_regular_file(deploypath) ||
-        (!md5sum.empty() && !filesystem::is_regular_file(md5path)) ||
+void executable::fetch(const string &cpuset, const fs::path &, const fs::path &chrootdir) {
+    ip::file_lock file_lock = lock_directory(dir);
+    ip::scoped_lock guard(file_lock);
+    if (!fs::is_directory(dir) ||
+        !fs::is_regular_file(deploypath) ||
+        (!md5sum.empty() && !fs::is_regular_file(md5path)) ||
         (!md5sum.empty() && read_file_content(md5path) != md5sum)) {
-        filesystem::remove_all(dir);
-        filesystem::create_directories(dir);
+        fs::remove_all(dir);
+        fs::create_directories(dir);
 
-        asset->fetch(dir);
+        asset->fetch(dir / "compile");
 
-        if (filesystem::exists(buildpath)) {
-            filesystem::path olddir = filesystem::current_path();
-            filesystem::current_path(dir);
-            // TODO: build in runguard, or no compile environment
-            if (system("./build") != 0) {
-                throw runtime_error("compilation error");
+        if (fs::exists(buildpath)) {
+            if (auto ret = call_process(EXEC_DIR / "compile_executable.sh", "-n", cpuset, /* workdir */ dir); ret != 0) {
+                switch (ret) {
+                    case E_COMPILER_ERROR:
+                        throw compilation_error("executable compilation error");
+                    default:
+                        throw internal_error("unknown exitcode " + to_string(ret));
+                }
             }
-            filesystem::current_path(olddir);
         }
 
-        if (!filesystem::exists(runpath)) {
-            throw runtime_error("malformed");
+        if (!fs::exists(runpath)) {
+            throw compilation_error("executable malformed");
         }
     }
     ofstream to_be_created(deploypath);
 }
 
-void executable::fetch(const filesystem::path &) {
+void executable::fetch(const string &cpuset, const fs::path &chrootdir) {
+    fetch(cpuset, {}, chrootdir);
 }
 
-local_executable_asset::local_executable_asset(const string &type, const string &id, const filesystem::path &execdir)
-    : asset(""), execdir(execdir / type / id) {}
+string executable::get_compilation_log(const fs::path &) {
+    fs::path compilation_log_file(dir / "compile.out");
+    if (!fs::exists(compilation_log_file)) {
+        return "No compilation informations";
+    } else {
+        return read_file_content(compilation_log_file);
+    }
+}
 
-void local_executable_asset::fetch(const filesystem::path &dir) {
-    filesystem::copy(execdir, dir, filesystem::copy_options::recursive);
+filesystem::path executable::get_run_path(const filesystem::path &) {
+    return runpath;
+}
+
+local_executable_asset::local_executable_asset(const string &type, const string &id, const fs::path &execdir)
+    : asset(""), execdir(execdir / assert_safe_path(type) / assert_safe_path(id)) {}
+
+void local_executable_asset::fetch(const fs::path &dir) {
+    fs::copy(/* from */ execdir, /* to */ dir, fs::copy_options::recursive);
 }
 
 remote_executable_asset::remote_executable_asset(asset_uptr &&remote_asset, const string &md5sum)
     : asset(""), remote_asset(move(remote_asset)), md5sum(md5sum) {}
 
-void remote_executable_asset::fetch(const filesystem::path &dir) {
-    filesystem::path md5path(dir / "md5sum");
-    filesystem::path deploypath(dir / ".deployed");
-    filesystem::path buildpath(dir / "build");
-    filesystem::path runpath(dir / "run");
-    filesystem::path zippath(dir / "executable.zip");
+void remote_executable_asset::fetch(const fs::path &dir) {
+    fs::path md5path(dir / "md5sum");
+    fs::path deploypath(dir / ".deployed");
+    fs::path buildpath(dir / "build");
+    fs::path runpath(dir / "run");
+    fs::path zippath(dir / "executable.zip");
 
     remote_asset->fetch(zippath);
 
@@ -69,77 +97,81 @@ void remote_executable_asset::fetch(const filesystem::path &dir) {
     LOG(INFO) << "Unzipping executable " << zippath;
 
     if (system(fmt::format("unzip -Z '{}' | grep -q ^l", zippath.string()).c_str()) == 0)
-        throw invalid_argument("Executable contains symlinks");
+        throw compilation_error("Executable contains symlinks");
 
     if (system(fmt::format("unzip -j -q -d {}, {}", dir, zippath).c_str()) != 0)
-        throw runtime_error("Unable to unzip executable");
+        throw compilation_error("Unable to unzip executable");
 }
 
-local_executable_manager::local_executable_manager(const filesystem::path &execdir, const filesystem::path &workdir)
+local_executable_manager::local_executable_manager(const fs::path &workdir, const fs::path &execdir)
     : workdir(workdir), execdir(execdir) {}
 
-executable local_executable_manager::get_compile_script(const string &language) const {
-    asset_uptr asset = make_unique<local_executable_asset>("compile", language, workdir, execdir);
-    executable exec("compile-" + language, workdir, move(asset));
-
-    return exec;
+unique_ptr<executable> local_executable_manager::get_compile_script(const string &language) const {
+    asset_uptr asset = make_unique<local_executable_asset>("compile", language, execdir);
+    return make_unique<executable>("compile-" + language, workdir, move(asset));
 }
 
-executable local_executable_manager::get_run_script(const string &language) const {
-    asset_uptr asset = make_unique<local_executable_asset>("run", language, workdir, execdir);
-    executable exec("run-" + language, workdir, move(asset));
-
-    return exec;
+unique_ptr<executable> local_executable_manager::get_run_script(const string &language) const {
+    asset_uptr asset = make_unique<local_executable_asset>("run", language, execdir);
+    return make_unique<executable>("run-" + language, workdir, move(asset));
 }
 
-executable local_executable_manager::get_check_script(const string &language) const {
-    asset_uptr asset = make_unique<local_executable_asset>("check", language, workdir, execdir);
-    executable exec("check-" + language, workdir, move(asset));
-
-    return exec;
+unique_ptr<executable> local_executable_manager::get_check_script(const string &language) const {
+    asset_uptr asset = make_unique<local_executable_asset>("check", language, execdir);
+    return make_unique<executable>("check-" + language, workdir, move(asset));
 }
 
-executable local_executable_manager::get_compare_script(const string &language) const {
-    asset_uptr asset = make_unique<local_executable_asset>("compare", language, workdir, execdir);
-    executable exec("compare-" + language, workdir, move(asset));
-
-    return exec;
+unique_ptr<executable> local_executable_manager::get_compare_script(const string &language) const {
+    asset_uptr asset = make_unique<local_executable_asset>("compare", language, execdir);
+    return make_unique<executable>("compare-" + language, workdir, move(asset));
 }
 
 source_code::source_code(executable_manager &exec_mgr)
     : exec_mgr(exec_mgr) {}
 
-void source_code::fetch(const filesystem::path &path) {
-    vector<filesystem::path> paths;
+void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs::path &chrootdir) {
+    vector<fs::path> paths;
     for (auto &file : source_files) {
-        auto filepath = path / "source" / file->name;
+        assert_safe_path(file->name);
+        auto filepath = workdir / "compile" / file->name;
+        fs::create_directories(filepath.parent_path());
         paths.push_back(filepath);
         file->fetch(filepath);
     }
 
     for (auto &file : assist_files) {
-        auto filepath = path / "source" / file->name;
+        assert_safe_path(file->name);
+        auto filepath = workdir / "compile" / file->name;
         file->fetch(filepath);
     }
 
     auto exec = exec_mgr.get_compile_script(language);
-    exec.fetch(path);
-}
-
-void source_code::compile(const string &cpuset, const filesystem::path &path, const filesystem::path &chrootdir) {
-    vector<filesystem::path> paths;
-    for (auto &file : source_files) {
-        auto filepath = path / "compile" / file->name;
-        paths.push_back(filepath);
-    }
-
-    auto exec = exec_mgr.get_compile_script(language);
-    exec.compile(cpuset, path, chrootdir);
+    exec->fetch(cpuset, chrootdir);
     // compile.sh <compile script> <cpuset> <chrootdir> <workdir> <memlimit> <files...>
-    call_process(EXEC_DIR / "compile.sh", /* compile script */ exec.get_run_path(path), cpuset, /* chroot dir */ chrootdir, /* workdir */ path, memory_limit, paths);
+    if (auto ret = call_process(EXEC_DIR / "compile.sh", "-n", cpuset, /* compile script */ exec->get_run_path(), cpuset, chrootdir, workdir, memory_limit, /* source files */ paths); ret != 0) {
+        switch (ret) {
+            case E_COMPILER_ERROR:
+                throw compilation_error("Compilation failed");
+            case E_INTERNAL_ERROR:
+                throw internal_error("Compilation failed because of internal errors");
+            default:
+                throw runtime_error(fmt::format("Unrecognized compile.sh return code: {}", ret));
+        }
+    }
 }
 
-filesystem::path source_code::get_run_path(const filesystem::path &path) {
+string source_code::get_compilation_log(const fs::path &workdir) {
+    fs::path compilation_log_file(workdir / "compile" / "compile.out");
+    if (!fs::exists(compilation_log_file)) {
+        return "No compilation informations";
+    } else {
+        return read_file_content(compilation_log_file);
+    }
+}
+
+fs::path source_code::get_run_path(const fs::path &path) {
     // program 参见 compile.sh，path 为 $WORKDIR
     return path / "compile" / "program";
 }
+
+}  // namespace judge::server

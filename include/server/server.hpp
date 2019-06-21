@@ -1,12 +1,26 @@
 #pragma once
 
-#include "msg_queue.hpp"
+#include "common/msg_queue.hpp"
 #include "server/remote_server.hpp"
 
 namespace judge::server {
 
+/**
+ * @brief 注册服务端
+ * 服务端是指一个可以和数据库连接可以收集选手代码提交的程序，表示
+ * 评测系统如何拉取提交、返回评测结果的方式。
+ * 可能的服务端比如有 Sicily 评测、Matrix 的 2.0、3.0 评测、GDOI 的评测。
+ */
 void register_judge_server(unique_ptr<judge_server> &&judge_server);
 
+judge_server &get_judge_server_by_category(const string &category);
+
+/**
+ * @brief 根据 judge_id 获得 submission 信息
+ * 这个函数供评测客户端使用，评测客户端拉取评测队列只能拿到 judge_id，
+ * 更加详细的信息需要使用这个函数获取。
+ * @param judge_id 评测任务在评测系统中的 id
+ */
 submission &get_submission_by_judge_id(unsigned judge_id);
 
 /**
@@ -26,4 +40,5 @@ submission &get_submission_by_judge_id(unsigned judge_id);
  * 关）中，否则等待 10ms 再轮询一次）
  */
 void server(message::queue &testcase_queue, message::queue &result_queue);
+
 }  // namespace judge::server

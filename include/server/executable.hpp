@@ -1,32 +1,42 @@
 #pragma once
 
-#include <unistd.h>
 #include <filesystem>
 #include <string>
+#include <vector>
 #include "server/asset.hpp"
 
 namespace judge::server {
 using namespace std;
 
 /**
+ * @brief 表示 program 编译错误
+ * 可以表示 program 格式不正确，或者编译错误
+ */
+struct compilation_error : public runtime_error {
+public:
+    explicit compilation_error(const string &what);
+    explicit compilation_error(const char *what);
+};
+
+/**
  * @brief 表示一个程序
  * 这个类负责下载代码、编译、生成可执行文件
  */
 struct program {
-
     /**
-     * @brief 编译程序
+     * @brief 下载并编译程序
      * @param cpuset 编译器所能使用的 CPU 核心
-     * @param dir 评测的工作路径
+     * @param workdir 评测的工作路径，源代码将下载到这个文件夹中
      * @param chrootdir 配置好的 Linux 子系统环境
      */
-    virtual void compile(const string &cpuset, const filesystem::path &dir, const filesystem::path &chrootdir) = 0;
+    virtual void fetch(const string &cpuset, const filesystem::path &workdir, const filesystem::path &chrootdir) = 0;
 
     /**
-     * @brief 下载程序
-     * @param dir 评测的工作路径，源代码将下载到这个文件夹中
+     * @brief 获取程序的编译信息
+     * @param workdir 评测的工作路径
+     * @return 获得的编译信息
      */
-    virtual void fetch(const filesystem::path &dir) = 0;
+    virtual string get_compilation_log(const filesystem::path &workdir) = 0;
 
     /**
      * @brief 获得程序的可执行文件路径
@@ -56,19 +66,21 @@ struct executable : program {
      */
     executable(const string &id, const filesystem::path &workdir, asset_uptr &&asset, const string &md5sum = "");
 
-    void compile(const string &cpuset, const filesystem::path &dir, const filesystem::path &chrootdir) override;
-
     /**
      * @brief 获取 executable
      * executable 的获取通过 compile 来做，而且 executable 有自己的文件存放路径，因此不使用 fetch 传入的 path
      */
-    void fetch(const filesystem::path &) override;
+    void fetch(const string &cpuset, const filesystem::path &dir, const filesystem::path &chrootdir) override;
+
+    void fetch(const string &cpuset, const filesystem::path &chrootdir);
+
+    string get_compilation_log(const filesystem::path &workdir) override;
 
     /**
      * @brief 获得 executable 的可执行文件路径
      * executable 有自己的文件存放路径，因此不使用传入的 path 来计算可执行文件路径
      */
-    filesystem::path get_run_path(const filesystem::path &) override;
+    filesystem::path get_run_path(const filesystem::path & = filesystem::path()) override;
 
 protected:
     filesystem::path md5path, deploypath, buildpath;
@@ -77,7 +89,7 @@ protected:
 
 /**
  * @brief 表示 executable 的本地复制方式
- * 本地复制方式支持从评测系统源代码目录的 /exec 文件夹内获得已经配置好的 executables
+ * 本地复制方式支持从 execdir 文件夹内获得已经配置好的 executables
  */
 struct local_executable_asset : public asset {
     filesystem::path dir, execdir;
@@ -111,40 +123,51 @@ struct executable_manager {
      * @param language 编程语言，必须和该编译脚本的外置脚本名一致
      * @return 尚未完成下载、编译的编译脚本信息 executable 类，需要手动调用 fetch 来进行下载
      */
-    virtual executable get_compile_script(const string &language) const = 0;
+    virtual unique_ptr<executable> get_compile_script(const string &language) const = 0;
 
     /**
      * @brief 根据语言获取运行脚本
      * @param language 编程语言，必须和该编译脚本的外置脚本名一致
      * @return 尚未完成下载、编译的编译脚本信息 executable 类，需要手动调用 fetch 来进行下载
      */
-    virtual executable get_run_script(const string &language) const = 0;
+    virtual unique_ptr<executable> get_run_script(const string &language) const = 0;
 
     /**
      * @brief 根据名称获取测试脚本
      * @param name 测试脚本名
      * @return 尚未完成下载、编译的编译脚本信息 executable 类，需要手动调用 fetch 来进行下载
      */
-    virtual executable get_check_script(const string &name) const = 0;
+    virtual unique_ptr<executable> get_check_script(const string &name) const = 0;
 
     /**
      * @brief 根据语言获取编译脚本
      * @param name 比较脚本名，可能的名称有 diff-ignore-tailing-space，diff-all
      * @return 尚未完成下载、编译的编译脚本信息 executable 类，需要手动调用 fetch 来进行下载
      */
-    virtual executable get_compare_script(const string &name) const = 0;
+    virtual unique_ptr<executable> get_compare_script(const string &name) const = 0;
 };
 
+/**
+ * @brief 外置脚本的全局管理器，其中外置脚本直接从本地预设中查找.
+ */
 struct local_executable_manager : public executable_manager {
+    /**
+     * @brief 构造函数
+     * @param workdir 存放 executable 的临时文件夹，用于存放编译后的程序
+     * @param execdir 存放 executable 的本地预设文件夹
+     */
     local_executable_manager(const filesystem::path &workdir, const filesystem::path &execdir);
 
-    executable get_compile_script(const string &language) const;
-    executable get_run_script(const string &language) const;
-    executable get_check_script(const string &name) const;
-    executable get_compare_script(const string &name) const;
+    unique_ptr<executable> get_compile_script(const string &language) const;
+    unique_ptr<executable> get_run_script(const string &language) const;
+    unique_ptr<executable> get_check_script(const string &name) const;
+    unique_ptr<executable> get_compare_script(const string &name) const;
 
 private:
-    filesystem::path workdir, execdir;
+    // 存放 executable 的临时文件夹，用于存放编译后的程序
+    filesystem::path workdir;
+    // 存放 executable 的本地预设文件夹
+    filesystem::path execdir;
 };
 
 /**
@@ -210,8 +233,8 @@ struct source_code : program {
 
     source_code(executable_manager &exec_mgr);
 
-    void fetch(const filesystem::path &path) override;
-    void compile(const string &cpuset, const filesystem::path &dir, const filesystem::path &chrootdir) override;
+    void fetch(const string &cpuset, const filesystem::path &dir, const filesystem::path &chrootdir) override;
+    string get_compilation_log(const filesystem::path &workdir) override;
     filesystem::path get_run_path(const filesystem::path &path) override;
 
 protected:

@@ -15,7 +15,7 @@ namespace judge {
         RUNNING,
 
         /**
-         * @brief 用户程序本测试点评测通过
+         * @brief 用户程序本测试点评测通过，或者编译通过（还未评测）
          * 如果没有打开 PE 评测选项且为模糊比较模式时若有空白字符不匹配的情况也会返回 AC。
          */
         ACCEPTED,
@@ -25,11 +25,6 @@ namespace judge {
          * 用户程序无法通过编译
          */
         COMPILATION_ERROR,
-
-        /**
-         * @brief 用户程序编译通过
-         */
-        COMPILATION_SUCCEEDED,
 
         /**
          * @brief 标准程序、随机数据生成器、脚本编译错误
@@ -86,8 +81,8 @@ namespace judge {
          * setcomp 和 ptrace
          */
         RESTRICT_FUNCTION,
+
         OUT_OF_CONTEST_TIME,
-        OTHER,
 
         /**
          * @brief 评测系统正在编译程序
@@ -108,6 +103,18 @@ namespace judge {
          * 对于不支持段错误的评测系统，需要将该项标记为运行时错误。
          */
         FLOATING_POINT_ERROR,
+
+        /**
+         * @brief 随机测试生成器或者标准程序运行错误
+         * 如果评测系统不支持此项，应当把此项标记为内部错误。
+         */
+        RANDOM_GEN_ERROR,
+
+        /**
+         * @brief 比较程序出错或超时
+         * 如果评测系统不支持此项，应当把此项标记为内部错误。
+         */
+        COMPARE_ERROR,
 
         /**
          * @brief 内部错误，评测系统出错

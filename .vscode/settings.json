@@ -66,7 +66,9 @@
         "cinttypes": "cpp",
         "valarray": "cpp",
         "variant": "cpp",
-        "set": "cpp"
+        "set": "cpp",
+        "wait.h": "c",
+        "execute.h": "c"
     },
     "cmake.configureOnOpen": false
 }
