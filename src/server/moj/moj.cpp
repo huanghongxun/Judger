@@ -209,7 +209,9 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         for (size_t i = 0; i < input_url.size() && output_url.size(); ++i) {
             test_case_data datacase;
             datacase.inputs.push_back(moj_url_to_remote_file(input_url[i]));
+            datacase.inputs[0]->name = "testdata.in"; // 我们要求输入数据文件名必须为 testdata.in
             datacase.outputs.push_back(moj_url_to_remote_file(output_url[i]));
+            datacase.outputs[0]->name = "testdata.out"; // 我们要求输出数据文件名必须为 testdata.out
             submit.test_data.push_back(move(datacase));
         }
     }
@@ -372,9 +374,10 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
             if (task_result.type == standard_check_report::TYPE) {
                 check_case_report kase;
                 kase.result = status_string.at(task_result.status);
-                filesystem::path rundir(task_result.path_to_error);
-                kase.stdin = read_file_content(rundir / "input" / "testdata.in");
-                kase.stdout = read_file_content(rundir / "output" / "testdata.out");
+                filesystem::path rundir(task_result.run_dir);
+                filesystem::path datadir(task_result.data_dir);
+                kase.stdin = read_file_content(datadir / "input" / "testdata.in");
+                kase.stdout = read_file_content(datadir / "output" / "testdata.out");
                 kase.subout = read_file_content(rundir / "program.out");
 
                 if (task_result.status == status::ACCEPTED) {

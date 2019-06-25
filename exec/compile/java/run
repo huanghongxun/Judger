@@ -30,7 +30,7 @@ MEMLIMITJAVA = $((MEMLIMIT - MEMRESERVED))
 
 cat > "$DEST" <<EOF
 #!/bin/sh
-# Detect dirname and change dir to prevent class not found errors.
+# 运行路径不一定是编译目录，因此我们需要切换到编译目录下运行，否则会找不到文件
 if [ "\${0%/*}" != "\$0" ]; then
 	cd "\${0%/*}"
 fi

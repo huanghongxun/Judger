@@ -170,8 +170,8 @@ string source_code::get_compilation_log(const fs::path &workdir) {
 }
 
 fs::path source_code::get_run_path(const fs::path &path) {
-    // program 参见 compile.sh，path 为 $WORKDIR
-    return path / "compile" / "program";
+    // run 参见 compile.sh，path 为 $WORKDIR
+    return path / "compile" / "run";
 }
 
 }  // namespace judge::server

@@ -41,71 +41,10 @@ static void judge(judge::message::client_task &client_task, judge::server::submi
     judge::message::task_result result = {
         .judge_id = client_task.judge_id,
         .id = client_task.id,
-        .type = client_task.type};
-
-    filesystem::path stdin, stdout;
-
-    // 获得输入输出数据
-    if (task.is_random) {
-        // 生成随机测试数据
-        filesystem::path random_data_dir = cachedir / "random_data";
-        // 随机目录的写入必须加锁
-        ip::file_lock file_lock = lock_directory(random_data_dir);
-        ip::scoped_lock scoped_lock(file_lock);
-        int number = count_directories_in_directory(random_data_dir);
-        if (number < MAX_RANDOM_DATA_NUM) {
-            filesystem::create_directories(random_data_dir / to_string(number));
-
-            filesystem::path randomdir = cachedir / "random";
-            filesystem::path standarddir = cachedir / "standard";
-            stdin = random_data_dir / to_string(number) / "input" / "testdata.in";
-            stdout = random_data_dir / to_string(number) / "output" / "testdata.out";
-            // random_generator.sh <random generator> <standard program> <stdin> <stdout>
-            int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), stdin, stdout);
-            switch (ret) {
-                case E_SUCCESS: {
-                    // 随机数据已经准备好
-                } break;
-                case E_RANDOM_GEN_ERROR: {
-                    // 随机数据生成器出错，返回 RANDOM_GEN_ERROR 并携带错误信息
-                    result.status = status::RANDOM_GEN_ERROR;
-                    strcpy(result.path_to_error, (random_data_dir / to_string(number) / "random.out").c_str());
-                    result_queue.send_as_pod(result);
-                    return;
-                } break;
-                default: {  // INTERNAL_ERROR
-                    // 随机数据生成器出错，返回 SYSTEM_ERROR 并携带错误信息
-                    result.status = status::SYSTEM_ERROR;
-                    strcpy(result.path_to_error, (random_data_dir / to_string(number) / "random.out").c_str());
-                    result_queue.send_as_pod(result);
-                    return;
-                } break;
-            }
-        } else {
-            int number = random(0, MAX_RANDOM_DATA_NUM - 1);
-            stdin = random_data_dir / to_string(number) / "input" / "testdata.in";
-            stdout = random_data_dir / to_string(number) / "output" / "testdata.out";
-        }
-    } else {
-        // 下载标准测试数据
-        filesystem::path standard_data_dir = cachedir / "standard_data";
-        filesystem::path data_dir = standard_data_dir / to_string(task.testcase_id);
-        ip::file_lock file_lock = lock_directory(standard_data_dir);
-        ip::scoped_lock scoped_lock(file_lock);
-        auto &test_data = submit.test_data[task.testcase_id];
-        if (!filesystem::exists(data_dir)) {
-            filesystem::create_directories(data_dir / "input");
-            filesystem::create_directories(data_dir / "output");
-            for (auto &asset : test_data.inputs)
-                asset->fetch(data_dir / "input");
-            for (auto &asset : test_data.outputs)
-                asset->fetch(data_dir / "output");
-        }
-        if (!test_data.inputs.empty())  // inputs 的第一个元素是标准输入的测试数据
-            stdin = data_dir / "input" / test_data.inputs[0]->name;
-        if (!test_data.outputs.empty())  // outputs 的第一个元素是标准输出的测试数据
-            stdout = data_dir / "output" / test_data.outputs[0]->name;
-    }
+        .type = client_task.type,
+        .run_time = 0,
+        .memory_used = 0};
+    strcpy(result.run_dir, rundir.c_str());
 
     judge::server::judge_server &server = judge::server::get_judge_server_by_category(submit.category);
     auto &exec_mgr = server.get_executable_manager();
@@ -120,7 +59,66 @@ static void judge(judge::message::client_task &client_task, judge::server::submi
     auto &compare_script = submit.compare;
     compare_script->fetch(execcpuset, cachedir / "compare", CHROOT_DIR);
 
-    int ret = call_process(check_script->get_run_path(), "-n", execcpuset, stdin, stdout, submit.time_limit, CHROOT_DIR, workdir, getpid(), run_script->get_run_path(), compare_script->get_run_path(cachedir / "compare"));
+    filesystem::path datadir;
+
+    // 获得输入输出数据
+    if (task.is_random) {
+        // 生成随机测试数据
+        filesystem::path random_data_dir = cachedir / "random_data";
+        // 随机目录的写入必须加锁
+        ip::file_lock file_lock = lock_directory(random_data_dir);
+        ip::scoped_lock scoped_lock(file_lock);
+        int number = count_directories_in_directory(random_data_dir);
+        if (number < MAX_RANDOM_DATA_NUM) {
+            filesystem::create_directories(random_data_dir / to_string(number));
+
+            filesystem::path randomdir = cachedir / "random";
+            filesystem::path standarddir = cachedir / "standard";
+            datadir = random_data_dir / to_string(number);
+            // random_generator.sh <random generator> <standard program> <timelimit> <memlimit> <chrootdir> <workdir> <run>
+            int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), submit.time_limit, submit.memory_limit, CHROOT_DIR, datadir, run_script->get_run_path());
+            switch (ret) {
+                case E_SUCCESS: {
+                    // 随机数据已经准备好
+                } break;
+                case E_RANDOM_GEN_ERROR: {
+                    // 随机数据生成器出错，返回 RANDOM_GEN_ERROR 并携带错误信息
+                    result.status = status::RANDOM_GEN_ERROR;
+                    strcpy(result.path_to_error, (datadir / "random.out").c_str());
+                    result_queue.send_as_pod(result);
+                    return;
+                } break;
+                default: {  // INTERNAL_ERROR
+                    // 随机数据生成器出错，返回 SYSTEM_ERROR 并携带错误信息
+                    result.status = status::SYSTEM_ERROR;
+                    strcpy(result.path_to_error, (random_data_dir / to_string(number) / "random.out").c_str());
+                    result_queue.send_as_pod(result);
+                    return;
+                } break;
+            }
+        } else {
+            int number = random(0, MAX_RANDOM_DATA_NUM - 1);
+            datadir = random_data_dir / to_string(number);
+        }
+    } else {
+        // 下载标准测试数据
+        filesystem::path standard_data_dir = cachedir / "standard_data";
+        datadir = standard_data_dir / to_string(task.testcase_id);
+        ip::file_lock file_lock = lock_directory(standard_data_dir);
+        ip::scoped_lock scoped_lock(file_lock);
+        auto &test_data = submit.test_data[task.testcase_id];
+        if (!filesystem::exists(datadir)) {
+            filesystem::create_directories(datadir / "input");
+            filesystem::create_directories(datadir / "output");
+            for (auto &asset : test_data.inputs)
+                asset->fetch(datadir / "input");
+            for (auto &asset : test_data.outputs)
+                asset->fetch(datadir / "output");
+        }
+    }
+
+    strcpy(result.data_dir, datadir.c_str());
+    int ret = call_process(check_script->get_run_path(), "-n", execcpuset, datadir, submit.time_limit, submit.memory_limit, CHROOT_DIR, workdir, getpid(), run_script->get_run_path(), compare_script->get_run_path(cachedir / "compare"));
     switch (ret) {
         case E_INTERNAL_ERROR:
             result.status = judge::status::SYSTEM_ERROR;

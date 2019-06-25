@@ -103,8 +103,8 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
         for (unsigned i = 0; fin >> stdin >> stdout; ++i) {
             // 注册标准测试数据
             test_case_data data;
-            data.inputs.push_back(make_unique<local_asset>(stdin, case_dir / stdin));
-            data.outputs.push_back(make_unique<local_asset>(stdout, case_dir / stdout));
+            data.inputs.push_back(make_unique<local_asset>("testdata.in", case_dir / stdin));
+            data.outputs.push_back(make_unique<local_asset>("testdata.out", case_dir / stdout));
             submit.test_data.push_back(move(data));
 
             // 添加评测任务，sicily 只有标准测试，因此为每个测试数据添加一个标准测试数据组

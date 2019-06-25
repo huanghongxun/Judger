@@ -2,12 +2,12 @@
 #
 # 评测提交的脚本
 #
-# 用法：$0 <std.in> <std.out> <timelimit> <chrootdir> <workdir> <run-uuid> <run> <compare>
+# 用法：$0 <datadir> <timelimit> <memlimit> <chrootdir> <workdir> <run-uuid> <run> <compare>
 #
-# <std.in>       标准输入数据文件的绝对路径
-# <std.out>      标准输出数据文件的绝对路径
+# <datadir>      包含数据文件的文件夹的绝对路径
 # <timelimit>    运行时间限制，格式为 %d:%d，如 1:3 表示测试点时间限制
 #                为 1s，如果运行时间超过 3s 则结束程序
+# <memlimit>     运行内存限制，单位为 KB
 # <chrootdir>    子环境
 # <workdir>      程序的工作文件夹，为了保证安全，请务必将运行路径设置
 #                为空文件夹，特别是保证不可以包含标准输出文件
@@ -80,13 +80,13 @@ else
 fi
 
 GAINROOT="sudo -n"
-PROGRAM="compile/program"
+PROGRAM="compile/run"
 
 [ $# -ge 4] || error "not enough arguments"
 
-TESTIN="$1"; shift
-TESTOUT="$1"; shift
+DATADIR="$1"; shift
 TIMELIMIT="$1"; shift
+MEMLIMIT="$1"; shift
 CHROOTDIR="$1"; shift
 WORKDIR="$1"; shift
 RUN_UUID="$1"; shift
@@ -94,8 +94,11 @@ RUN_SCRIPT="$1"
 COMPARE_SCRIPT="$2"
 COMPARE_ARGS="$3"
 
-[ -r "$TESTIN" ] || error "input data does not exist: $TESTIN"
-[ -r "$TESTOUT" ] || error "output data does not exist: $TESTOUT"
+TESTIN="$DATADIR/input"
+TESTOUT="$DATADIR/output"
+
+[ -d "$TESTIN" ] || error "input data does not exist: $TESTIN"
+[ -d "$TESTOUT" ] || error "output data does not exist: $TESTOUT"
 if [ ! -d "$WORKDIR" ] || [ ! -w "$WORKDIR" ] || [ ! -x "$WORKDIR" ]; then
     error "Working directory does not exist: $WORKDIR"
 fi
@@ -126,36 +129,34 @@ mkdir -p "$RUNDIR/work/judge"
 mkdir -p "$RUNDIR/work/judge_utils"
 mkdir -p "$RUNDIR/work/compare"
 mkdir -p "$RUNDIR/merged"
-mount -t overlayfs overlayfs -o lowerdir="$WORKDIR/compile",upperdir="$RUNDIR/run" "$RUNDIR/work/judge"
+# 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
+mount -t overlayfs overlayfs -o lowerdir="$TESTIN",lowerdir="$WORKDIR/compile",upperdir="$RUNDIR/run" "$RUNDIR/work/judge"
 mount -t overlayfs overlayfs -o lowerdir="$JUDGE_UTILS" "$RUNDIR/work/judge_utils"
 mount -t overlayfs overlayfs -o lowerdir="$COMPARE_SCRIPT" "$RUNDIR/work/compare"
 mount -t overlayfs overlayfs -o lowerdir="$CHROOTDIR",upperdir="$RUNDIR/work" "$RUNDIR/merged"
 chmod a-wx "$RUNDIR/work/compare"
 
-# 将测试数据复制到 chroot 文件夹中
-cp "$TESTIN" "$RUNDIR/run/testdata.in"
-
 # 我们不检查选手程序的返回值，比如 C 程序的 main 函数没有写 return 会导致返回值非零，这种不是崩溃导致的
-runcheck "$RUN_SCRIPT" "$RUNDIR/run/testdata.in" "$RUNDIR/run/program.out" \
+runcheck "$RUN_SCRIPT" "$TESTIN/testdata.in" "$RUNDIR/program.out" \
     $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
-    --root "$CHROOTDIR" \
+    --root "$RUNDIR/merged" \
     --work /judge \
     --nproc $PROCLIMIT \
     --no-core-dumps \
     --streamsize $FILELIMIT \
     --user "$RUNUSER" \
     --group "$RUNGROUP" \
-    --cpu-time $TIMELIMIT \
     --wall-time $TIMELIMIT \
     --memory-limit $MEMLIMIT \
     --file-limit $FILELIMIT \
     --standard-error-file program.err \
     --outmeta program.meta -- \
-    "/judge/program" 2>runguard.err
+    "/judge/run" 2>runguard.err
 
 # 比较选手程序输出
 logmsg $LOG_INFO "Comparing output"
-cp "$TESTOUT" "$RUNDIR/run/testdata.out"
+umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
+mount -t overlayfs overlayfs -o lowerdir="$TESTIN",lowerdir="$TESTOUT",lowerdir="$WORKDIR/compile",upperdir="$RUNDIR/run" "$RUNDIR/work/judge"
 
 exitcode=0
 runcheck \

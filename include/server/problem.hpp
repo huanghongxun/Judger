@@ -18,13 +18,13 @@ struct test_case_data {
 
     /**
      * @brief 该组标准测试的输入数据
-     * @note 第一个元素将喂给 stdin，剩余的输入数据由选手程序手动打开
+     * @note 输入数据由选手程序手动打开，若输入数据文件名为 testdata.in 则喂给 stdin
      */
     vector<asset_uptr> inputs;
 
     /**
      * @brief 该组标准测试的输出数据
-     * @note 第一个元素将从 stdout 读取，剩余的输出数据由选手程序手动打开
+     * @note 输入数据由选手程序手动打开，若输出数据文件名为 testdata.out 则和 stdout 比对
      */
     vector<asset_uptr> outputs;
 };

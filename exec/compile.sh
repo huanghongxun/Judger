@@ -129,7 +129,7 @@ $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --file-limit $SCRIPTFILELIMIT \
         --outmeta compile.meta \
         $ENVIRONMENT_VARS -- \
-        "$COMPILE_SCRIPT" program "$MEMLIMIT" "$@" > compile.tmp 2>&1 || \
+        "$COMPILE_SCRIPT" run "$MEMLIMIT" "$@" > compile.tmp 2>&1 || \
         exitcode=$?
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/compile 中，因此删除挂载点即可。
@@ -158,7 +158,7 @@ if [ $exitcode -ne 0 ]; then
 fi
 
 # 检查是否成功编译出程序
-if [ ! -f program ] || [ ! -x program ]; then
+if [ ! -f run ] || [ ! -x run ]; then
     echo "Compilation failed: executable is not created." > compile.out
     cat compile.tmp >> compile.out
     cleanexit ${E_COMPILER_ERROR:--1}

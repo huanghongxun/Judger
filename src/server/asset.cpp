@@ -10,14 +10,14 @@ local_asset::local_asset(const string &name, const filesystem::path &path)
     : asset(name), path(path) {}
 
 void local_asset::fetch(const filesystem::path &path) {
-    filesystem::copy(this->path, path);
+    filesystem::copy(this->path, path / name);
 }
 
 text_asset::text_asset(const string &name, const string &text)
     : asset(name), text(text) {}
 
 void text_asset::fetch(const filesystem::path &path) {
-    ofstream fout(path);
+    ofstream fout(path / name);
     fout << text;
 }
 

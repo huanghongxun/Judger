@@ -98,10 +98,34 @@ struct task_result {
 
     /**
      * @brief 指向错误报告文件的路径
-     * 如果 status 为 SYSTEM_ERROR，那么服务端通过读取该文件来获取
-     * 错误信息
+     * 如果 status 为 SYSTEM_ERROR/RANDOM_GEN_ERROR，那么这个路径表示保存错误信息的文件，
      */
     char path_to_error[256];
+
+    /**
+     * @brief 指向当前评测的运行路径
+     * 
+     * RUN_DIR // 选手程序的运行目录，包含选手程序输出结果
+     * ├── run // 运行路径
+     * ├── work // 运行路径
+     * ├── program.out // 选手程序的 stdout 输出
+     * ├── program.err // 选手程序的 stderr 输出
+     * └── runguard.err // runguard 的错误输出
+     */
+    char run_dir[256];
+
+    /**
+     * @brief 指向当前评测的数据路径
+     * 这个文件夹内必须包含 input 文件夹和 output 文件夹
+     * 
+     * DATA_DIR
+     * ├── input  // 输入数据文件夹
+     * │   ├── testdata.in  // 标准输入数据
+     * │   └── something.else  // 其他输入数据，由选手自行打开
+     * └── output // 输出数据文件夹
+     *     └── testdata.out // 标准输出数据
+     */
+    char data_dir[256];
 };
 
 }  // namespace judge::message

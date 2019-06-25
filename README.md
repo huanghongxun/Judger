@@ -80,14 +80,12 @@
     │       └── 5100001 // submission id
     │           ├── compile // 选手程序的代码和编译目录
     │           │   ├── main.cpp // 选手程序的主代码（示例）
-    │           │   ├── program // 选手程序的执行入口（可能是生成的运行脚本）
+    │           │   ├── run // 选手程序的执行入口（可能是生成的运行脚本）
     │           │   ├── compile.out // 编译器的输出
     │           │   └── (Makefile) // 允许 Makefile
     │           ├── run-[client_id] // 选手程序的运行目录，包含选手程序输出结果
-    │           │   ├── input // 输入数据
-    │           │   │   └── testdata.in // (标准)输入数据
-    │           │   ├── output // 输出数据（运行结束后才会复制进来）
-    │           │   │   └── testdata.out // (标准)输出数据
+    │           │   ├── run // 运行路径
+    │           │   ├── work // 运行路径
     │           │   ├── program.out // 选手程序的 stdout 输出
     │           │   ├── program.err // 选手程序的 stderr 输出
     │           │   └── runguard.err // runguard 的错误输出
