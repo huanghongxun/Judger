@@ -64,7 +64,7 @@ struct moj_remote_file : public asset {
         : asset(substr_after_last(path, '/')) {
     }
 
-    void fetch(const filesystem::path &path) override {
+    void fetch(const filesystem::path & /* path */) override {
         // TODO
     }
 };

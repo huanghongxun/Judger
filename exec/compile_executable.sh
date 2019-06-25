@@ -2,11 +2,12 @@
 #
 # 编译 executable 的脚本
 #
-# 用法：$0 <workdir>
+# 用法：$0 <workdir> <chrootdir>
 #
 # <cpuset_opt> 编译使用的 CPU 集合
 # <workdir> executable 的文件夹，比如 /tmp/cache/executable/cpp
 #                   编译生成的可执行文件在该文件夹中，编译器输出也在该文件夹中
+# <chrootdir> executable 编译时的运行环境
 #
 # 本脚本直接调用 executable 的 build 脚本进行编译
 #
@@ -68,6 +69,7 @@ fi
 
 [ $# -ge 1 ] || error "Not enough arguments."
 WORKDIR="$1"; shift
+CHROOTDIR="$1"; shift
 
 if [ ! -d "$WORKDIR" ] || [ ! -w "$WORKDIR" ] || [ ! -x "$WORKDIR" ]; then
     error "Work directory is not found or not writable: $WORKDIR"

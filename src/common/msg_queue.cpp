@@ -65,9 +65,9 @@ envelope queue::recv_message(void *data, size_t len, int type, int flag) const {
             throw runtime_error("Message cannot be acked");
         long actual_type = *(long *)data;
         memmove(data, (char *)data + sizeof(long), len - sizeof(long));
-        return {actual_type};
+        return {true, actual_type};
     } else {
-        return {type};
+        return {true, type};
     }
 }
 

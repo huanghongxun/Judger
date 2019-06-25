@@ -8,7 +8,7 @@ endif()
 set(CMAKE_BUILD_TYPE Debug)
 # set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
-set(MATRIX_JUDGE_TARGET MatrixJudge)
+set(MATRIX_JUDGE_TARGET judge-system)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 add_definitions(-DORMPP_ENABLE_MYSQL)
@@ -39,17 +39,11 @@ file(GLOB ENTRY_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
 # Necessary libraries
 ################################################################################
 find_package(Threads REQUIRED)
-find_package(Boost COMPONENTS program_options 1.65)
+find_package(Boost 1.65 REQUIRED COMPONENTS program_options)
 
-# Force to build Release version
-set(CMAKE_BUILD_TYPE_SAVED "${CMAKE_BUILD_TYPE}")
-set(CMAKE_BUILD_TYPE Release)
-
-  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/glog")
-  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt")
-  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/SimpleAmqpClient")
-
-set(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE_SAVED}")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/glog")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/SimpleAmqpClient")
 
 if (BUILD_UNIT_TEST OR BUILD_GTEST_MODULE_TEST)
   if (NOT TARGET gtest)
@@ -105,7 +99,6 @@ endif ()
 
 if (BUILD_ENTRY)
   add_executable(${MATRIX_JUDGE_TARGET} ${SOURCE_FILES} ${ENTRY_FILE})
-  target_compile_options (${MATRIX_JUDGE_TARGET} PRIVATE -fconcepts)
   set_target_properties(${MATRIX_JUDGE_TARGET}
     PROPERTIES
     # ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/lib"

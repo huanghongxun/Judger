@@ -37,7 +37,7 @@ void executable::fetch(const string &cpuset, const fs::path &, const fs::path &c
         asset->fetch(dir / "compile");
 
         if (fs::exists(buildpath)) {
-            if (auto ret = call_process(EXEC_DIR / "compile_executable.sh", "-n", cpuset, /* workdir */ dir); ret != 0) {
+            if (auto ret = call_process(EXEC_DIR / "compile_executable.sh", "-n", cpuset, /* workdir */ dir, chrootdir); ret != 0) {
                 switch (ret) {
                     case E_COMPILER_ERROR:
                         throw compilation_error("executable compilation error");
@@ -79,7 +79,7 @@ void local_executable_asset::fetch(const fs::path &dir) {
 }
 
 remote_executable_asset::remote_executable_asset(asset_uptr &&remote_asset, const string &md5sum)
-    : asset(""), remote_asset(move(remote_asset)), md5sum(md5sum) {}
+    : asset(""), md5sum(md5sum), remote_asset(move(remote_asset)) {}
 
 void remote_executable_asset::fetch(const fs::path &dir) {
     fs::path md5path(dir / "md5sum");

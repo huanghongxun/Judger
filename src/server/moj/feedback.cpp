@@ -25,6 +25,12 @@ void to_json(json &j, const compile_check_report &report) {
          {"report", report.report}};
 }
 
+void to_json(json &j, const static_check_report &report) {
+    j = {{"grade", report.grade},
+         {"full_grade", report.full_grade},
+         {"report", report.report}};
+}
+
 void to_json(json &j, const check_case_report &report) {
     j = {{"result", report.result},
          {"stdin", report.stdin},
@@ -61,7 +67,7 @@ void to_json(json &j, const memory_check_report &report) {
          {"report", report.report}};
 }
 
-void to_json(json &j, const gtest_check_report &report) {
+void to_json(json & /* j */, const gtest_check_report & /* report */) {
     // TODO: not implemented
 }
 

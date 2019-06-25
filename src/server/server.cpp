@@ -11,6 +11,12 @@ void register_judge_server(unique_ptr<judge_server> &&judge_server) {
     judge_servers.insert({category, move(judge_server)});
 }
 
+judge_server &get_judge_server_by_category(const string &category) {
+    // 由于 judge_servers 只会在 server 启动时注册，因此之后都不会修改
+    // 因此不需要担心并发问题
+    return *judge_servers.at(category).get();
+}
+
 static unsigned global_judge_id = 0;
 // 键为一个唯一的 judge_id
 static map<unsigned, submission> submissions;

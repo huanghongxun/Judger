@@ -27,16 +27,11 @@ file(GLOB ENTRY_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/runguard.cpp")
 # Necessary libraries
 ################################################################################
 find_package(Threads REQUIRED)
-find_package(Boost COMPONENTS program_options REQUIRED)
+find_package(Boost 1.65 REQUIRED COMPONENTS program_options)
 
-# Force to build Release version
-set(CMAKE_BUILD_TYPE_SAVED "${CMAKE_BUILD_TYPE}")
-set(CMAKE_BUILD_TYPE Release)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ext/glog" glog)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ext/fmt" fmt)
 
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ext/glog" glog)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ext/fmt" fmt)
-
-set(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE_SAVED}")
 ################################################################################
 
 add_executable(${BUILD_TARGET} ${SOURCE_FILES} ${ENTRY_FILE})

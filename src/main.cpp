@@ -28,7 +28,7 @@ void sig_chld_handler(int sig) {
 
 struct cpuset {
     string literal;
-    set<int> ids;
+    set<unsigned> ids;
     cpu_set_t cpuset;
 };
 
@@ -46,7 +46,7 @@ void validate(boost::any& v, const vector<string>& values, cpuset*, int) {
     boost::split(splitted, s, boost::is_any_of(","));
     for (auto& token : splitted) {
         smatch matches;
-        if (regex_search(s, matches, matcher)) {
+        if (regex_search(token, matches, matcher)) {
             if (matches[3].str().empty()) {
                 int i = boost::lexical_cast<int>(matches[1].str());
                 result.ids.insert(i);
@@ -56,7 +56,7 @@ void validate(boost::any& v, const vector<string>& values, cpuset*, int) {
                 int end = boost::lexical_cast<int>(matches[3].str());
                 if (begin > end || begin < 0 || end < 0)
                     throw validation_error(validation_error::invalid_option_value);
-                for (int i = begin; i <= end; ++i) {
+                for (unsigned i = (unsigned)begin; i <= (unsigned)end; ++i) {
                     result.ids.insert(i);
                     CPU_SET(i, &result.cpuset);
                 }
@@ -89,8 +89,8 @@ int main(int argc, const char* argv[]) {
         ("enable",   po::value<vector<string>>(), "run Matrix Judge System 4.0 submission fetcher, with configuration file path.")
         ("enable-3", po::value<vector<string>>(), "run Matrix Judge System 3.0 submission fetcher, with configuration file path.")
         ("enable-2", po::value<vector<string>>(), "run Matrix Judge System 2.0 submission fetcher, with configuration file path.")
-        ("server", po::value<size_t>(), "set the core the judge server occupies")
-        ("clients", po::value<size_t>(), "set number of single thread judge clients to be kept")
+        ("server", po::value<unsigned>(), "set the core the judge server occupies")
+        ("clients", po::value<unsigned>(), "set number of single thread judge clients to be kept")
         ("client", po::value<vector<cpuset>>(), "run a judge client which cpuset is given")
         ("exec-dir", po::value<string>(), "set the default predefined executables for falling back")
         ("cache-dir", po::value<string>(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
@@ -179,9 +179,9 @@ int main(int argc, const char* argv[]) {
         // TODO: not implemented
     }
 
-    int server_cpuid = 0;
+    unsigned server_cpuid = 0;
     if (vm.count("server")) {
-        auto i = vm.at("server").as<size_t>();
+        auto i = vm.at("server").as<unsigned>();
         if (i >= cpus) {
             cerr << "Not enough cores" << endl;
             return EXIT_FAILURE;
@@ -194,7 +194,7 @@ int main(int argc, const char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    set<int> cores;
+    set<unsigned> cores;
     cpu_set_t servercpuset;
     CPU_ZERO(&servercpuset);
     CPU_SET(server_cpuid, &servercpuset);
@@ -210,7 +210,7 @@ int main(int argc, const char* argv[]) {
     if (vm.count("client")) {
         auto clients = vm.at("client").as<vector<cpuset>>();
         for (auto& client : clients) {
-            for (int id : client.ids) {
+            for (unsigned id : client.ids) {
                 auto it = cores.find(id);
                 if (it == cores.end()) {
                     cerr << "Cpuset must be disjoint" << endl;
@@ -225,12 +225,12 @@ int main(int argc, const char* argv[]) {
     }
 
     if (vm.count("clients")) {
-        auto clients = vm.at("clients").as<size_t>();
+        auto clients = vm.at("clients").as<unsigned>();
         if (cores.size() < clients) {
             cerr << "Not enough cores" << endl;
             return EXIT_FAILURE;
         }
-        size_t i = 0;
+        unsigned i = 0;
         auto it = cores.begin();
         for (; i < clients; ++i, ++it) {
             int cpuid = *it;

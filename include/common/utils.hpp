@@ -7,9 +7,7 @@
 
 namespace std {
 
-std::string to_string(const std::filesystem::path &path) {
-    return path.string();
-}
+std::string to_string(const std::filesystem::path &path);
 
 }  // namespace std
 
@@ -85,7 +83,7 @@ void to_string_list(ContainerT &cont, Head &head, Args &... args) {
  * @param argv 外部命令的路径 (argv[0]) 和 参数 (argv)
  * @return 外部命令的返回值，如果外部命令因为信号崩溃而没有返回码，则返回 -1
  */
-int exec_program(char **argv);
+int exec_program(const char **argv);
 
 /**
  * @brief 调用外部程序
@@ -103,7 +101,7 @@ template <typename... Args>
 int call_process(Args &&... args) {
     std::vector<std::string> list;
     to_string_list(list, args...);
-    char *argv[list.size() + 1];
+    const char *argv[list.size() + 1];
     for (size_t i = 0; i < list.size(); ++i)
         argv[i] = list[i].data();
     argv[list.size()] = nullptr;
