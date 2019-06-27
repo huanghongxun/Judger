@@ -4,6 +4,9 @@
 #include <boost/interprocess/sync/scoped_lock.hpp>
 #include <filesystem>
 
+/**
+ * 这个类包含 boost/interprocess 的帮助函数
+ */
 namespace judge {
 namespace fs = std::filesystem;
 namespace ip = boost::interprocess;

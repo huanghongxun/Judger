@@ -1,8 +1,8 @@
 #pragma once
 
 #include <variant>
-#include "server/executable.hpp"
-#include "server/problem.hpp"
+#include "server/program.hpp"
+#include "server/submission.hpp"
 #include "server/status.hpp"
 
 namespace judge::message {

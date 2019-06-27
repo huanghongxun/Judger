@@ -5,6 +5,20 @@
 #include <vector>
 #include "server/asset.hpp"
 
+/**
+ * 这个头文件包含表示可以编译的可执行文件的类
+ * 我们有两种可执行文件：
+ * 1. executable: 是用来提供给评测系统使用的外置程序，用 zip 打包。
+ *                比如比较脚本、运行脚本、测试脚本和编译脚本，
+ *                这些脚本一般通过配置系统进行维护，是内部使用的。
+ *                评测系统会允许 executable 获得 root 的执行权限，因此 executable 比较敏感。
+ * 2. source_code：是表示外部导入进来的程序，比如选手的代码、
+ *                 Matrix 的随机数据生成器、评测标准程序、比较程序。
+ * 区别：
+ * 1. executable 比较灵活，通过提供 build 脚本编译运行，不需要明确编程语言。
+ * source_code 需要提供语言，在选择 Makefile 语言之后其实也可以表示成 executable。
+ * 2. executable 一般不在保护模式下运行，且有 root 权限；而 source code 在保护模式下运行。
+ */
 namespace judge::server {
 using namespace std;
 
@@ -67,11 +81,14 @@ struct executable : program {
     executable(const string &id, const filesystem::path &workdir, asset_uptr &&asset, const string &md5sum = "");
 
     /**
-     * @brief 获取 executable
-     * executable 的获取通过 compile 来做，而且 executable 有自己的文件存放路径，因此不使用 fetch 传入的 path
+     * @brief 获取并编译 executable
+     * executable 有自己的文件存放路径，因此不使用 fetch 传入的 path
      */
     void fetch(const string &cpuset, const filesystem::path &dir, const filesystem::path &chrootdir) override;
 
+    /**
+     * @brief 获取并编译 executable
+     */
     void fetch(const string &cpuset, const filesystem::path &chrootdir);
 
     string get_compilation_log(const filesystem::path &workdir) override;
@@ -101,7 +118,8 @@ struct local_executable_asset : public asset {
 
 /**
  * @brief 表示 executable 的远程下载方式
- * 远程下载方式从远程服务器下载（通过 remote_asset 来进行下载），之后会验证 zip
+ * 远程下载方式从远程服务器下载 executable 的 zip 压缩包
+ * （通过 remote_asset 来进行下载），之后会验证压缩包正确。
  * 压缩包的 md5 哈希值来确保压缩包正确，并予以解压
  */
 struct remote_executable_asset : public asset {
@@ -215,7 +233,7 @@ struct source_code : program {
      * @note 这个参数将传送给 compile script，请参见这些脚本以获得更多信息
      * 
      * 示例（对于 gcc）:
-     * -g -lcgroup -Wno-long-long
+     * -g -lcgroup -Wno-long-long -nostdinc -nostdinc++
      */
     vector<string> compile_command;
 

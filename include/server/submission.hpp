@@ -3,17 +3,37 @@
 #include <boost/rational.hpp>
 #include <map>
 #include <nlohmann/json.hpp>
-#include "server/executable.hpp"
+#include "server/program.hpp"
 
+/**
+ * 这个头文件包含提交信息
+ * 包含：
+ * 1. submission 类（表示一个提交）
+ * 2. test_case_data 类（表示一个标准测试数据组）
+ * 3. test_check 类（表示一个测试点）
+ */
 namespace judge::server {
 using namespace std;
 using namespace nlohmann;
 
 /**
- * @brief 表示一组测试数据
+ * @brief 表示一组标准测试数据
+ * 标准测试数据和测试点的顺序没有必然关系，比如一道题同时存在
+ * 标准测试和内存测试，两种测试都需要使用标准测试数据进行评测，
+ * 这种情况下会有多组测试点使用同一个标准测试数据普
  */
 struct test_case_data {
+    /**
+     * @brief Construct a new test case data object
+     * 默认构造函数
+     */
     test_case_data();
+
+    /**
+     * @brief Construct a new test case data object
+     * 这个类中使用了 unique_ptr，因此只能移动
+     * @param other 要移动的对象
+     */
     test_case_data(test_case_data &&other);
 
     /**
@@ -29,10 +49,19 @@ struct test_case_data {
     vector<asset_uptr> outputs;
 };
 
+/**
+ * @brief 表示一个测试点
+ */
 struct test_check {
     /**
-     * @brief 
-     * 
+     * @brief 测试点类型
+     * 提供给 judge_server 来区分测试类型，比如对于 MOJ：
+     * 0: CompileCheck
+     * 1: MemoryCheck
+     * 2: RandomCheck
+     * 3: StandardCheck
+     * 4: StaticCheck
+     * 5: GTestCheck
      */
     uint8_t check_type;
 
@@ -58,7 +87,7 @@ struct test_check {
     bool is_random;
 
     /**
-     * @brief 标准测试数据 id
+     * @brief 标准测试数据 id，在 submission.test_cases 中进行索引
      * 若为随机测试，此项无用
      */
     unsigned testcase_id;

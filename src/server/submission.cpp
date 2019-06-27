@@ -1,4 +1,4 @@
-#include "server/problem.hpp"
+#include "server/submission.hpp"
 
 namespace judge::server {
 using namespace std;

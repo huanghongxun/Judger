@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/msg_queue.hpp"
-#include "server/remote_server.hpp"
+#include "server/judge_server.hpp"
 
 namespace judge::server {
 

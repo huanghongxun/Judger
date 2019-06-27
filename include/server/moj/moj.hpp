@@ -3,7 +3,7 @@
 #include <map>
 #include <nlohmann/json.hpp>
 #include "server/moj/submission_fetcher.hpp"
-#include "server/remote_server.hpp"
+#include "server/judge_server.hpp"
 
 namespace judge::server::moj {
 using namespace std;

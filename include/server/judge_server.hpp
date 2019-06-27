@@ -3,12 +3,23 @@
 #include <filesystem>
 #include "common/messages.hpp"
 #include "config.hpp"
-#include "server/problem.hpp"
+#include "server/submission.hpp"
 #include "server/status.hpp"
 
 namespace judge::server {
 using namespace std;
+
+/**
+ * @brief 表示一个远程服务器
+ * 比如可以表示 MOJ 的评测类型，运行时可以注册多个远程服务器拉取提交
+ */
 struct judge_server {
+    /**
+     * @brief 评测服务器的 id，用于标记 submission 是哪个
+     * 远程服务器拉取的提交。
+     * 
+     * @return string 评测服务器的 id
+     */
     virtual string category() const = 0;
 
     /**
@@ -42,4 +53,5 @@ struct judge_server {
      */
     virtual const executable_manager &get_executable_manager() const = 0;
 };
+
 }  // namespace judge::server

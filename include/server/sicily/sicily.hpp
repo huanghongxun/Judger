@@ -1,7 +1,7 @@
 #pragma once
 
 #include <unordered_map>
-#include "server/remote_server.hpp"
+#include "server/judge_server.hpp"
 #include "sql/dbng.hpp"
 #include "sql/mysql.hpp"
 

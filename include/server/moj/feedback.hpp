@@ -3,6 +3,9 @@
 #include <nlohmann/json.hpp>
 #include <string>
 
+/**
+ * 这个头文件包含 MOJ 的所有测试报告的结构体和 JSON 序列化函数
+ */
 namespace judge::server::moj {
 using namespace std;
 using namespace nlohmann;
@@ -252,7 +255,7 @@ struct gtest_check_report {
     int error_cases;
 
     /**
-     * @brief 
+     * @brief GTest 中被禁用的测试组
      * 
      */
     int disabled_cases;
