@@ -1,0 +1,35 @@
+version: '2'
+
+services:
+  master:
+    image: chrislusf/seaweedfs
+    ports:
+      - 9630:9333
+    command: 'master -defaultReplication=100'
+    networks:
+      default:
+        aliases:
+          - seaweed_master
+  filer:
+    image: chrislusf/seaweedfs
+    ports:
+      - 8999:8888
+    command: 'filer -master="seaweed_master:9333" -dir=/data'
+    depends_on:
+      - master
+    networks:
+      default:
+        aliases:
+          - seaweed_filer
+  volume:
+    image: chrislusf/seaweedfs
+    ports:
+      - 9730:9730
+    command: 'volume -max=10 -mserver="master:9333" -port=9730'
+    depends_on:
+     - master
+     - filer
+    networks:
+      default:
+        aliases:
+          - seaweed_volume

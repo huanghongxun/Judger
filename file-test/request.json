@@ -1,0 +1,55 @@
+{
+    "prob_id":1234,
+    "sub_id":12340,
+    "language":"c++",
+    "files":{
+        "support":{
+            "source_files":[
+                "main.cpp"
+            ],
+            "header_files":[
+                "header.hpp"
+            ],
+            "rw_files":[
+
+            ]
+        },
+        "submission":{
+            "source_files":[
+                "sub_main.cpp"
+            ],
+            "header_files":[
+                "sub_header.h"
+            ]
+        },
+        "standard":{
+            "source_files":[
+                "stand_main.cpp"
+            ],
+            "header_files":[
+                "stand_header.h"
+            ],
+            "input":[
+                "input0",
+                "input1"
+            ],
+            "output":[
+                "output0",
+                "output1"
+            ]
+        },
+        "random":[
+            "random.c"
+        ]
+    },
+    "cache":{
+        "standard":[
+            "standard"
+        ],
+        "random":[
+            "random"
+        ]
+    }
+}
+
+

@@ -26,11 +26,6 @@
 *.a
 *.lib
 
-# Executables
-*.exe
-*.out
-*.app
-
 .vscode/ipch
 .vscode/settings.json
 

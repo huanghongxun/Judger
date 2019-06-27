@@ -137,9 +137,9 @@ int main(int argc, char* argv[]) {
              << "This app requires root privilege" << endl
              << "Required Environment Variables:" << endl
              << "\tRUNGUARD: location of runguard" << endl
-             << "\tSCRIPT_TIME_LIMIT: time limit for scripts in seconds" << endl
-             << "\tSCRIPT_MEM_LIMIT: memory limit for scripts in KB" << endl
-             << "\tSCRIPT_FILE_LIMIT: file limit for scripts in bytes" << endl
+             << "\tSCRIPTTIMELIMIT: time limit for scripts in seconds" << endl
+             << "\tSCRIPTMEMLIMIT: memory limit for scripts in KB" << endl
+             << "\tSCRIPTFILELIMIT: file limit for scripts in bytes" << endl
              << "Usage: " << argv[0] << " [options]" << endl;
         cout << desc << endl;
         return EXIT_SUCCESS;
