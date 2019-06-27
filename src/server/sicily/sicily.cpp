@@ -18,7 +18,7 @@ const unordered_map<status, const char *> status_string = boost::assign::map_lis
     (status::RUNNING, "Judging")
     (status::ACCEPTED, "Accepted")
     (status::COMPILATION_ERROR, "Compile Error")
-    (status::EXECUTABLE_COMPILATION_ERROR, "Other")
+    (status::EXECUTABLE_COMPILATION_ERROR, "Other") // 假定我们默认提供的 executable 是正确的，因此不存在这个 status
     (status::WRONG_ANSWER, "Wrong Answer")
     (status::RUNTIME_ERROR, "Runtime Error")
     (status::TIME_LIMIT_EXCEEDED, "Time Limit Exceeded")
@@ -30,8 +30,8 @@ const unordered_map<status, const char *> status_string = boost::assign::map_lis
     (status::COMPILING, "Judging")
     (status::SEGMENTATION_FAULT, "Runtime Error")
     (status::FLOATING_POINT_ERROR, "Runtime Error")
-    (status::RANDOM_GEN_ERROR, "Other")
-    (status::COMPARE_ERROR, "Other")
+    (status::RANDOM_GEN_ERROR, "Other") // Sicily 评测不包含此项
+    (status::COMPARE_ERROR, "Wrong Answer") // Sicily 评测若遇到 spj 崩溃则认为评测结果是 WA
     (status::SYSTEM_ERROR, "Other");
 // clang-format on
 

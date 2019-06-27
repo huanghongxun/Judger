@@ -1,4 +1,5 @@
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 #include <sys/wait.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
@@ -85,14 +86,12 @@ void put_error_codes() {
     set_env("E_MEM_LIMIT", to_string(judge::error_codes::E_MEM_LIMIT));
 }
 
-int main(int argc, const char* argv[]) {
+int main(int argc, char* argv[]) {
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
     google::InitGoogleLogging(argv[0]);
 
-    if (!getenv("RUNGUARD")) {
-        // RUNGUARD 环境变量将传给 exec/check/standard/run 评测脚本使用
-        cerr << "RUNGUARD environment variable should be specified. This env points out where the runguard executable locates in." << endl;
-        return EXIT_FAILURE;
-    }
+    CHECK(getenv("RUNGUARD")) // RUNGUARD 环境变量将传给 exec/check/standard/run 评测脚本使用
+        << "RUNGUARD environment variable should be specified. This env points out where the runguard executable locates in.";
 
     put_error_codes();
 

@@ -137,7 +137,7 @@ mount -t overlayfs overlayfs -o lowerdir="$CHROOTDIR",upperdir="$RUNDIR/work" "$
 chmod a-wx "$RUNDIR/work/compare"
 
 # 我们不检查选手程序的返回值，比如 C 程序的 main 函数没有写 return 会导致返回值非零，这种不是崩溃导致的
-runcheck "$RUN_SCRIPT" "$TESTIN/testdata.in" "$RUNDIR/program.out" \
+runcheck "$RUN_SCRIPT" "$RUNDIR/run/testdata.in" "$RUNDIR/run/program.out" \
     $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --root "$RUNDIR/merged" \
     --work /judge \

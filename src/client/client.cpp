@@ -1,9 +1,11 @@
 #include "client/client.hpp"
+#include <boost/lexical_cast.hpp>
 #include <unistd.h>
 #include <fstream>
 #include <thread>
 #include "config.hpp"
 #include "server/server.hpp"
+#include "client/judge.hpp"
 #include "common/interprocess.hpp"
 #include "common/stl_utils.hpp"
 #include "common/messages.hpp"
@@ -157,6 +159,9 @@ static void judge(judge::message::client_task &client_task, judge::server::submi
             result.status = judge::status::SYSTEM_ERROR;
             break;
     }
+    auto metadata = read_runguard_result(rundir / "program.meta");
+    result.run_time = metadata.wall_time;
+    result.memory_used = metadata.memory / 1024;
     result_queue.send_as_pod(result);
 }
 
@@ -189,12 +194,13 @@ static void compile(judge::message::client_task &client_task, judge::server::sub
         .id = client_task.id,
         .type = client_task.type};
 
-        // TODO: add time and memory usage
-
     // 编译选手程序，一般情况下 submit.submission 都为非空
     if (submit.submission) {
         filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
         result.status = compile(submit.submission.get(), workdir, execcpuset);
+        auto metadata = read_runguard_result(workdir / "compile" / "compile.meta");
+        result.run_time = metadata.wall_time;
+        result.memory_used = metadata.memory / 1024;
         if (result.status != status::ACCEPTED) goto end;
     }
 

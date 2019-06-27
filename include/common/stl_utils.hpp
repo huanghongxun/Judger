@@ -27,6 +27,10 @@ int count_directories_in_directory(const std::filesystem::path &dir);
 
 int random(int L, int R);
 
+bool is_integer(const std::string &s);
+
+bool is_number(const std::string &s);
+
 template <typename T>
 struct bits_t { T t; };
 

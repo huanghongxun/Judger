@@ -77,17 +77,21 @@
     RUN_DIR
     ├── sicily // category id
     │   └── 1001 // problem id
-    │       └── 5100001 // submission id
+    │       └── 5100001 // submission id, workdir
     │           ├── compile // 选手程序的代码和编译目录
     │           │   ├── main.cpp // 选手程序的主代码（示例）
     │           │   ├── run // 选手程序的执行入口（可能是生成的运行脚本）
     │           │   ├── compile.out // 编译器的输出
+    │           │   ├── compile.meta // 编译器的运行信息
     │           │   └── (Makefile) // 允许 Makefile
     │           ├── run-[client_id] // 选手程序的运行目录，包含选手程序输出结果
     │           │   ├── run // 运行路径
+    │           │   │   ├── testdata.in // 映射进来的标准输入文件
+    │           │   │   ├── testdata.out // 映射进来的标准输出文件（在选手程序运行完成后再挂载）
+    │           │   │   └── program.out // 选手程序的 stdout 输出
     │           │   ├── work // 运行路径
-    │           │   ├── program.out // 选手程序的 stdout 输出
     │           │   ├── program.err // 选手程序的 stderr 输出
+    │           │   ├── program.meta // 选手程序的运行信息
     │           │   └── runguard.err // runguard 的错误输出
     │           └── run-...
     ├── moj
