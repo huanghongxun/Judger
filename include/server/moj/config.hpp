@@ -68,6 +68,8 @@ struct system_config {
     time_limit_config time_limit;
 
     size_t max_report_io_size;
+
+    string file_api;
 };
 
 void from_json(const json &j, system_config &config);

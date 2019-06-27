@@ -64,6 +64,7 @@ static void judge(judge::message::client_task &client_task, judge::server::submi
     filesystem::path datadir;
 
     // 获得输入输出数据
+    // TODO: 根据 submission 的 last_update 更新数据
     if (task.is_random) {
         // 生成随机测试数据
         filesystem::path random_data_dir = cachedir / "random_data";

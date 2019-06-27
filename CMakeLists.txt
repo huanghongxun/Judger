@@ -111,6 +111,7 @@ if (BUILD_ENTRY)
     fmt
     SimpleAmqpClient
     mysqlclient
+    curl
     ${Boost_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     )

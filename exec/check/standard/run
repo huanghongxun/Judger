@@ -241,6 +241,7 @@ fi
 
 # FIXME: C 语言程序可能会因为没有写 return 0; 导致非零
 # 返回值而误判为 Runtime Error
+# 经过测试，现在 gcc/g++ 会自动解决 main 函数没有 return 0 的问题，暂时不需要解决
 if [ "$progexit" -ne 0 ]; then
     echo "Non-zero exitcode $progexit" >> system.out
     echo "$resource_usage" >> system.out

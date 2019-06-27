@@ -13,6 +13,7 @@ using namespace nlohmann;
 void from_json(const json &j, system_config &config) {
     j.at("maxReportIOSize").get_to(config.max_report_io_size);
     j.at("timeLimit").get_to(config.time_limit);
+    j.at("fileApi").get_to(config.file_api);
 }
 
 void from_json(const json &j, amqp &mq) {

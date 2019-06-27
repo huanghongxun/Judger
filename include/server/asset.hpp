@@ -43,10 +43,24 @@ struct local_asset : public asset {
     void fetch(const filesystem::path &path) override;
 };
 
+/**
+ * @brief 表示已经知道内容的文本资源（不需要下载）
+ */
 struct text_asset : public asset {
     string text;
 
     text_asset(const string &name, const string &text);
+
+    void fetch(const filesystem::path &path) override;
+};
+
+/**
+ * @brief 从远程下载的资源文件（只支持 GET 请求下载）
+ */
+struct remote_asset : public asset {
+    string url;
+
+    remote_asset(const string &name, const string &url_get);
 
     void fetch(const filesystem::path &path) override;
 };

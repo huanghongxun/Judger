@@ -60,18 +60,10 @@ const executable_manager &configuration::get_executable_manager() const {
     return exec_mgr;
 }
 
-struct moj_remote_file : public asset {
-    moj_remote_file(const string &path)
-        : asset(substr_after_last(path, '/')) {
-    }
-
-    void fetch(const filesystem::path & /* path */) override {
-        // TODO
-    }
-};
-
-static asset_uptr moj_url_to_remote_file(const string &path) {
-    return make_unique<moj_remote_file>(path);
+static function<asset_uptr(const string &)> moj_url_to_remote_file(configuration &config, const string &subpath) {
+    return [&](const string &name) {
+        return make_unique<remote_asset>(name, config.system.file_api + "/" + subpath + "/" + name);
+    };
 }
 
 /*
@@ -185,35 +177,42 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
     if (files.count("support")) {
         auto src_url = files.at("support").at("source_files").get<vector<string>>();
         auto hdr_url = files.at("support").at("header_files").get<vector<string>>();
-        append(submission->source_files, src_url, moj_url_to_remote_file);
-        append(submission->assist_files, hdr_url, moj_url_to_remote_file);
-        append(standard->source_files, src_url, moj_url_to_remote_file);
-        append(standard->assist_files, hdr_url, moj_url_to_remote_file);
+        // 依赖文件的下载地址：FILE_API/problem/<prob_id>/support/<filename>
+        append(submission->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
+        append(submission->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
+        append(standard->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
+        append(standard->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
     }
 
     if (files.count("submission")) {
         auto src_url = files.at("submission").at("source_files").get<vector<string>>();
-        append(submission->source_files, src_url, moj_url_to_remote_file);
+        // 选手提交的下载地址：FILE_API/submission/<sub_id>/<filename>
+        append(submission->source_files, src_url, moj_url_to_remote_file(server, fmt::format("submission/{}", submit.sub_id)));
 
         auto hdr_url = files.at("submission").at("header_files").get<vector<string>>();
-        append(submission->assist_files, hdr_url, moj_url_to_remote_file);
+        // 选手提交的下载地址：FILE_API/submission/<sub_id>/<filename>
+        append(submission->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("submission/{}", submit.sub_id)));
     }
 
     if (files.count("standard")) {
         const json &standard_json = files.at("standard");
         auto src_url = standard_json.at("source_files").get<vector<string>>();
-        append(standard->source_files, src_url, moj_url_to_remote_file);
+        // 标准程序的下载地址：FILE_API/problem/<prob_id>/support/<filename>
+        append(standard->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
 
         auto hdr_url = standard_json.at("header_files").get<vector<string>>();
-        append(standard->assist_files, hdr_url, moj_url_to_remote_file);
+        // 标准程序的下载地址：FILE_API/problem/<prob_id>/support/<filename>
+        append(standard->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
 
         auto input_url = standard_json.at("input").get<vector<string>>();
         auto output_url = standard_json.at("output").get<vector<string>>();
         for (size_t i = 0; i < input_url.size() && output_url.size(); ++i) {
             test_case_data datacase;
-            datacase.inputs.push_back(moj_url_to_remote_file(input_url[i]));
+            // 标准输入的的下载地址：FILE_API/problem/<prob_id>/standard_input/<filename>
+            datacase.inputs.push_back(moj_url_to_remote_file(server, fmt::format("problem/{}/standard_input", submit.prob_id))(input_url[i]));
             datacase.inputs[0]->name = "testdata.in";  // 我们要求输入数据文件名必须为 testdata.in
-            datacase.outputs.push_back(moj_url_to_remote_file(output_url[i]));
+            // 标准输出的的下载地址：FILE_API/problem/<prob_id>/standard_output/<filename>
+            datacase.outputs.push_back(moj_url_to_remote_file(server, fmt::format("problem/{}/standard_output", submit.prob_id))(output_url[i]));
             datacase.outputs[0]->name = "testdata.out";  // 我们要求输出数据文件名必须为 testdata.out
             submit.test_data.push_back(move(datacase));
         }
@@ -233,6 +232,14 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         random.at("language").get_to(random_ptr->language);
         random.at("compile").get_to(random_ptr->compile_command);
         random.at("run_times").get_to(submit.random_test_times);
+
+        if (files.count("random")) {
+            const json &random_json = files.at("random");
+            auto src_url = random_json.get<vector<string>>();
+            // 随机数据生成器的下载地址：FILE_API/problem/<prob_id>/random_source/<filename>
+            append(random_ptr->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/random_source", submit.prob_id)));
+        }
+
         submit.random = move(random_ptr);
     }
 
