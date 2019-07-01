@@ -14,11 +14,11 @@ using namespace std;
 
 namespace judge::server {
 
-compilation_error::compilation_error(const string &what)
-    : runtime_error(what) {}
+compilation_error::compilation_error(const string &what, const string &error_log)
+    : runtime_error(what), error_log(error_log) {}
 
-compilation_error::compilation_error(const char *what)
-    : runtime_error(what) {}
+executable_compilation_error::executable_compilation_error(const string &what, const string &error_log)
+    : compilation_error(what, error_log) {}
 
 executable::executable(const string &id, const fs::path &workdir, asset_uptr &&asset, const string &md5sum)
     : dir(workdir / "executable" / id), runpath(dir / "compile" / "run"), id(assert_safe_path(id)), md5sum(md5sum), md5path(dir / "md5sum"), deploypath(dir / ".deployed"), buildpath(dir / "compile" / "build"), asset(move(asset)) {
@@ -40,7 +40,7 @@ void executable::fetch(const string &cpuset, const fs::path &, const fs::path &c
             if (auto ret = call_process(EXEC_DIR / "compile_executable.sh", "-n", cpuset, /* workdir */ dir, chrootdir); ret != 0) {
                 switch (ret) {
                     case E_COMPILER_ERROR:
-                        throw compilation_error("executable compilation error");
+                        throw executable_compilation_error("executable compilation error", get_compilation_log(dir));
                     default:
                         throw internal_error("unknown exitcode " + to_string(ret));
                 }
@@ -48,7 +48,7 @@ void executable::fetch(const string &cpuset, const fs::path &, const fs::path &c
         }
 
         if (!fs::exists(runpath)) {
-            throw compilation_error("executable malformed");
+            throw executable_compilation_error("executable malformed", "Executable malformed");
         }
     }
     ofstream to_be_created(deploypath);
@@ -59,12 +59,8 @@ void executable::fetch(const string &cpuset, const fs::path &chrootdir) {
 }
 
 string executable::get_compilation_log(const fs::path &) {
-    fs::path compilation_log_file(dir / "compile.out");
-    if (!fs::exists(compilation_log_file)) {
-        return "No compilation informations";
-    } else {
-        return read_file_content(compilation_log_file);
-    }
+    fs::path compilation_log_file(dir / "compile" / "compile.out");
+    return read_file_content(compilation_log_file, "No compilation information");
 }
 
 filesystem::path executable::get_run_path(const filesystem::path &) {
@@ -97,10 +93,10 @@ void remote_executable_asset::fetch(const fs::path &dir) {
     LOG(INFO) << "Unzipping executable " << zippath;
 
     if (system(fmt::format("unzip -Z '{}' | grep -q ^l", zippath.string()).c_str()) == 0)
-        throw compilation_error("Executable contains symlinks");
+        throw executable_compilation_error("Executable contains symlinks", "Unable to unzip executable");
 
     if (system(fmt::format("unzip -j -q -d {}, {}", dir, zippath).c_str()) != 0)
-        throw compilation_error("Unable to unzip executable");
+        throw executable_compilation_error("Unable to unzip executable", "Unable to unzip executable");
 }
 
 local_executable_manager::local_executable_manager(const fs::path &workdir, const fs::path &execdir)
@@ -151,7 +147,7 @@ void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs:
     if (auto ret = call_process(EXEC_DIR / "compile.sh", "-n", cpuset, /* compile script */ exec->get_run_path(), cpuset, chrootdir, workdir, memory_limit, /* source files */ paths); ret != 0) {
         switch (ret) {
             case E_COMPILER_ERROR:
-                throw compilation_error("Compilation failed");
+                throw compilation_error("Compilation failed", get_compilation_log(workdir));
             case E_INTERNAL_ERROR:
                 throw internal_error("Compilation failed because of internal errors");
             default:
@@ -162,11 +158,7 @@ void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs:
 
 string source_code::get_compilation_log(const fs::path &workdir) {
     fs::path compilation_log_file(workdir / "compile" / "compile.out");
-    if (!fs::exists(compilation_log_file)) {
-        return "No compilation informations";
-    } else {
-        return read_file_content(compilation_log_file);
-    }
+    return read_file_content(compilation_log_file, "No compilation information");
 }
 
 fs::path source_code::get_run_path(const fs::path &path) {

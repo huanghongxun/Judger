@@ -1,6 +1,7 @@
 #pragma once
 
 #include <set>
+#include <thread>
 #include "common/msg_queue.hpp"
 
 namespace judge::client {

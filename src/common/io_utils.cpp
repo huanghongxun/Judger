@@ -11,6 +11,14 @@ string read_file_content(filesystem::path const &path) {
     return str;
 }
 
+string read_file_content(filesystem::path const &path, const string &def) {
+    if (!filesystem::exists(path)) {
+        return def;
+    } else {
+        return read_file_content(path);
+    }
+}
+
 string assert_safe_path(const string &subpath) {
     if (subpath.find("../") != string::npos)
         throw runtime_error("subpath is not safe " + subpath);

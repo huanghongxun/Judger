@@ -2,9 +2,9 @@
 #include <unistd.h>
 #include <boost/lexical_cast.hpp>
 #include <fstream>
-#include <thread>
 #include "client/judge.hpp"
 #include "common/interprocess.hpp"
+#include "common/io_utils.hpp"
 #include "common/messages.hpp"
 #include "common/stl_utils.hpp"
 #include "common/utils.hpp"
@@ -40,13 +40,8 @@ static judge::message::task_result judge(judge::message::client_task &client_tas
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
     filesystem::path rundir = workdir / ("run-" + to_string(getpid()));
 
-    judge::message::task_result result = {
-        .judge_id = client_task.judge_id,
-        .id = client_task.id,
-        .type = client_task.type,
-        .run_time = 0,
-        .memory_used = 0};
-    strcpy(result.run_dir, rundir.c_str());
+    judge::message::task_result result{client_task.judge_id, client_task.id, client_task.type};
+    result.run_dir = rundir;
 
     judge::server::judge_server &server = judge::server::get_judge_server_by_category(submit.category);
     auto &exec_mgr = server.get_executable_manager();
@@ -87,13 +82,13 @@ static judge::message::task_result judge(judge::message::client_task &client_tas
                 case E_RANDOM_GEN_ERROR: {
                     // 随机数据生成器出错，返回 RANDOM_GEN_ERROR 并携带错误信息
                     result.status = status::RANDOM_GEN_ERROR;
-                    strcpy(result.path_to_error, (datadir / "random.out").c_str());
+                    result.error_log = read_file_content(datadir / "random.out", "No information");
                     return result;
                 } break;
                 default: {  // INTERNAL_ERROR
                     // 随机数据生成器出错，返回 SYSTEM_ERROR 并携带错误信息
                     result.status = status::SYSTEM_ERROR;
-                    strcpy(result.path_to_error, (random_data_dir / to_string(number) / "random.out").c_str());
+                    result.error_log = read_file_content(datadir / "random.out", "No information");
                     return result;
                 } break;
             }
@@ -118,7 +113,7 @@ static judge::message::task_result judge(judge::message::client_task &client_tas
         }
     }
 
-    strcpy(result.data_dir, datadir.c_str());
+    result.data_dir = datadir;
     int ret = call_process(check_script->get_run_path(), "-n", execcpuset, datadir, submit.time_limit, submit.memory_limit, CHROOT_DIR, workdir, getpid(), run_script->get_run_path(), compare_script->get_run_path(cachedir / "compare"));
     switch (ret) {
         case E_INTERNAL_ERROR:
@@ -164,17 +159,20 @@ static judge::message::task_result judge(judge::message::client_task &client_tas
     return result;
 }
 
-static judge::status compile(judge::server::program *program, const filesystem::path &workdir, const string &execcpuset) {
+static void compile(judge::server::program *program, const filesystem::path &workdir, const string &execcpuset, judge::message::task_result &task_result) {
     try {
         // 将程序存放在 workdir 下，program->fetch 会自行组织 workdir 内的文件存储结构
         // 并编译程序，编译需要的运行环境就是全局的 CHROOT_DIR，这样可以获得比较完整的环境
         program->fetch(execcpuset, workdir, CHROOT_DIR);
-        return judge::status::ACCEPTED;
+        task_result.status = judge::status::ACCEPTED;
+    } catch (judge::server::executable_compilation_error &ex) {
+        task_result.status = judge::status::EXECUTABLE_COMPILATION_ERROR;
     } catch (judge::server::compilation_error &ex) {
-        return judge::status::COMPILATION_ERROR;
+        task_result.status = judge::status::COMPILATION_ERROR;
     } catch (exception &ex) {
-        return judge::status::SYSTEM_ERROR;
+        task_result.status = judge::status::SYSTEM_ERROR;
     }
+    task_result.error_log = program->get_compilation_log(workdir);
 }
 
 /**
@@ -188,15 +186,12 @@ static judge::status compile(judge::server::program *program, const filesystem::
 static judge::message::task_result compile(judge::message::client_task &client_task, judge::server::submission &submit, const string &execcpuset) {
     filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;
 
-    judge::message::task_result result = {
-        .judge_id = client_task.judge_id,
-        .id = client_task.id,
-        .type = client_task.type};
+    judge::message::task_result result{client_task.judge_id, client_task.id, client_task.type};
 
-    // 编译选手程序，一般情况下 submit.submission 都为非空
+    // 编译选手程序，submit.submission 都为非空
     if (submit.submission) {
         filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
-        result.status = compile(submit.submission.get(), workdir, execcpuset);
+        compile(submit.submission.get(), workdir, execcpuset, result);
         auto metadata = read_runguard_result(workdir / "compile" / "compile.meta");
         result.run_time = metadata.wall_time;
         result.memory_used = metadata.memory / 1024;
@@ -206,14 +201,18 @@ static judge::message::task_result compile(judge::message::client_task &client_t
     // 编译随机数据生成器
     if (submit.random) {
         filesystem::path randomdir = cachedir / "random";
-        result.status = compile(submit.random.get(), randomdir, execcpuset);
+        compile(submit.random.get(), randomdir, execcpuset, result);
+        if (result.status == status::COMPILATION_ERROR)
+            result.status = status::EXECUTABLE_COMPILATION_ERROR;
         if (result.status != status::ACCEPTED) return result;
     }
 
     // 编译标准程序
     if (submit.standard) {
         filesystem::path standarddir = cachedir / "standard";
-        result.status = compile(submit.random.get(), standarddir, execcpuset);
+        compile(submit.random.get(), standarddir, execcpuset, result);
+        if (result.status == status::COMPILATION_ERROR)
+            result.status = status::EXECUTABLE_COMPILATION_ERROR;
         if (result.status != status::ACCEPTED) return result;
     }
     return result;

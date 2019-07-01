@@ -167,12 +167,7 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
     return true;
 }
 
-static void set_compilelog(configuration &sicily, const filesystem::path &logfile, const submission &submit) {
-    if (!filesystem::exists(logfile))
-        LOG(INFO) << "Error: compile log file " << logfile << " not found.";
-
-    string log = read_file_content(logfile);
-
+static void set_compilelog(configuration &sicily, const string &log, const submission &submit) {
     sicily.db.query<std::tuple<>>(
         "UPDATE status set compilelog=? where sid=?",
         log, submit.sub_id);
@@ -281,7 +276,7 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
 
     if (task_results[0].status != judge::status::ACCEPTED) {
         set_status(*this, task_results[0], 0, submit);
-        set_compilelog(*this, filesystem::path(task_results[0].path_to_error), submit);
+        set_compilelog(*this, task_results[0].error_log, submit);
         update_user(*this, false, submit);
     } else {
         judge::message::task_result final_result;

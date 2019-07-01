@@ -28,8 +28,19 @@ using namespace std;
  */
 struct compilation_error : public runtime_error {
 public:
-    explicit compilation_error(const string &what);
-    explicit compilation_error(const char *what);
+    const string error_log;
+
+    explicit compilation_error(const string &what, const string &error_log);
+};
+
+/**
+ * @brief 表示 executable 编译错误，表示标准程序不合法
+ */
+struct executable_compilation_error : public compilation_error {
+public:
+    const string error_log;
+
+    explicit executable_compilation_error(const string &what, const string &error_log);
 };
 
 /**

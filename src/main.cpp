@@ -228,7 +228,7 @@ int main(int argc, char* argv[]) {
                 } else {
                     cores.erase(it);
                 }
-                CPU_SET(it, &cpuset);
+                CPU_SET(id, &cpuset);
             }
 
             client_threads.push_back(move(judge::client::start_client(cpuset, client.literal, testcase_queue)));

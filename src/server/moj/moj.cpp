@@ -310,7 +310,7 @@ bool configuration::fetch_submission(submission &submit) {
 
 static json get_error_report(const judge::message::task_result &result) {
     error_report report;
-    report.message = read_file_content(filesystem::path(result.path_to_error));
+    report.message = result.error_log;
     return report;
 }
 
@@ -325,7 +325,7 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
     {
         compile_check_report compile_check;
         compile_check.full_grade = boost::rational_cast<double>(submit.test_cases[0].score);
-        compile_check.report = read_file_content(filesystem::path(task_results[0].path_to_error));
+        compile_check.report = task_results[0].error_log;
         if (task_results[0].status == status::ACCEPTED) {
             compile_check.grade = compile_check.grade;
             compile_check_json = compile_check;
@@ -351,15 +351,17 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
             if (task_result.type == random_check_report::TYPE) {
                 check_case_report kase;
                 kase.result = status_string.at(task_result.status);
-                filesystem::path rundir(task_result.path_to_error);
-                kase.stdin = read_file_content(rundir / "input" / "testdata.in");
-                kase.stdout = read_file_content(rundir / "output" / "testdata.out");
-                kase.subout = read_file_content(rundir / "program.out");
+                kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
+                kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
+                kase.subout = read_file_content(task_result.run_dir / "program.out");
 
                 if (task_result.status == status::ACCEPTED) {
                     score += submit.test_cases[i].score;
                     ++random_check.pass_cases;
-                } else if (task_result.status == status::SYSTEM_ERROR) {
+                } else if (task_result.status == status::SYSTEM_ERROR ||
+                           task_result.status == status::RANDOM_GEN_ERROR ||
+                           task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
+                           task_result.status == status::COMPARE_ERROR) {
                     random_check_json = get_error_report(task_result);
                     goto random_check_final;
                 }
@@ -386,16 +388,17 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
             if (task_result.type == standard_check_report::TYPE) {
                 check_case_report kase;
                 kase.result = status_string.at(task_result.status);
-                filesystem::path rundir(task_result.run_dir);
-                filesystem::path datadir(task_result.data_dir);
-                kase.stdin = read_file_content(datadir / "input" / "testdata.in");
-                kase.stdout = read_file_content(datadir / "output" / "testdata.out");
-                kase.subout = read_file_content(rundir / "program.out");
+                kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
+                kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
+                kase.subout = read_file_content(task_result.run_dir / "program.out");
 
                 if (task_result.status == status::ACCEPTED) {
                     score += submit.test_cases[i].score;
                     ++standard_check.pass_cases;
-                } else if (task_result.status == status::SYSTEM_ERROR) {
+                } else if (task_result.status == status::SYSTEM_ERROR ||
+                           task_result.status == status::RANDOM_GEN_ERROR ||
+                           task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
+                           task_result.status == status::COMPARE_ERROR) {
                     standard_check_json = get_error_report(task_result);
                     goto standard_check_final;
                 }

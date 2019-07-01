@@ -67,6 +67,9 @@ struct client_task {
 struct task_result {
     static constexpr long ID = 1;
 
+    task_result();
+    task_result(unsigned judge_id, uint8_t id, uint8_t type);
+
     unsigned judge_id;
 
     judge::status status;
@@ -96,10 +99,10 @@ struct task_result {
     int memory_used;
 
     /**
-     * @brief 指向错误报告文件的路径
-     * 如果 status 为 SYSTEM_ERROR/RANDOM_GEN_ERROR，那么这个路径表示保存错误信息的文件，
+     * @brief 错误报告
+     * 如果 status 为 SYSTEM_ERROR/RANDOM_GEN_ERROR/EXECUTABLE_COMPILATION_ERROR 时起效
      */
-    char path_to_error[256];
+    string error_log;
 
     /**
      * @brief 指向当前评测的运行路径
@@ -111,7 +114,7 @@ struct task_result {
      * ├── program.err // 选手程序的 stderr 输出
      * └── runguard.err // runguard 的错误输出
      */
-    char run_dir[256];
+    filesystem::path run_dir;
 
     /**
      * @brief 指向当前评测的数据路径
@@ -124,7 +127,7 @@ struct task_result {
      * └── output // 输出数据文件夹
      *     └── testdata.out // 标准输出数据
      */
-    char data_dir[256];
+    filesystem::path data_dir;
 };
 
 }  // namespace judge::message

@@ -14,6 +14,14 @@ using namespace std;
 string read_file_content(const filesystem::path &path);
 
 /**
+ * @brief 读取文本文件的全部内容
+ * @param path 文本文件路径
+ * @param def 若文件不存在，返回 def
+ * @return 文本文件的内容(没有指定编码)
+ */
+string read_file_content(filesystem::path const &path, const string &def);
+
+/**
  * @brief 断言 subpath 一定不会出现返回上一层目录的情况
  * 这里用于确保计算目录时不会出现目录遍历攻击，由于评测系统
  * 运行时需要 root 权限，如果拿到的文件名包含 "../"，那么

@@ -29,7 +29,7 @@ static map<string, string> read_metadata(const filesystem::path &metadata_file) 
 template <typename T>
 void try_to_parse(const string &text, T &value) {
     try {
-        value = boost::lexical_cast<T>(value);
+        value = boost::lexical_cast<T>(text);
     } catch (boost::bad_lexical_cast &) {
         // ignore exception
     }
