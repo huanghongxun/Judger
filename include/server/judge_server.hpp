@@ -2,9 +2,9 @@
 
 #include <filesystem>
 #include "common/messages.hpp"
+#include "common/status.hpp"
 #include "config.hpp"
 #include "server/submission.hpp"
-#include "server/status.hpp"
 
 namespace judge::server {
 using namespace std;

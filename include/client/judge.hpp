@@ -2,7 +2,7 @@
 
 #include <filesystem>
 #include <string>
-#include "server/status.hpp"
+#include "common/status.hpp"
 
 namespace judge::client {
 using namespace std;

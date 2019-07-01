@@ -5,7 +5,7 @@
 #include <fstream>
 #include <tuple>
 #include "common/io_utils.hpp"
-#include "server/status.hpp"
+#include "common/status.hpp"
 
 namespace judge::server::sicily {
 using namespace std;

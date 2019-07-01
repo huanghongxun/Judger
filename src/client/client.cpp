@@ -1,29 +1,29 @@
 #include "client/client.hpp"
-#include <boost/lexical_cast.hpp>
 #include <unistd.h>
+#include <boost/lexical_cast.hpp>
 #include <fstream>
 #include <thread>
-#include "config.hpp"
-#include "server/server.hpp"
 #include "client/judge.hpp"
 #include "common/interprocess.hpp"
-#include "common/stl_utils.hpp"
 #include "common/messages.hpp"
+#include "common/stl_utils.hpp"
 #include "common/utils.hpp"
+#include "config.hpp"
+#include "server/server.hpp"
 
 namespace judge::client {
 using namespace std;
 
-void start_client(const cpu_set_t &set, const string &execcpuset, message::queue &testcase_queue, message::queue &result_queue) {
+thread start_client(const cpu_set_t &set, const string &execcpuset, message::queue &testcase_queue) {
     thread thd([&] {
-        client(execcpuset, testcase_queue, result_queue);
+        client(execcpuset, testcase_queue);
     });
-
-    thd.detach();
 
     // 设置当前线程（客户端线程）的 CPU 亲和性，要求操作系统将 thd 线程放在指定的 cpuset 上运行
     int ret = pthread_setaffinity_np(thd.native_handle(), sizeof(cpu_set_t), &set);
     if (ret < 0) throw std::system_error();
+
+    return thd;
 }
 
 /**
@@ -34,7 +34,7 @@ void start_client(const cpu_set_t &set, const string &execcpuset, message::queue
  * @param execcpuset 当前评测任务能允许运行在那些 cpu 核心上
  * @param result_queue 评测结果队列
  */
-static void judge(judge::message::client_task &client_task, judge::server::submission &submit, const judge::server::test_check &task, const string &execcpuset, message::queue &result_queue) {
+static judge::message::task_result judge(judge::message::client_task &client_task, judge::server::submission &submit, const judge::server::test_check &task, const string &execcpuset) {
     namespace ip = boost::interprocess;
     filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
@@ -88,15 +88,13 @@ static void judge(judge::message::client_task &client_task, judge::server::submi
                     // 随机数据生成器出错，返回 RANDOM_GEN_ERROR 并携带错误信息
                     result.status = status::RANDOM_GEN_ERROR;
                     strcpy(result.path_to_error, (datadir / "random.out").c_str());
-                    result_queue.send_as_pod(result);
-                    return;
+                    return result;
                 } break;
                 default: {  // INTERNAL_ERROR
                     // 随机数据生成器出错，返回 SYSTEM_ERROR 并携带错误信息
                     result.status = status::SYSTEM_ERROR;
                     strcpy(result.path_to_error, (random_data_dir / to_string(number) / "random.out").c_str());
-                    result_queue.send_as_pod(result);
-                    return;
+                    return result;
                 } break;
             }
         } else {
@@ -163,7 +161,7 @@ static void judge(judge::message::client_task &client_task, judge::server::submi
     auto metadata = read_runguard_result(rundir / "program.meta");
     result.run_time = metadata.wall_time;
     result.memory_used = metadata.memory / 1024;
-    result_queue.send_as_pod(result);
+    return result;
 }
 
 static judge::status compile(judge::server::program *program, const filesystem::path &workdir, const string &execcpuset) {
@@ -187,7 +185,7 @@ static judge::status compile(judge::server::program *program, const filesystem::
  * @param execcpuset 当前评测任务能允许运行在那些 cpu 核心上
  * @param result_queue 评测结果队列
  */
-static void compile(judge::message::client_task &client_task, judge::server::submission &submit, const string &execcpuset, message::queue &result_queue) {
+static judge::message::task_result compile(judge::message::client_task &client_task, judge::server::submission &submit, const string &execcpuset) {
     filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;
 
     judge::message::task_result result = {
@@ -202,41 +200,45 @@ static void compile(judge::message::client_task &client_task, judge::server::sub
         auto metadata = read_runguard_result(workdir / "compile" / "compile.meta");
         result.run_time = metadata.wall_time;
         result.memory_used = metadata.memory / 1024;
-        if (result.status != status::ACCEPTED) goto end;
+        if (result.status != status::ACCEPTED) return result;
     }
 
     // 编译随机数据生成器
     if (submit.random) {
         filesystem::path randomdir = cachedir / "random";
         result.status = compile(submit.random.get(), randomdir, execcpuset);
-        if (result.status != status::ACCEPTED) goto end;
+        if (result.status != status::ACCEPTED) return result;
     }
 
     // 编译标准程序
     if (submit.standard) {
         filesystem::path standarddir = cachedir / "standard";
         result.status = compile(submit.random.get(), standarddir, execcpuset);
-        if (result.status != status::ACCEPTED) goto end;
+        if (result.status != status::ACCEPTED) return result;
     }
-end:
-    result_queue.send_as_pod(result);
+    return result;
 }
 
-void client(const string &execcpuset, message::queue &testcase_queue, message::queue &result_queue) {
+void client(const string &execcpuset, message::queue &testcase_queue) {
     while (true) {
+        // 从队列中读取评测信息
+        message::client_task client_task;
         {
-            // 从队列中读取评测信息
-            judge::message::client_task client_task;
-            auto envelope = testcase_queue.recv_from_pod(client_task);
-            if (envelope.success) {
-                judge::server::submission &submit = *client_task.submit;
-                if (client_task.test_check == nullptr)
-                    compile(client_task, submit, execcpuset, result_queue);
-                else
-                    judge(client_task, submit, *client_task.test_check, execcpuset, result_queue);
+            auto envelope = testcase_queue.recv_from_pod(client_task, message::queue::NO_WAIT);
+            if (!envelope.success) {
+                if (!server::fetch_submission(testcase_queue))
+                    usleep(10 * 1000);  // 10ms，这里必须等待，不可以忙等，否则会挤占 process 函数的执行权
+                continue;
             }
         }
-        usleep(10 * 1000);  // sleep for 10ms.
+
+        judge::server::submission &submit = *client_task.submit;
+        judge::message::task_result result;
+        if (client_task.test_check == nullptr)
+            result = compile(client_task, submit, execcpuset);
+        else
+            result = judge(client_task, submit, *client_task.test_check, execcpuset);
+        server::process(testcase_queue, result);
     }
 }
 

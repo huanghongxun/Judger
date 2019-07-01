@@ -25,6 +25,12 @@ enum class status {
     ACCEPTED,
 
     /**
+     * @brief 用户程序本测试点没有拿到全部分数。
+     * TODO: 支持 spj 部分分
+     */
+    PARTIAL_CORRECT,
+
+    /**
      * @brief 用户程序编译错误
      * 用户程序无法通过编译
      */

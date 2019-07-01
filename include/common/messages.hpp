@@ -1,9 +1,9 @@
 #pragma once
 
 #include <variant>
+#include "common/status.hpp"
 #include "server/program.hpp"
 #include "server/submission.hpp"
-#include "server/status.hpp"
 
 namespace judge::message {
 using namespace std;
@@ -13,7 +13,6 @@ using namespace std;
  */
 struct client_task {
     static constexpr long ID = 0;
-    static constexpr uint8_t COMPILE_ID = 0;
     static constexpr uint8_t COMPILE_TYPE = 0;
 
     /**

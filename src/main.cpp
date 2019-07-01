@@ -1,5 +1,5 @@
-#include <glog/logging.h>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <sys/wait.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
@@ -16,16 +16,8 @@
 #include "server/sicily/sicily.hpp"
 using namespace std;
 
-judge::message::queue testcase_queue, result_queue;
+judge::message::queue testcase_queue;
 set<int> client_pid;
-
-void sig_chld_handler(int sig) {
-    pid_t p;
-    int status;
-
-    while ((p = waitpid(-1, &status, WNOHANG)) != -1) {
-    }
-}
 
 struct cpuset {
     string literal;
@@ -90,7 +82,7 @@ int main(int argc, char* argv[]) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     google::InitGoogleLogging(argv[0]);
 
-    CHECK(getenv("RUNGUARD")) // RUNGUARD 环境变量将传给 exec/check/standard/run 评测脚本使用
+    CHECK(getenv("RUNGUARD"))  // RUNGUARD 环境变量将传给 exec/check/standard/run 评测脚本使用
         << "RUNGUARD environment variable should be specified. This env points out where the runguard executable locates in.";
 
     put_error_codes();
@@ -107,7 +99,8 @@ int main(int argc, char* argv[]) {
         ("enable",   po::value<vector<string>>(), "run Matrix Judge System 4.0 submission fetcher, with configuration file path.")
         ("enable-3", po::value<vector<string>>(), "run Matrix Judge System 3.0 submission fetcher, with configuration file path.")
         ("enable-2", po::value<vector<string>>(), "run Matrix Judge System 2.0 submission fetcher, with configuration file path.")
-        ("server", po::value<unsigned>(), "set the core the judge server occupies")
+        ("monitor-port", po::value<unsigned>(), "set the port the monitor server listens to, default to 80")
+        ("server", po::value<unsigned>(), "set the core the monitor server occupies")
         ("clients", po::value<unsigned>(), "set number of single thread judge clients to be kept")
         ("client", po::value<vector<cpuset>>(), "run a judge client which cpuset is given")
         ("exec-dir", po::value<string>(), "set the default predefined executables for falling back")
@@ -197,7 +190,7 @@ int main(int argc, char* argv[]) {
         // TODO: not implemented
     }
 
-    unsigned server_cpuid = 0;
+    int server_cpuid = -1;
     if (vm.count("server")) {
         auto i = vm.at("server").as<unsigned>();
         if (i >= cpus) {
@@ -213,11 +206,7 @@ int main(int argc, char* argv[]) {
     }
 
     set<unsigned> cores;
-    cpu_set_t servercpuset;
-    CPU_ZERO(&servercpuset);
-    CPU_SET(server_cpuid, &servercpuset);
-    int ret = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &servercpuset);
-    if (ret < 0) throw std::system_error();
+    vector<thread> client_threads;
 
     // 评测服务端需要占用一个 cpu 核心
     for (unsigned i = 0; i < cpus; ++i) {
@@ -228,6 +217,9 @@ int main(int argc, char* argv[]) {
     if (vm.count("client")) {
         auto clients = vm.at("client").as<vector<cpuset>>();
         for (auto& client : clients) {
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);
+
             for (unsigned id : client.ids) {
                 auto it = cores.find(id);
                 if (it == cores.end()) {
@@ -236,9 +228,10 @@ int main(int argc, char* argv[]) {
                 } else {
                     cores.erase(it);
                 }
+                CPU_SET(it, &cpuset);
             }
 
-            judge::client::start_client(servercpuset, client.literal, testcase_queue, result_queue);
+            client_threads.push_back(move(judge::client::start_client(cpuset, client.literal, testcase_queue)));
         }
     }
 
@@ -252,9 +245,15 @@ int main(int argc, char* argv[]) {
         auto it = cores.begin();
         for (; i < clients; ++i, ++it) {
             int cpuid = *it;
-            judge::client::start_client(servercpuset, to_string(cpuid), testcase_queue, result_queue);
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);
+            CPU_SET(cpuid, &cpuset);
+            client_threads.push_back(move(judge::client::start_client(cpuset, to_string(cpuid), testcase_queue)));
         }
     }
 
-    judge::server::server(testcase_queue, result_queue);
+    // TODO: termination recovery
+    for (auto& th : client_threads)
+        th.join();
+    return 0;
 }
