@@ -248,30 +248,34 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
     submit.compare = server.exec_mgr.get_compare_script("diff-ign-space");
 
     const json &grading = config.at("grading").at(language);
+    vector<int> standard_checks;  // 标准测试的评测点编号
+    vector<int> random_checks;    // 随机测试的评测点编号
+
     for (auto &check : grading.items()) {
         test_check testcase;
         int grade = check.value().get<int>();
         testcase.score = grade;
+        testcase.depends_on = 0;  // 依赖编译任务
+        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
         if (!grade) continue;
         if (check.key() == "CompileCheck") {
+            testcase.is_random = false;
+            testcase.score = 0;
             testcase.check_type = 0;
-        } else if (check.key() == "MemoryCheck") {
-            testcase.check_type = memory_check_report::TYPE;
-            testcase.check_script = "memory";
-            testcase.is_random = submit.test_cases.empty();
-
-            size_t case_num = testcase.is_random ? 10 : submit.test_cases.size();
-            for (size_t i = 0; i < case_num; ++i) {
-                testcase.testcase_id = i;
-                submit.test_cases.push_back(testcase);
-            }
+            testcase.testcase_id = 0;
+            testcase.depends_on = -1;
+            submit.test_cases.push_back(testcase);
         } else if (check.key() == "RandomCheck") {
             testcase.check_type = random_check_report::TYPE;
             testcase.check_script = "standard";
             testcase.is_random = true;
+            testcase.depends_on = 0;  // 依赖编译任务
+            testcase.depends_cond = test_check::depends_condition::ACCEPTED;
 
             for (size_t i = 0; i < submit.random_test_times; ++i) {
-                testcase.testcase_id = i;
+                testcase.testcase_id = -1; // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
+                // 将当前的随机测试点编号记录下来，给内存测试依赖
+                random_checks.push_back(submit.test_cases.size());
                 submit.test_cases.push_back(testcase);
             }
         } else if (check.key() == "StandardCheck") {
@@ -281,6 +285,8 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
 
             for (size_t i = 0; i < submit.test_cases.size(); ++i) {
                 testcase.testcase_id = i;
+                // 将当前的标准测试点编号记录下来，给内存测试依赖
+                standard_checks.push_back(submit.test_cases.size());
                 submit.test_cases.push_back(testcase);
             }
         } else if (check.key() == "StaticCheck") {
@@ -289,6 +295,41 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         } else if (check.key() == "GTestCheck") {
             testcase.check_type = gtest_check_report::TYPE;
             // TODO: not implemented
+        }
+    }
+
+    for (auto &check : grading.items()) {
+        test_check testcase;
+        int grade = check.value().get<int>();
+        testcase.score = grade;
+        if (!grade) continue;
+        if (check.key() == "MemoryCheck") {
+            testcase.check_type = memory_check_report::TYPE;
+            testcase.check_script = "memory";
+            testcase.is_random = submit.test_cases.empty();
+
+            if (testcase.is_random) {
+                if (!random_checks.empty()) {  // 如果存在随机测试，则依赖随机测试点的数据
+                    for (int &i : random_checks) {
+                        testcase.testcase_id = submit.test_cases[i].testcase_id;
+                        testcase.depends_on = i;
+                        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+                        submit.test_cases.push_back(testcase);
+                    }
+                } else {
+                    for (size_t i = 0; i < 10; ++i) {
+                        testcase.testcase_id = i;
+                        submit.test_cases.push_back(testcase);
+                    }
+                }
+            } else {
+                for (int &i : standard_checks) {
+                    testcase.testcase_id = submit.test_cases[i].testcase_id;
+                    testcase.depends_on = i;
+                    testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+                    submit.test_cases.push_back(testcase);
+                }
+            }
         }
     }
 }
@@ -308,10 +349,101 @@ bool configuration::fetch_submission(submission &submit) {
     return false;
 }
 
+void configuration::summarize_invalid(submission &submit) {
+    throw runtime_error("Invalid submission");
+}
+
 static json get_error_report(const judge::message::task_result &result) {
     error_report report;
     report.message = result.error_log;
     return report;
+}
+
+static void summarize_compile_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &compile_check_json) {
+    compile_check_report compile_check;
+    compile_check.full_grade = boost::rational_cast<double>(submit.test_cases[0].score);
+    compile_check.report = task_results[0].error_log;
+    if (task_results[0].status == status::ACCEPTED) {
+        compile_check.grade = compile_check.grade;
+        compile_check_json = compile_check;
+    } else if (task_results[0].status == status::SYSTEM_ERROR) {
+        compile_check_json = get_error_report(task_results[0]);
+    } else {
+        compile_check.grade = 0;
+        compile_check_json = compile_check;
+    }
+    report.grade += compile_check.grade;
+}
+
+static void summarize_random_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &random_check_json) {
+    random_check_report random_check;
+    random_check.pass_cases = 0;
+    random_check.total_cases = 0;
+    boost::rational<int> score, full_score;
+    for (size_t i = 0; i < task_results.size(); ++i) {
+        auto &task_result = task_results[i];
+        if (task_result.type == random_check_report::TYPE) {
+            check_case_report kase;
+            kase.result = status_string.at(task_result.status);
+            kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
+            kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
+            kase.subout = read_file_content(task_result.run_dir / "program.out");
+
+            if (task_result.status == status::ACCEPTED) {
+                score += submit.test_cases[i].score;
+                ++random_check.pass_cases;
+            } else if (task_result.status == status::SYSTEM_ERROR ||
+                        task_result.status == status::RANDOM_GEN_ERROR ||
+                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
+                        task_result.status == status::COMPARE_ERROR) {
+                random_check_json = get_error_report(task_result);
+                return;
+            }
+
+            full_score += submit.test_cases[i].score;
+            ++random_check.total_cases;
+            random_check.report.push_back(kase);
+        }
+    }
+    random_check.grade = boost::rational_cast<double>(score);
+    random_check.full_grade = boost::rational_cast<double>(full_score);
+    report.grade += random_check.grade;
+}
+
+static void summarize_standard_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
+
+    standard_check_report standard_check;
+    standard_check.pass_cases = 0;
+    standard_check.total_cases = 0;
+    boost::rational<int> score, full_score;
+    for (size_t i = 0; i < task_results.size(); ++i) {
+        auto &task_result = task_results[i];
+        if (task_result.type == standard_check_report::TYPE) {
+            check_case_report kase;
+            kase.result = status_string.at(task_result.status);
+            kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
+            kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
+            kase.subout = read_file_content(task_result.run_dir / "program.out");
+
+            if (task_result.status == status::ACCEPTED) {
+                score += submit.test_cases[i].score;
+                ++standard_check.pass_cases;
+            } else if (task_result.status == status::SYSTEM_ERROR ||
+                        task_result.status == status::RANDOM_GEN_ERROR ||
+                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
+                        task_result.status == status::COMPARE_ERROR) {
+                standard_check_json = get_error_report(task_result);
+                return;
+            }
+
+            full_score += submit.test_cases[i].score;
+            ++standard_check.total_cases;
+            standard_check.report.push_back(kase);
+        }
+    }
+    standard_check.grade = boost::rational_cast<double>(score);
+    standard_check.full_grade = boost::rational_cast<double>(full_score);
+    report.grade += standard_check.grade;
 }
 
 void configuration::summarize(submission &submit, const vector<judge::message::task_result> &task_results) {
@@ -322,97 +454,15 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
     report.is_complete = true;
 
     json compile_check_json;
-    {
-        compile_check_report compile_check;
-        compile_check.full_grade = boost::rational_cast<double>(submit.test_cases[0].score);
-        compile_check.report = task_results[0].error_log;
-        if (task_results[0].status == status::ACCEPTED) {
-            compile_check.grade = compile_check.grade;
-            compile_check_json = compile_check;
-        } else if (task_results[0].status == status::SYSTEM_ERROR) {
-            compile_check_json = get_error_report(task_results[0]);
-        } else {
-            compile_check.grade = 0;
-            compile_check_json = compile_check;
-        }
-        report.grade += compile_check.grade;
-    }
+    summarize_compile_check(report, submit, task_results, compile_check_json);
 
     memory_check_report memory_check;
 
     json random_check_json;
-    {
-        random_check_report random_check;
-        random_check.pass_cases = 0;
-        random_check.total_cases = 0;
-        boost::rational<int> score, full_score;
-        for (size_t i = 0; i < task_results.size(); ++i) {
-            auto &task_result = task_results[i];
-            if (task_result.type == random_check_report::TYPE) {
-                check_case_report kase;
-                kase.result = status_string.at(task_result.status);
-                kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
-                kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
-                kase.subout = read_file_content(task_result.run_dir / "program.out");
-
-                if (task_result.status == status::ACCEPTED) {
-                    score += submit.test_cases[i].score;
-                    ++random_check.pass_cases;
-                } else if (task_result.status == status::SYSTEM_ERROR ||
-                           task_result.status == status::RANDOM_GEN_ERROR ||
-                           task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
-                           task_result.status == status::COMPARE_ERROR) {
-                    random_check_json = get_error_report(task_result);
-                    goto random_check_final;
-                }
-
-                full_score += submit.test_cases[i].score;
-                ++random_check.total_cases;
-                random_check.report.push_back(kase);
-            }
-        }
-        random_check.grade = boost::rational_cast<double>(score);
-        random_check.full_grade = boost::rational_cast<double>(full_score);
-        report.grade += random_check.grade;
-    random_check_final:;
-    }
+    summarize_random_check(report, submit, task_results, random_check_json);
 
     json standard_check_json;
-    {
-        standard_check_report standard_check;
-        standard_check.pass_cases = 0;
-        standard_check.total_cases = 0;
-        boost::rational<int> score, full_score;
-        for (size_t i = 0; i < task_results.size(); ++i) {
-            auto &task_result = task_results[i];
-            if (task_result.type == standard_check_report::TYPE) {
-                check_case_report kase;
-                kase.result = status_string.at(task_result.status);
-                kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
-                kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
-                kase.subout = read_file_content(task_result.run_dir / "program.out");
-
-                if (task_result.status == status::ACCEPTED) {
-                    score += submit.test_cases[i].score;
-                    ++standard_check.pass_cases;
-                } else if (task_result.status == status::SYSTEM_ERROR ||
-                           task_result.status == status::RANDOM_GEN_ERROR ||
-                           task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
-                           task_result.status == status::COMPARE_ERROR) {
-                    standard_check_json = get_error_report(task_result);
-                    goto standard_check_final;
-                }
-
-                full_score += submit.test_cases[i].score;
-                ++standard_check.total_cases;
-                standard_check.report.push_back(kase);
-            }
-        }
-        standard_check.grade = boost::rational_cast<double>(score);
-        standard_check.full_grade = boost::rational_cast<double>(full_score);
-        report.grade += standard_check.grade;
-    standard_check_final:;
-    }
+    summarize_standard_check(report, submit, task_results, standard_check_json);
 
     static_check_report static_check;
     gtest_check_report gtest_check;

@@ -49,6 +49,12 @@ struct judge_server {
     virtual void summarize(submission &submit, const vector<judge::message::task_result> &task_results) = 0;
 
     /**
+     * @brief 处理不合法的提交
+     * @param submit 不合法的提交
+     */
+    virtual void summarize_invalid(submission &submit) = 0;
+
+    /**
      * @brief 获取服务器对应的 executable manager
      */
     virtual const executable_manager &get_executable_manager() const = 0;

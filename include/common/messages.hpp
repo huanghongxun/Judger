@@ -33,7 +33,7 @@ struct client_task {
     judge::server::test_check *test_check;
 
     /**
-     * @brief 本测试点的 id，不同的 type 的 id 不冲突
+     * @brief 本测试点的 id，为当前评测点在 submit.test_cases 的下标
      * 用于返回评测结果的时候统计
      */
     uint8_t id;
@@ -75,7 +75,7 @@ struct task_result {
     judge::status status;
 
     /**
-     * @brief 本测试点的 id
+     * @brief 本测试点的 id，是 submission.test_cases 的下标
      * 用于返回评测结果的时候统计
      */
     uint8_t id;

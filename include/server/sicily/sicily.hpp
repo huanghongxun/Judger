@@ -47,6 +47,13 @@ struct configuration : public judge_server {
      * @param task_results 评测结果
      */
     void summarize(submission &submit, const vector<judge::message::task_result> &task_results) override;
+
+    /**
+     * @brief 处理不合法的提交
+     * 对于 sicily，不可能存在不合法的提交，如果存在则报错并终止程序
+     * @param submit 不合法的提交
+     */
+    void summarize_invalid(submission &submit) override;
 };
 
 }  // namespace judge::server::sicily

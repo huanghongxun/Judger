@@ -53,6 +53,13 @@ struct test_case_data {
  * @brief 表示一个测试点
  */
 struct test_check {
+
+    enum class depends_condition {
+        ACCEPTED, // 要求依赖的测试点通过后才能执行本测试
+        PARTIAL_CORRECT, // 要求依赖的测试点不为 0 分时才能执行本测试
+        NON_TIME_LIMIT // 仅在依赖的测试点超出时间限制后才不继续测试
+    };
+
     /**
      * @brief 测试点类型
      * 提供给 judge_server 来区分测试类型，比如对于 MOJ：
@@ -88,9 +95,23 @@ struct test_check {
 
     /**
      * @brief 标准测试数据 id，在 submission.test_cases 中进行索引
-     * 若为随机测试，此项无用
+     * 若为随机测试，此项在评测完成后将会被修改成随机测试使用的数据点
      */
     unsigned testcase_id;
+
+    /**
+     * @brief 本测试点依赖哪个测试点，负数表示不依赖任何测试点
+     * 依赖指的是，本测试点是否执行，取决于依赖的测试点的状态。
+     * 可以实现标准/随机测试点未通过的情况下不测试对应的内存测试的功能。
+     * 可以实现所有的测试点均需依赖编译测试的功能。
+     */
+    int depends_on;
+
+    /**
+     * @brief 测试点依赖条件，要求依赖的测试点满足要求时才执行之后的测试点
+     * 
+     */
+    depends_condition depends_cond;
 };
 
 /**

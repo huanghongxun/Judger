@@ -14,7 +14,6 @@
 # <run-uuid>     运行的 uuid，用于索引运行文件夹位置
 # <run>          运行程序的脚本的绝对路径
 # <compare>      比较程序/脚本文件夹的绝对路径
-# <compare-args> 比较程序的参数
 #
 # 必须包含的环境变量：
 # "RUNGUARD"     runguard 的路径

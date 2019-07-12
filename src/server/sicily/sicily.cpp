@@ -62,6 +62,10 @@ void configuration::init(const filesystem::path &config_path) {
     db.connect(host.c_str(), user.c_str(), password.c_str(), database.c_str());
 }
 
+void configuration::summarize_invalid(submission &submit) {
+    throw runtime_error("Invalid submission");
+}
+
 static filesystem::path get_data_path(const filesystem::path &testdata, const string &prob_id, const string &filename) {
     return testdata / prob_id / filename;
 }
@@ -96,6 +100,18 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
     prog->source_files.push_back(make_unique<text_asset>("source.cpp", sourcecode));
 
     {
+        // 编译任务
+        test_check kase;
+        kase.check_script = "compile";
+        kase.is_random = false;
+        kase.score = 0;
+        kase.check_type = 0;
+        kase.testcase_id = 0;
+        kase.depends_on = -1;
+        submit.test_cases.push_back(kase);
+    }
+
+    {
         // test_data
         filesystem::path case_dir = sicily.testdata / submit.prob_id;
         ifstream fin(case_dir / ".DIR");
@@ -114,6 +130,8 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
             kase.score = 0;
             kase.check_type = 1;
             kase.testcase_id = i;
+            kase.depends_on = i;  // 当前的 kase 是第 i + 1 组测试点
+            kase.depends_cond = test_check::depends_condition::ACCEPTED;
             submit.test_cases.push_back(kase);
         }
     }

@@ -43,6 +43,11 @@ enum class status {
     EXECUTABLE_COMPILATION_ERROR,
 
     /**
+     * @brief 表示当前评测点的依赖评测点没有满足依赖要求，当前测试点失败
+     */
+    DEPENDENCY_NOT_SATISFIED,
+
+    /**
      * @brief 答案错误
      * 一般是答案错误。
      * 在没开启 PE 评测选项且为精确比较时若有空白字符不匹配的情况也会返回 WA。

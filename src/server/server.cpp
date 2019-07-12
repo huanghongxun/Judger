@@ -41,6 +41,11 @@ static void summarize(unsigned judge_id) {
     filesystem::remove_all(workdir);
 }
 
+static void report_failure(submission &submit) {
+    auto &judge_server = judge_servers.at(submit.category);
+    judge_server->summarize_invalid(submit);
+}
+
 /**
  * @brief 处理 client 返回的评测结果
  * 
@@ -57,13 +62,48 @@ static void process_nolock(message::queue &testcase_queue, const judge::message:
     if (task_result.status == judge::status::ACCEPTED) {
         // 记录测试成功信息
         auto &task_results = judge::server::task_results[judge_id];
-        task_results[0] = task_result;
+        task_results[task_result.id] = task_result;
     }
 
     DLOG(INFO) << "Testcase [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id
                << ", status: " << (int)task_result.status << ", runtime: " << task_result.run_time
                << ", memory: " << task_result.memory_used << ", run_dir: " << task_result.run_dir
                << ", data_dir: " << task_result.data_dir << "]";
+
+    for (size_t i = 0; i < submit.test_cases.size(); ++i) {
+        test_check &kase = submit.test_cases[i];
+        // 寻找依赖当前评测点的评测点
+        if (kase.depends_on == task_result.id) {
+            bool satisfied;
+            switch (kase.depends_cond) {
+                case test_check::depends_condition::ACCEPTED:
+                    satisfied = task_result.status == status::ACCEPTED;
+                    break;
+                case test_check::depends_condition::PARTIAL_CORRECT:
+                    satisfied = task_result.status == status::PARTIAL_CORRECT ||
+                                task_result.status == status::ACCEPTED;
+                    break;
+                case test_check::depends_condition::NON_TIME_LIMIT:
+                    satisfied = task_result.status != status::SYSTEM_ERROR &&
+                                task_result.status != status::COMPARE_ERROR &&
+                                task_result.status != status::COMPILATION_ERROR &&
+                                task_result.status != status::DEPENDENCY_NOT_SATISFIED &&
+                                task_result.status != status::TIME_LIMIT_EXCEEDED &&
+                                task_result.status != status::EXECUTABLE_COMPILATION_ERROR &&
+                                task_result.status != status::OUT_OF_CONTEST_TIME &&
+                                task_result.status != status::RANDOM_GEN_ERROR;
+                    break;
+            }
+
+            if (!satisfied) {
+                message::task_result next_result = task_result;
+                next_result.status = status::DEPENDENCY_NOT_SATISFIED;
+                next_result.id = i;
+                next_result.type = kase.check_type;
+                process_nolock(testcase_queue, next_result);
+            }
+        }
+    }
 
     size_t finished = ++finished_task_cases[judge_id];
     // 如果当前提交的所有测试点都完成测试，则返回评测结果
@@ -74,27 +114,6 @@ static void process_nolock(message::queue &testcase_queue, const judge::message:
         LOG(ERROR) << "Test case exceeded [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "]";
         return;  // 跳过本次评测过程
     }
-
-    // 编译任务比较特殊
-    if (task_result.type == judge::message::client_task::COMPILE_TYPE) {
-        if (task_result.status == judge::status::ACCEPTED) {
-            // 如果编译成功，则分发评测任务
-            for (size_t i = 1; i < submit.test_cases.size(); ++i) {
-                auto &test_case = submit.test_cases[i];
-                judge::message::client_task client_task = {
-                    .judge_id = judge_id,
-                    .submit = &submit,
-                    .test_check = &test_case,
-                    .id = (uint8_t)i,
-                    .type = test_case.check_type};
-                testcase_queue.send_as_pod(client_task);
-            }
-        } else {
-            // 否则评测直接结束，返回评测结果
-            summarize(judge_id);
-            return;  // 跳过本次评测过程
-        }
-    }
 }
 
 void process(message::queue &testcase_queue, const message::task_result &task_result) {
@@ -102,81 +121,81 @@ void process(message::queue &testcase_queue, const message::task_result &task_re
     process_nolock(testcase_queue, task_result);
 }
 
+static bool verify_submission(message::queue &testcase_queue, submission &&submit) {
+    LOG(INFO) << "Judging submission [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "]";
+
+    // 检查 judge_server 获取的 submit 是否包含编译任务，且确保至多一个编译任务
+    bool has_compile_case = false;
+    for (size_t i = 0; i < submit.test_cases.size(); ++i) {
+        auto &test_case = submit.test_cases[i];
+
+        if (test_case.depends_on >= i) {  // 如果每个任务都只依赖前面的任务，那么这个图将是森林，确保不会出现环
+            LOG(WARNING) << "submit from [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "] may contains circular dependency.";
+            report_failure(submit);
+            return false;
+        }
+
+        if (test_case.check_type == message::client_task::COMPILE_TYPE) {
+            if (!has_compile_case) {
+                has_compile_case = true;
+            } else {
+                LOG(WARNING) << "submit from [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "] has multiple compilation subtasks.";
+                report_failure(submit);
+                return false;
+            }
+        }
+    }
+
+    // 给当前提交分配一个 judge_id 给评测服务端和客户端进行识别
+    // global_judge_id++ 就算溢出也无所谓，一般情况下不会同时评测这么多提交
+    unsigned judge_id = global_judge_id++;
+    submissions[judge_id] = move(submit);
+    auto &submit = submissions.at(judge_id);
+
+    if (!submit.submission) return false;
+
+    // 初始化当前提交的所有评测任务状态为 PENDING
+    vector<judge::message::task_result> task_results;
+    task_results.resize(submit.test_cases.size());
+    for (size_t i = 0; i < task_results.size(); ++i) {
+        task_results[i].judge_id = judge_id;
+        task_results[i].status = judge::status::PENDING;
+        task_results[i].id = i;
+        task_results[i].type = submit.test_cases[i].check_type;
+    }
+    judge::server::task_results[judge_id] = move(task_results);
+
+    // 寻找没有依赖的评测点，并发送评测消息
+    bool sent_testcase = false;
+    for (size_t i = 0; i < submit.test_cases.size(); ++i) {
+        if (submit.test_cases[i].depends_on < 0) { // 不依赖任何任务的任务可以直接开始评测
+            judge::message::client_task client_task = {
+                .judge_id = judge_id,
+                .submit = &submit,
+                .test_check = &submit.test_cases[i],
+                .id = i,
+                .type = submit.test_cases[i].check_type};
+            testcase_queue.send_as_pod(client_task);
+            sent_testcase = true;
+        }
+    }
+
+    if (!sent_testcase) {
+        // 如果不存在评测任务，直接返回
+        summarize(judge_id);
+    }
+
+    return sent_testcase;
+}
+
 static bool fetch_submission_nolock(message::queue &testcase_queue) {
-    bool success = false;
+    bool success = false;  // 是否成功拉到评测任务
     // 尝试从服务器拉取提交，每次都向所有的评测服务器拉取评测任务
     for (auto &[category, server] : judge_servers) {
         judge::server::submission submission;
         if (server->fetch_submission(submission)) {
-            LOG(INFO) << "Judging submission [" << submission.category << "-" << submission.prob_id << "-" << submission.sub_id << "]";
-
-            // 检查 judge_server 获取的 submission 是否包含编译任务，且确保至多一个编译任务
-            int compile_case;
-            bool has_compile_case = false;
-            bool has_multiple_compile_case = false;
-            for (size_t i = 0; i < submission.test_cases.size(); ++i) {
-                auto &test_case = submission.test_cases[i];
-                if (test_case.check_type == message::client_task::COMPILE_TYPE) {
-                    if (compile_case == -1) {
-                        has_compile_case = true;
-                        compile_case = i;
-                    } else {
-                        has_multiple_compile_case = true;
-                        break;
-                    }
-                }
-            }
-
-            if (has_multiple_compile_case) {
-                LOG(WARNING) << "Submission from [" << submission.category << "-" << submission.prob_id << "-" << submission.sub_id << "] has multiple compilation subtasks.";
-                continue;
-            }
-
-            // 给当前提交分配一个 judge_id 给评测服务端和客户端进行识别
-            // global_judge_id++ 就算溢出也无所谓，一般情况下不会同时评测这么多提交
-            unsigned judge_id = global_judge_id++;
-            submissions[judge_id] = move(submission);
-            auto &submit = submissions.at(judge_id);
-
-            if (!submit.submission) continue;
-
-            // 初始化当前提交的所有评测任务状态为 PENDING
-            vector<judge::message::task_result> task_results;
-            task_results.resize(submit.test_cases.size());
-            for (size_t i = 0; i < task_results.size(); ++i) {
-                task_results[i].judge_id = judge_id;
-                task_results[i].status = judge::status::PENDING;
-                task_results[i].id = i;
-                task_results[i].type = submit.test_cases[i].check_type;
-            }
-            judge::server::task_results[judge_id] = move(task_results);
-
-            if (has_compile_case) {
-                // 如果是需要编译的提交，先向评测发送编译任务
-                judge::message::client_task client_task = {
-                    .judge_id = judge_id,
-                    .submit = &submit,
-                    .test_check = nullptr,
-                    .id = compile_case,
-                    .type = judge::message::client_task::COMPILE_TYPE};
-                testcase_queue.send_as_pod(client_task);
+            if (verify_submission(testcase_queue, move(submission)))
                 success = true;
-            } else if (submit.test_cases.empty()) {
-                // 如果不存在评测任务，直接返回
-                summarize(judge_id);
-            } else {
-                // 否则直接发送所有的评测任务
-                for (size_t i = 0; i < submit.test_cases.size(); ++i) {
-                    judge::message::client_task client_task = {
-                        .judge_id = judge_id,
-                        .submit = &submit,
-                        .test_check = nullptr,
-                        .id = i,
-                        .type = submit.test_cases[i].check_type};
-                    testcase_queue.send_as_pod(client_task);
-                }
-                success = true;
-            }
         }
     }
     return success;
