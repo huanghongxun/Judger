@@ -1,6 +1,10 @@
 version: '2'
 
 services:
+  rabbit-mq:
+    image: rabbitmq:3.7.15-management
+    ports:
+      - 5672:5672
   master:
     image: chrislusf/seaweedfs
     ports:
@@ -14,7 +18,7 @@ services:
     image: chrislusf/seaweedfs
     ports:
       - 8999:8888
-    command: 'filer -master="seaweed_master:9333" -dir=/data'
+    command: 'filer -master="seaweed_master:9333"'
     depends_on:
       - master
     networks:

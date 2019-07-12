@@ -30,12 +30,12 @@ def on_response(ch, method, props, body):
 def main():
     channel = init_rabbitmq()
     req = json.load(open("./request.json"))
-    result = channel.queue_declare(exclusive=True)
+    result = channel.queue_declare(queue="callback_queue", exclusive=True)
     callback_queue = result.method.queue
     global queue_name, exchange
     channel.queue_bind(exchange=exchange, queue=callback_queue)
     print(callback_queue)
-    channel.basic_consume(on_response, no_ack=True, queue=callback_queue)
+    channel.basic_consume(queue=callback_queue, on_message_callback=on_response, auto_ack=False)
     channel.basic_publish(exchange=exchange, routing_key=queue_name,
                           properties=pika.BasicProperties(reply_to=callback_queue), body=json.dumps(req))
     channel.start_consuming()
