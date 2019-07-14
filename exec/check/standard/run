@@ -125,16 +125,17 @@ touch compare.meta compare.err
 mkdir -p "$RUNDIR/run" # 运行的临时文件都在这里
 mkdir -p "$RUNDIR/feedback"
 mkdir -p "$RUNDIR/work"
+mkdir -p "$RUNDIR/compare-work"
 mkdir -p "$RUNDIR/work/judge"
 mkdir -p "$RUNDIR/work/judge_utils"
 mkdir -p "$RUNDIR/work/compare"
 mkdir -p "$RUNDIR/work/feedback"
 mkdir -p "$RUNDIR/merged"
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
-mount -t overlayfs overlayfs -o lowerdir="$TESTIN",lowerdir="$WORKDIR/compile",upperdir="$RUNDIR/run" "$RUNDIR/work/judge"
-mount -t overlayfs overlayfs -o lowerdir="$JUDGE_UTILS" "$RUNDIR/work/judge_utils"
-mount -t overlayfs overlayfs -o lowerdir="$COMPARE_SCRIPT" "$RUNDIR/work/compare"
-mount -t overlayfs overlayfs -o lowerdir="$CHROOTDIR",upperdir="$RUNDIR/work" "$RUNDIR/merged"
+mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro "$RUNDIR/work/judge"
+mount --bind -o ro "$JUDGE_UTILS" "$RUNDIR/work/judge_utils"
+mount --bind -o ro "$COMPARE_SCRIPT" "$RUNDIR/work/compare"
+mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
 chmod a-wx "$RUNDIR/work/compare"
 
 # 我们不检查选手程序的返回值，比如 C 程序的 main 函数没有写 return 会导致返回值非零，这种不是崩溃导致的
@@ -157,8 +158,8 @@ runcheck "$RUN_SCRIPT" "$RUNDIR/run/testdata.in" "$RUNDIR/run/program.out" \
 # 比较选手程序输出
 logmsg $LOG_INFO "Comparing output"
 umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
-mount -t overlayfs overlayfs -o upperdir="$RUNDIR/feedback" "$RUNDIR/work/feedback"
-mount -t overlayfs overlayfs -o lowerdir="$TESTIN",lowerdir="$TESTOUT",lowerdir="$WORKDIR/compile",upperdir="$RUNDIR/run" "$RUNDIR/work/judge"
+mount --bind "$RUNDIR/feedback" "$RUNDIR/work/feedback"
+mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro:"$TESTOUT"=ro "$RUNDIR/work/judge"
 
 exitcode=0
 runcheck \

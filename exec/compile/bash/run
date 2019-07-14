@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Bash 脚本的编译脚本
+
+DEST="$1" ; shift
+MEMLIMIT="$1" ; shift
+MAINSOURCE="${ENTRY_POINT:-$1}"
+
+RUNOPTIONS=""
+
+# Report the entry point, so it can be saved, e.g. for later replay:
+if [ -z "$ENTRY_POINT" ]; then
+	echo "Info: detected entry_point: $MAINCLASS"
+fi
+
+# 检查 bash 脚本的语法
+for i in "$@" ; do
+	bash $RUNOPTIONS -n "$i"
+	EXITCODE=$?
+	[ "$EXITCODE" -ne 0 ] && exit $EXITCODE
+done
+
+cat > "$DEST" <<EOF
+#!/bin/sh
+
+if [ "\${0%/*}" != "\$0" ]; then
+	cd "\${0%/*}"
+fi
+
+export ONLINE_JUDGE=1
+
+exec bash $RUNOPTIONS "$MAINSOURCE" "\$@"
+EOF
+
+chmod a+x "$DEST"
+
+exit 0
