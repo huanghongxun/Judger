@@ -55,6 +55,7 @@ Options:
   -i <debs>   List of extra package names to install (comma separated).
   -r <debs>   List of extra package names to remove (comma separated).
   -l <debs>   List of local package files to install (comma separated).
+  -M <mirror> Ubuntu mirror.
   -y          Force overwriting the chroot dir and downloading debootstrap.
   -h          Display this help.
 This script must be run as root, <chrootdir> is the non-existing
@@ -78,7 +79,7 @@ error()
 }
 
 # Read command-line parameters:
-while getopts 'a:d:i:r:l:R:yh' OPT ; do
+while getopts 'a:d:i:r:l:M:R:yh' OPT ; do
 	case $OPT in
 		a) ARCH=$OPTARG ;;
 		d) CHROOTDIR=$OPTARG ;;
@@ -86,6 +87,7 @@ while getopts 'a:d:i:r:l:R:yh' OPT ; do
 		i) INSTALLDEBS_EXTRA=$OPTARG ;;
 		r) REMOVEDEBS_EXTRA=$OPTARG ;;
 		l) LOCALDEBS=$OPTARG ;;
+		M) DEBMIRROR=$OPTARG ;;
 		y) FORCEYES=1 ;;
 		h) SHOWHELP=1 ;;
 		\?) error "Could not parse options." ;;
@@ -191,7 +193,6 @@ if [ -n "$INCLUDEDEBS" ]; then
 	INCLUDEOPT="--include=$INCLUDEDEBS"
 fi
 EXCLUDEOPT=""
-# shellcheck disable=SC2153
 if [ -n "$EXCLUDEDEBS" ]; then
 	EXCLUDEOPT="--exclude=$EXCLUDEDEBS"
 fi
@@ -203,9 +204,13 @@ fi
 
 echo "Running debootstrap to install base system, this may take a while..."
 
-# shellcheck disable=SC2086
-eval $BOOTSTRAP_COMMAND $INCLUDEOPT $EXCLUDEOPT \
-	--variant=minbase --arch "$ARCH" "$RELEASE" "$CHROOTDIR" "http://mirrors.aliyun.com/ubuntu"
+if [ -z $DEBMIRROR ]; then
+	eval $BOOTSTRAP_COMMAND $INCLUDEOPT $EXCLUDEOPT \
+		--variant=minbase --arch "$ARCH" "$RELEASE" "$CHROOTDIR" "http://mirrors.aliyun.com/ubuntu"
+else
+	eval $BOOTSTRAP_COMMAND $INCLUDEOPT $EXCLUDEOPT \
+		--variant=minbase --arch "$ARCH" "$RELEASE" "$CHROOTDIR" "$DEBMIRROR"
+fi
 
 rm -f "$CHROOTDIR/etc/resolv.conf"
 cp /etc/resolv.conf /etc/hosts /etc/hostname "$CHROOTDIR/etc" || true
@@ -232,22 +237,22 @@ export LC_ALL=C
 chroot "$CHROOTDIR" /bin/sh -c debconf-set-selections <<EOF
 passwd	passwd/root-password-crypted	password
 passwd	passwd/user-password-crypted	password
-passwd	passwd/root-password		password
-passwd	passwd/root-password-again	password
-passwd	passwd/user-password-again	password
-passwd	passwd/user-password		password
-passwd	passwd/shadow			boolean	true
-passwd	passwd/username-bad		note
-passwd	passwd/password-mismatch	note
-passwd	passwd/username			string
-passwd	passwd/make-user		boolean	true
-passwd	passwd/md5			boolean	false
-passwd	passwd/user-fullname		string
-passwd	passwd/user-uid			string
-passwd	passwd/password-empty		note
-debconf	debconf/priority	select	high
-debconf	debconf/frontend	select	Noninteractive
-locales	locales/locales_to_be_generated	multiselect
+passwd	passwd/root-password			password
+passwd	passwd/root-password-again		password
+passwd	passwd/user-password-again		password
+passwd	passwd/user-password			password
+passwd	passwd/shadow					boolean	true
+passwd	passwd/username-bad				note
+passwd	passwd/password-mismatch		note
+passwd	passwd/username					string
+passwd	passwd/make-user				boolean	true
+passwd	passwd/md5						boolean	false
+passwd	passwd/user-fullname			string
+passwd	passwd/user-uid					string
+passwd	passwd/password-empty			note
+debconf	debconf/priority				select	high
+debconf	debconf/frontend				select	Noninteractive
+locales	locales/locales_to_be_generated		multiselect
 locales	locales/default_environment_locale	select	None
 EOF
 
@@ -293,19 +298,16 @@ chroot "$CHROOTDIR" /bin/sh -c "apt-get autoremove --purge"
 chroot "$CHROOTDIR" /bin/sh -c "apt-get clean"
 
 # Install D-lang compiler suite
-chroot "$CHROOTDIR" /bin/sh -c "curl -fsS https://dlang.org/install.sh | bash -s dmd"
-
-# Install gtest
-chroot "$CHROOTDIR" /bin/sh -c "cd /usr/src/gtest; cmake .; make; cp *.a /usr/lib; ln -s /usr/lib/libgtest.a /usr/local/lib/gtest/libgtest.a; ln -s /usr/lib/libgtest_main.a /usr/local/lib/gtest/libgtest_main.a"
+#chroot "$CHROOTDIR" /bin/sh -c "curl -fsS https://dlang.org/install.sh | bash -s dmd"
 
 # Install testlib
 wget "https://github.com/MikeMirzayanov/testlib/blob/master/testlib.h" -P "$CHROOTDIR/usr/include"
 
 # Install oclint
-wget "https://github.com/oclint/oclint/releases/download/v0.13.1/oclint-0.13.1-x86_64-linux-4.4.0-112-generic.tar.gz" -P "$CHROOTDIR/tmp"
-tar -C "$CHROOTDIR/tmp/" -xzf "$CHROOTDIR/tmp/oclint-0.13.1-x86_64-linux-4.4.0-112-generic.tar.gz" 
-cp "$CHROOTDIR/tmp/oclint-0.13.1/bin/oclint*" "$CHROOTDIR/usr/local/bin/"
-cp -rp "$CHROOTDIR/tmp/oclint-0.13.1/lib/*" "$CHROOTDIR/usr/local/lib/"
+#wget "https://github.com/oclint/oclint/releases/download/v0.13.1/oclint-0.13.1-x86_64-linux-4.4.0-112-generic.tar.gz" -P "$CHROOTDIR/tmp"
+#tar -C "$CHROOTDIR/tmp/" -xzf "$CHROOTDIR/tmp/oclint-0.13.1-x86_64-linux-4.4.0-112-generic.tar.gz" 
+#cp -p $(find "$CHROOTDIR/tmp/oclint-0.13.1/bin" -name "oclint*") "$CHROOTDIR/usr/local/bin/"
+#cp -rp "$CHROOTDIR/tmp/oclint-0.13.1/lib/*" "$CHROOTDIR/usr/local/lib/"
 # cp -rp "$CHROOTDIR/tmp/oclint-0.13.1/include/*" "$CHROOTDIR/usr/local/include/"
 
 # Clean temp directory
