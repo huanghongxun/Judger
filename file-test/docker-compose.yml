@@ -4,7 +4,7 @@ services:
   rabbit-mq:
     image: rabbitmq:3.7.15-management
     ports:
-      - 5672:5672
+      - 25565:5672
   master:
     image: chrislusf/seaweedfs
     ports:

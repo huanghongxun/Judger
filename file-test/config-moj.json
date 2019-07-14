@@ -1,0 +1,32 @@
+{
+    "submissionReportQueue": {
+        "port": 25565,
+        "exchange": "Submission",
+        "hostname": "localhost",
+        "queue": "callback_queue"
+    },
+    "choiceSubmissionQueue": {
+        "port": 25565,
+        "hostname": "localhost",
+        "exchange": "Submission",
+        "queue": "ChoiceSubmission"
+    },
+    "programmingSubmissionQueue": {
+        "port": 25565,
+        "hostname": "localhost",
+        "exchange": "Submission",
+        "queue": "ProgrammingSubmission"
+    },
+    "systemConfig": {
+        "initChoiceWorkerCount": "{v:__CHOICE_WORKER_COUNT__}",
+        "initProgrammingWorkerCount": "{v:__PROGRAMMING_WORKER_COUNT__}",
+        "maxReportIOSize": 10240,
+        "timeLimit": {
+            "cCompile": 10.0,
+            "crun": 10.0,
+            "oclint": 10.0,
+            "randomGenerate": 10.0,
+            "valgrind": 20.0
+        }
+    }
+}
