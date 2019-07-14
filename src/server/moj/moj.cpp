@@ -392,6 +392,8 @@ static void summarize_random_check(judge_report &report, submission &submit, con
             if (task_result.status == status::ACCEPTED) {
                 score += submit.test_cases[i].score;
                 ++random_check.pass_cases;
+            } else if (task_result.status == status::PARTIAL_CORRECT) {
+                score += boost::rational_cast<double>(task_result.score * submit.test_cases[i].score);
             } else if (task_result.status == status::SYSTEM_ERROR ||
                         task_result.status == status::RANDOM_GEN_ERROR ||
                         task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||

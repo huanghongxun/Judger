@@ -22,6 +22,7 @@ enum error_codes {
     E_OUTPUT_LIMIT = 51,
     E_TIME_LIMIT = 52,
     E_MEM_LIMIT = 53,
+    E_PARTIAL_CORRECT = 54
 };
 
 extern int MAX_RANDOM_DATA_NUM;

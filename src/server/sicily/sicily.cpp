@@ -17,6 +17,7 @@ const unordered_map<status, const char *> status_string = boost::assign::map_lis
     (status::PENDING, "Waiting")
     (status::RUNNING, "Judging")
     (status::ACCEPTED, "Accepted")
+    (status::PARTIAL_CORRECT, "Wrong Answer")
     (status::COMPILATION_ERROR, "Compile Error")
     (status::EXECUTABLE_COMPILATION_ERROR, "Other") // 假定我们默认提供的 executable 是正确的，因此不存在这个 status
     (status::WRONG_ANSWER, "Wrong Answer")

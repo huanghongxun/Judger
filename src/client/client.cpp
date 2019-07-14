@@ -136,15 +136,26 @@ static judge::message::task_result judge(judge::message::client_task &client_tas
             break;
         case E_ACCEPTED:
             result.status = judge::status::ACCEPTED;
+            result.score = 1;
             break;
         case E_WRONG_ANSWER:
             result.status = judge::status::WRONG_ANSWER;
+            break;
+        case E_PARTIAL_CORRECT:
+            result.status = judge::status::PARTIAL_CORRECT;
+            {
+                ifstream fin(rundir / "feedback" / "score.txt");
+                int numerator, denominator;
+                fin >> numerator >> denominator;
+                result.score = { numerator, denominator };
+            }
             break;
         case E_PRESENTATION_ERROR:
             result.status = judge::status::PRESENTATION_ERROR;
             break;
         case E_COMPARE_ERROR:
             result.status = judge::status::COMPARE_ERROR;
+            result.error_log = read_file_content(rundir / "feedback" / "judgemessage.txt", "No judge message");
             break;
         case E_RUNTIME_ERROR:
             result.status = judge::status::RUNTIME_ERROR;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/rational.hpp>
 #include <variant>
 #include "common/status.hpp"
 #include "server/program.hpp"
@@ -85,6 +86,12 @@ struct task_result {
      * 一道题的评测可以包含多种评测类型，方便 judge_server 进行统计
      */
     uint8_t type;
+
+    /**
+     * @brief 对于部分分情况，保存 0~1 范围内的部分分比例
+     * 测试点的真实分数将根据测试点总分乘上 score 计算得到
+     */
+    boost::rational<int> score;
 
     /**
      * @brief 本测试点程序运行用时

@@ -66,6 +66,7 @@ void put_error_codes() {
     set_env("E_INTERNAL_ERROR", to_string(judge::error_codes::E_INTERNAL_ERROR));
     set_env("E_ACCEPTED", to_string(judge::error_codes::E_ACCEPTED));
     set_env("E_WRONG_ANSWER", to_string(judge::error_codes::E_WRONG_ANSWER));
+    set_env("E_PARTIAL_CORRECT", to_string(judge::error_codes::E_PARTIAL_CORRECT));
     set_env("E_PRESENTATION_ERROR", to_string(judge::error_codes::E_PRESENTATION_ERROR));
     set_env("E_COMPILER_ERROR", to_string(judge::error_codes::E_COMPILER_ERROR));
     set_env("E_RANDOM_GEN_ERROR", to_string(judge::error_codes::E_RANDOM_GEN_ERROR));

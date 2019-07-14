@@ -123,10 +123,12 @@ touch program.meta runguard.err
 touch compare.meta compare.err
 
 mkdir -p "$RUNDIR/run" # 运行的临时文件都在这里
+mkdir -p "$RUNDIR/feedback"
 mkdir -p "$RUNDIR/work"
 mkdir -p "$RUNDIR/work/judge"
 mkdir -p "$RUNDIR/work/judge_utils"
 mkdir -p "$RUNDIR/work/compare"
+mkdir -p "$RUNDIR/work/feedback"
 mkdir -p "$RUNDIR/merged"
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
 mount -t overlayfs overlayfs -o lowerdir="$TESTIN",lowerdir="$WORKDIR/compile",upperdir="$RUNDIR/run" "$RUNDIR/work/judge"
@@ -155,6 +157,7 @@ runcheck "$RUN_SCRIPT" "$RUNDIR/run/testdata.in" "$RUNDIR/run/program.out" \
 # 比较选手程序输出
 logmsg $LOG_INFO "Comparing output"
 umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
+mount -t overlayfs overlayfs -o upperdir="$RUNDIR/feedback" "$RUNDIR/work/feedback"
 mount -t overlayfs overlayfs -o lowerdir="$TESTIN",lowerdir="$TESTOUT",lowerdir="$WORKDIR/compile",upperdir="$RUNDIR/run" "$RUNDIR/work/judge"
 
 exitcode=0
@@ -169,7 +172,7 @@ runcheck \
     --file-limit $SCRIPTFILELIMIT \
     --outmeta compare.meta \
     -VJUDGE_UTILS=/judge_utils -- \
-    "/compare/run" testdata.in program.out testdata.out > compare.out 2>&1
+    "/compare/run" testdata.in program.out testdata.out /feedback > compare.tmp 2>&1
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/run-$uuid 中，因此删除挂载点即可。
 umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
@@ -181,6 +184,24 @@ rm -rf "$RUNDIR/merged"
 rm -rf "$RUNDIR/work"
 # RUNDIR 还剩下 compare.meta, compare.out, program.meta, program.err, system.out, runguard.err 供评测客户端检查
 # RUNDIR 由评测客户端删除
+
+# Make sure that all feedback files are owned by the current
+# user/group, so that we can append content.
+$GAINROOT chown -R "$(id -un):" "$RUNDIR/feedback"
+chmod -R go-w feedback
+
+# Append output validator error messages
+# TODO: display extra
+if [ -s feedback/judgeerror.txt ]; then
+	printf "\\n---------- output validator (error) messages ----------\\n" >> feedback/judgemessage.txt
+	cat feedback/judgeerror.txt >> feedback/judgemessage.txt
+fi
+
+# Append output validator stdin/stderr - display extra?
+if [ -s compare.tmp ]; then
+	printf "\\n---------- output validator stdout/stderr messages ----------\\n" >> feedback/judgemessage.txt
+	cat compare.tmp >> feedback/judgemessage.txt
+fi
 
 logmsg $LOG_DEBUG "checking compare script exit-status: $exitcode"
 if grep '^time-result: .*timelimit' compare.meta >/dev/null 2>&1; then
@@ -247,6 +268,11 @@ if [ "$progexit" -ne 0 ]; then
     cleanexit ${E_RUNTIME_ERROR:-1}
 fi
 
+if [ $exitcode -eq $RESULT_PC ] && [ ! -f "$RUNDIR/feedback/score.txt" ]; then
+    logmsg $LOG_ERR "Compare script reports partial correct without score record."
+    cleanexit ${E_COMPARE_ERROR:-1}
+fi
+
 case $exitcode in
     $RESULT_AC)
         echo "Accepted" >> system.out
@@ -263,8 +289,12 @@ case $exitcode in
         echo "$resource_usage" >> system.out
         cleanexit ${E_PRESENTATION_ERROR:-1}
         ;;
+    $RESULT_PC)
+        echo "Partial Correct" >> system.out
+        echo "$resouce_usage" >> system.out
+        cleanexit ${E_PARTIAL_CORRECT:-1}
     *)
-        logmsg $LOG_ERR "Comparing failed with exitcode $exitcode, compare script output:\\n$(cat compare.out)"
+        logmsg $LOG_ERR "Comparing failed with exitcode $exitcode, compare script output:\\n$(cat feedback/judgemessage.txt)"
         cleanexit ${E_COMPARE_ERROR:-1}
         ;;
 esac

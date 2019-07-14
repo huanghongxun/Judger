@@ -3,9 +3,9 @@ import pika
 
 
 host = "127.0.0.1"
-port = 5672
-queue_name = "FileSystemRequest"
-exchange = "FileSystem"
+port = 25565
+queue_name = "ProgrammingSubmission"
+exchange = "Submission"
 
 def init_rabbitmq():
     global host, port, queue_name, exchange
@@ -35,7 +35,7 @@ def main():
     global queue_name, exchange
     channel.queue_bind(exchange=exchange, queue=callback_queue)
     print(callback_queue)
-    channel.basic_consume(queue=callback_queue, on_message_callback=on_response, auto_ack=False)
+    channel.basic_consume(on_response, no_ack=True, queue=callback_queue)
     channel.basic_publish(exchange=exchange, routing_key=queue_name,
                           properties=pika.BasicProperties(reply_to=callback_queue), body=json.dumps(req))
     channel.start_consuming()

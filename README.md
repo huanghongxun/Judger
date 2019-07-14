@@ -89,7 +89,11 @@
     │           │   │   ├── testdata.in // 映射进来的标准输入文件
     │           │   │   ├── testdata.out // 映射进来的标准输出文件（在选手程序运行完成后再挂载）
     │           │   │   └── program.out // 选手程序的 stdout 输出
-    │           │   ├── work // 运行路径
+    │           │   ├── feedback // 比较器结果路径
+    │           │   │   ├── judgemessage.txt // 比较器的输出信息
+    │           │   │   ├── judgeerror.txt // 比较器的错误信息
+    │           │   │   └── score.txt // 如果比较器支持部分分，那么这里将保存部分分数
+    │           │   ├── work // 构建的根目录
     │           │   ├── program.err // 选手程序的 stderr 输出
     │           │   ├── program.meta // 选手程序的运行信息
     │           │   └── runguard.err // runguard 的错误输出
