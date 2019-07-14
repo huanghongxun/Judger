@@ -114,7 +114,7 @@ fi
 INCLUDEDEBS="software-properties-common"
 
 # Packages to install after upgrade (space separated):
-INSTALLDEBS="curl make libcurl4-openssl-dev golang rustc xz-utils default-jdk-headless pypy python3 clang ruby scala libboost-all-dev cmake libgtest-dev gcc gcc-9 g++ g++-9 gcc-multilib g++-multilib libsqlite3-dev libmysqlclient-dev libpq-dev fp-compiler valgrind locales"
+INSTALLDEBS="curl make librabbitmq-dev libcurl4-openssl-dev golang rustc xz-utils default-jdk-headless pypy python3 clang ruby scala libboost-all-dev cmake libgtest-dev gcc gcc-9 g++ g++-9 gcc-multilib g++-multilib libsqlite3-dev libmysqlclient-dev libpq-dev fp-compiler valgrind locales"
 # For C# support add: mono-mcs mono-devel
 # However running mono within chroot still gives errors...
 

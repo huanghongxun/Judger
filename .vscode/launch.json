@@ -9,13 +9,32 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/runguard/bin/runguard",
-            "args": ["--user", "judge", "--group", "judge"],
+            "args": [
+                "--user",
+                "judge",
+                "--group",
+                "judge"
+            ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "externalConsole": true,
+            "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb and add better child debugging",
+                    "text": "-enable-pretty-printing -gdb-set detach-on-fork off",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "(gdb) Attach to gdb server",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceFolder}/bin/judge-system",
+            "processId": "${command:pickProcess}",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb and add better child debugging",

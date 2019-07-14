@@ -18,8 +18,7 @@
         "queue": "ProgrammingSubmission"
     },
     "systemConfig": {
-        "initChoiceWorkerCount": "{v:__CHOICE_WORKER_COUNT__}",
-        "initProgrammingWorkerCount": "{v:__PROGRAMMING_WORKER_COUNT__}",
+        "fileApi": "http://127.0.0.1:8999",
         "maxReportIOSize": 10240,
         "timeLimit": {
             "cCompile": 10.0,

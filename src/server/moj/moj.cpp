@@ -158,8 +158,8 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
 
     submit.category = server.category();
 
-    int version, sub_id, prob_id;
-    j.at("version").get_to(version);
+    int version = 1, sub_id, prob_id;
+    if (j.count("version")) j.at("version").get_to(version);
     j.at("sub_id").get_to(sub_id);    // type int
     j.at("prob_id").get_to(prob_id);  // type int
     submit.sub_id = to_string(sub_id);
@@ -224,6 +224,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
 
     const json &limits = config.at("limits").at(language);
     limits.at("memory").get_to(submit.memory_limit);
+    submit.memory_limit <<= 10;
     limits.at("time").get_to(submit.time_limit);
 
     if (config.count("random")) {
@@ -273,7 +274,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
             testcase.depends_cond = test_check::depends_condition::ACCEPTED;
 
             for (size_t i = 0; i < submit.random_test_times; ++i) {
-                testcase.testcase_id = -1; // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
+                testcase.testcase_id = -1;  // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
                 // 将当前的随机测试点编号记录下来，给内存测试依赖
                 random_checks.push_back(submit.test_cases.size());
                 submit.test_cases.push_back(testcase);
@@ -317,10 +318,10 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
                         testcase.depends_cond = test_check::depends_condition::ACCEPTED;
                         submit.test_cases.push_back(testcase);
                     }
-                } else { // 否则只能生成 10 组随机测试数据
+                } else {  // 否则只能生成 10 组随机测试数据
                     for (size_t i = 0; i < 10; ++i) {
                         testcase.testcase_id = i;
-                        testcase.depends_on = 0; // 依赖编译任务
+                        testcase.depends_on = 0;  // 依赖编译任务
                         testcase.depends_cond = test_check::depends_condition::ACCEPTED;
                         submit.test_cases.push_back(testcase);
                     }
@@ -414,9 +415,9 @@ static void summarize_random_check(judge_report &report, submission &submit, con
             } else if (task_result.status == status::PARTIAL_CORRECT) {
                 score += task_result.score * submit.test_cases[i].score;
             } else if (task_result.status == status::SYSTEM_ERROR ||
-                        task_result.status == status::RANDOM_GEN_ERROR ||
-                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
-                        task_result.status == status::COMPARE_ERROR) {
+                       task_result.status == status::RANDOM_GEN_ERROR ||
+                       task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
+                       task_result.status == status::COMPARE_ERROR) {
                 random_check_json = get_error_report(task_result);
                 return;
             }
@@ -432,7 +433,6 @@ static void summarize_random_check(judge_report &report, submission &submit, con
 }
 
 static void summarize_standard_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
-
     standard_check_report standard_check;
     standard_check.pass_cases = 0;
     standard_check.total_cases = 0;
@@ -450,9 +450,9 @@ static void summarize_standard_check(judge_report &report, submission &submit, c
                 score += submit.test_cases[i].score;
                 ++standard_check.pass_cases;
             } else if (task_result.status == status::SYSTEM_ERROR ||
-                        task_result.status == status::RANDOM_GEN_ERROR ||
-                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
-                        task_result.status == status::COMPARE_ERROR) {
+                       task_result.status == status::RANDOM_GEN_ERROR ||
+                       task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
+                       task_result.status == status::COMPARE_ERROR) {
                 standard_check_json = get_error_report(task_result);
                 return;
             }
@@ -479,7 +479,6 @@ static void summarize_standard_check(judge_report &report, submission &submit, c
  * 评测代码每违规一个 priority 1 扣 2 分，每违规一个 priority 2 扣 1 分，违规 priority 3 不扣分。扣分扣至 0 分为止.
  */
 static void summarize_static_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
-    
 }
 
 /**
@@ -495,7 +494,6 @@ static void summarize_static_check(judge_report &report, submission &submit, con
  * 内存检测会多次运行提交代码，未检测出问题则通过，最后总分为通过数/总共运行次数 × 内存检测满分分数
  */
 static void summarize_memory_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
-    
 }
 
 void configuration::summarize(submission &submit, const vector<judge::message::task_result> &task_results) {

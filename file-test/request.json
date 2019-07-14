@@ -1,55 +1,84 @@
 {
-    "prob_id":1234,
-    "sub_id":12340,
-    "language":"c++",
-    "files":{
-        "support":{
-            "source_files":[
-                "main.cpp"
-            ],
-            "header_files":[
-                "header.hpp"
-            ],
-            "rw_files":[
-
+    "version": 2,
+    "prob_id": 1234,
+    "sub_id": 12340,
+    "language": "cpp",
+    "last_update": 1,
+    "config": {
+        "grading": {
+            "cpp": {
+                "CompileCheck": 20,
+                "StandardCheck": 40,
+                "RandomCheck": 40
+            }
+        },
+        "files": {
+            "cpp": {
+                "support": {
+                    "source_files": [
+                        "main.cpp"
+                    ],
+                    "header_files": [
+                        "header.hpp"
+                    ],
+                    "rw_files": []
+                },
+                "submission": {
+                    "source_files": [
+                        "sub_main.cpp"
+                    ],
+                    "header_files": [
+                        "sub_header.h"
+                    ]
+                },
+                "standard": {
+                    "source_files": [
+                        "stand_main.cpp"
+                    ],
+                    "header_files": [
+                        "stand_header.h"
+                    ],
+                    "input": [
+                        "input0",
+                        "input1"
+                    ],
+                    "output": [
+                        "output0",
+                        "output1"
+                    ]
+                },
+                "random": [
+                    "random.c"
+                ]
+            }
+        },
+        "compile": {
+            "cpp": [
+                "{INPUT}",
+                "-Werror",
+                "-g",
+                "-lm",
+                "-o",
+                "{OUTPUT}"
             ]
         },
-        "submission":{
-            "source_files":[
-                "sub_main.cpp"
-            ],
-            "header_files":[
-                "sub_header.h"
-            ]
+        "limits": {
+            "cpp": {
+                "memory": 32,
+                "time": 1000
+            }
         },
-        "standard":{
-            "source_files":[
-                "stand_main.cpp"
-            ],
-            "header_files":[
-                "stand_header.h"
-            ],
-            "input":[
-                "input0",
-                "input1"
-            ],
-            "output":[
-                "output0",
-                "output1"
-            ]
-        },
-        "random":[
-            "random.c"
-        ]
-    },
-    "cache":{
-        "standard":[
-            "standard"
-        ],
-        "random":[
-            "random"
-        ]
+        "random": {
+            "cpp": {
+                "language": "c",
+                "compile": [
+                    "{INPUT}",
+                    "-w",
+                    "-o",
+                    "{OUTPUT}"
+                ],
+                "run_times": 2
+            }
+        }
     }
 }
-
-

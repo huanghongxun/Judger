@@ -4,10 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/ext/fmt/include",
-                "${workspaceFolder}/ext/iguana",
                 "${workspaceFolder}/ext/json/include",
                 "${workspaceFolder}/ext/glog/src",
-                "${workspaceFolder}/ext/ormpp",
                 "${workspaceFolder}/ext/SimpleAmqpClient/src",
                 "${workspaceFolder}/build/ext/glog",
                 "${workspaceFolder}/include",

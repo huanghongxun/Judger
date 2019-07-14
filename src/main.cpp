@@ -80,19 +80,17 @@ void put_error_codes() {
 }
 
 int main(int argc, char* argv[]) {
-    gflags::ParseCommandLineFlags(&argc, &argv, false);
     google::InitGoogleLogging(argv[0]);
 
     // 默认情况下，假设运行环境是拉取代码直接编译的环境，此时我们可以假定 runguard 的运行路径
     if (!getenv("RUNGUARD")) {
         filesystem::path current(argv[0]);
         filesystem::path runguard(filesystem::weakly_canonical(current).parent_path().parent_path() / "runguard" / "bin" / "runguard");
-        cout << filesystem::weakly_canonical(runguard).string() << endl;
         if (filesystem::exists(runguard)) {
             set_env("RUNGUARD", filesystem::weakly_canonical(runguard).string());
         }
     }
-  
+
     CHECK(getenv("RUNGUARD"))  // RUNGUARD 环境变量将传给 exec/check/standard/run 评测脚本使用
         << "RUNGUARD environment variable should be specified. This env points out where the runguard executable locates in.";
 
@@ -158,23 +156,33 @@ int main(int argc, char* argv[]) {
     if (vm.count("exec-dir")) {
         judge::EXEC_DIR = filesystem::path(vm.at("exec-dir").as<string>());
         set_env("JUDGE_UTILS", judge::EXEC_DIR, true);
+        CHECK(filesystem::is_directory(judge::EXEC_DIR))
+            << "Executables directory " << judge::EXEC_DIR << " does not exist";
     }
 
     if (vm.count("cache-dir")) {
         judge::CACHE_DIR = filesystem::path(vm.at("cache-dir").as<string>());
+        CHECK(filesystem::is_directory(judge::CACHE_DIR))
+            << "Cache directory " << judge::CACHE_DIR << " does not exist";
     }
 
     if (vm.count("data-dir")) {
         judge::DATA_DIR = filesystem::path(vm.at("data-dir").as<string>());
         judge::USE_DATA_DIR = true;
+        CHECK(filesystem::is_directory(judge::DATA_DIR))
+            << "Data directory " << judge::DATA_DIR << " does not exist";
     }
 
     if (vm.count("run-dir")) {
         judge::RUN_DIR = filesystem::path(vm.at("run-dir").as<string>());
+        CHECK(filesystem::is_directory(judge::RUN_DIR))
+            << "Run directory " << judge::RUN_DIR << " does not exist";
     }
 
     if (vm.count("chroot-dir")) {
         judge::CHROOT_DIR = filesystem::path(vm.at("chroot-dir").as<string>());
+        CHECK(filesystem::is_directory(judge::CHROOT_DIR))
+            << "Chroot directory " << judge::CHROOT_DIR << " does not exist";
     }
 
     if (vm.count("cache-random-data")) {
@@ -184,6 +192,9 @@ int main(int argc, char* argv[]) {
     if (vm.count("enable-sicily")) {
         auto sicily_servers = vm.at("enable-scicily").as<vector<string>>();
         for (auto& sicily_server : sicily_servers) {
+            CHECK(filesystem::is_regular_file(sicily_server))
+                << "Configuration file " << sicily_server << " does not exist";
+
             auto sicily_judger = make_unique<judge::server::sicily::configuration>();
             sicily_judger->init(sicily_server);
             judge::server::register_judge_server(move(sicily_judger));
@@ -197,6 +208,9 @@ int main(int argc, char* argv[]) {
     if (vm.count("enable-3")) {
         auto third_servers = vm.at("enable-3").as<vector<string>>();
         for (auto& third_server : third_servers) {
+            CHECK(filesystem::is_regular_file(third_server))
+                << "Configuration file " << third_server << " does not exist";
+
             auto third_judger = make_unique<judge::server::moj::configuration>();
             third_judger->init(third_server);
             judge::server::register_judge_server(move(third_judger));
