@@ -1,5 +1,7 @@
 #include "client/client.hpp"
 #include <glog/logging.h>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
 #include <unistd.h>
 #include <boost/lexical_cast.hpp>
 #include <fstream>
@@ -37,9 +39,9 @@ thread start_client(const cpu_set_t &set, const string &execcpuset, message::que
  */
 static judge::message::task_result judge(judge::message::client_task &client_task, judge::server::submission &submit, judge::server::test_check &task, const string &execcpuset) {
     namespace ip = boost::interprocess;
-    filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;
-    filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
-    filesystem::path rundir = workdir / ("run-" + to_string(getpid()));
+    filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id; // 题目的缓存文件夹
+    filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id; // 本提交的工作文件夹
+    filesystem::path rundir = workdir / ("run-" + to_string(getpid())); // 本测试点的运行文件夹
 
     judge::message::task_result result{client_task.judge_id, client_task.id, client_task.type};
     result.run_dir = rundir;
@@ -128,7 +130,16 @@ static judge::message::task_result judge(judge::message::client_task &client_tas
         }
     }
 
+    // result 记录的 data_dir 保存实际使用的测试数据
     result.data_dir = datadir;
+
+    if (USE_DATA_DIR) { // 如果要拷贝测试数据，我们随机 UUID 并创建文件夹拷贝数据
+        filesystem::path newdir = DATA_DIR / to_string(boost::uuids::random_generator()());
+        filesystem::copy(datadir, newdir, filesystem::copy_options::recursive);
+        datadir = newdir;
+    }
+
+    // 调用 check script 来执行真正的评测，这里会调用 run script 运行选手程序，调用 compare script 运行比较器，并返回评测结果
     int ret = call_process(check_script->get_run_path(), "-n", execcpuset, datadir, submit.time_limit, submit.memory_limit, CHROOT_DIR, workdir, getpid(), run_script->get_run_path(), compare_script->get_run_path(cachedir / "compare"));
     switch (ret) {
         case E_INTERNAL_ERROR:
@@ -144,9 +155,12 @@ static judge::message::task_result judge(judge::message::client_task &client_tas
         case E_PARTIAL_CORRECT:
             result.status = judge::status::PARTIAL_CORRECT;
             {
+                // 比较器会将评分（0~1 的分数）存到 score.txt 中。
+                // 不会出现文件不存在的情况，否则 check script 将返回 COMPARE_ERROR
+                // feedback 文件夹的内容参考 check script
                 ifstream fin(rundir / "feedback" / "score.txt");
                 int numerator, denominator;
-                fin >> numerator >> denominator;
+                fin >> numerator >> denominator; // 文件中第一个数字是分子，第二个数字是分母
                 result.score = { numerator, denominator };
             }
             break;
@@ -179,8 +193,13 @@ static judge::message::task_result judge(judge::message::client_task &client_tas
             result.status = judge::status::SYSTEM_ERROR;
             break;
     }
+
+    if (USE_DATA_DIR) { // 评测结束后删除拷贝的评测数据
+        filesystem::remove(datadir);
+    }
+
     auto metadata = read_runguard_result(rundir / "program.meta");
-    result.run_time = metadata.wall_time;
+    result.run_time = metadata.wall_time; // TODO: 支持题目选择 cpu_time 或者 wall_time 进行时间
     result.memory_used = metadata.memory / 1024;
     return result;
 }
@@ -214,7 +233,7 @@ static judge::message::task_result compile(judge::message::client_task &client_t
 
     judge::message::task_result result{client_task.judge_id, client_task.id, client_task.type};
 
-    // 编译选手程序，submit.submission 都为非空
+    // 编译选手程序，submit.submission 都为非空，否则在 server.cpp 中的 fetch_submission 会阻止该提交的评测
     if (submit.submission) {
         filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
         compile(submit.submission.get(), workdir, execcpuset, result);
@@ -261,7 +280,7 @@ void client(const string &execcpuset, message::queue &testcase_queue) {
         judge::message::task_result result;
 
         try {
-            if (client_task.test_check == nullptr)
+            if (client_task.type == message::client_task::COMPILE_TYPE)
                 result = compile(client_task, submit, execcpuset);
             else
                 result = judge(client_task, submit, *client_task.test_check, execcpuset);

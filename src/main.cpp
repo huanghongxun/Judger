@@ -106,6 +106,7 @@ int main(int argc, char* argv[]) {
         ("client", po::value<vector<cpuset>>(), "run a judge client which cpuset is given")
         ("exec-dir", po::value<string>(), "set the default predefined executables for falling back")
         ("cache-dir", po::value<string>(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
+        ("data-dir", po::value<string>(), "set the directory to store test data to be judged, for ramdisk to speed up IO performance of user program.")
         ("run-dir", po::value<string>(), "set the directory to run user programs, store compiled user program")
         ("chroot-dir", po::value<string>(), "set the chroot directory")
         ("cache-random-data", po::value<size_t>(), "set the maximum number of cached generated random data, default to 100.")
@@ -151,6 +152,11 @@ int main(int argc, char* argv[]) {
 
     if (vm.count("cache-dir")) {
         judge::CACHE_DIR = filesystem::path(vm.at("cache-dir").as<string>());
+    }
+
+    if (vm.count("data-dir")) {
+        judge::DATA_DIR = filesystem::path(vm.at("data-dir").as<string>());
+        judge::USE_DATA_DIR = true;
     }
 
     if (vm.count("run-dir")) {

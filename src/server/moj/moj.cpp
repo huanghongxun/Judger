@@ -261,8 +261,8 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         if (check.key() == "CompileCheck") {
             testcase.is_random = false;
             testcase.score = 0;
-            testcase.check_type = 0;
-            testcase.testcase_id = 0;
+            testcase.check_type = message::client_task::COMPILE_TYPE;
+            testcase.testcase_id = -1;
             testcase.depends_on = -1;
             submit.test_cases.push_back(testcase);
         } else if (check.key() == "RandomCheck") {
@@ -298,6 +298,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         }
     }
 
+    // 内存测试需要依赖标准测试或随机测试以便可以在标准或随机测试没有 AC 的情况下终止内存测试以加速评测速度
     for (auto &check : grading.items()) {
         test_check testcase;
         int grade = check.value().get<int>();
@@ -316,9 +317,11 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
                         testcase.depends_cond = test_check::depends_condition::ACCEPTED;
                         submit.test_cases.push_back(testcase);
                     }
-                } else {
+                } else { // 否则只能生成 10 组随机测试数据
                     for (size_t i = 0; i < 10; ++i) {
                         testcase.testcase_id = i;
+                        testcase.depends_on = 0; // 依赖编译任务
+                        testcase.depends_cond = test_check::depends_cond::ACCEPTED;
                         submit.test_cases.push_back(testcase);
                     }
                 }
@@ -359,6 +362,11 @@ static json get_error_report(const judge::message::task_result &result) {
     return report;
 }
 
+/**
+ * 执行条件
+ * 1. 配置中开启编译检测（编译检测满分大于0）
+ * 2. 已存在提交代码的源文件
+ */
 static void summarize_compile_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &compile_check_json) {
     compile_check_report compile_check;
     compile_check.full_grade = boost::rational_cast<double>(submit.test_cases[0].score);
@@ -375,6 +383,17 @@ static void summarize_compile_check(judge_report &report, submission &submit, co
     report.grade += compile_check.grade;
 }
 
+/**
+ * 通过提交的随机生成器产生随机输入文件，分别运行标准答案与提交的答案，比较输出是否相同。
+ * 
+ * 执行条件
+ * 1. 配置中开启随机检测（随机检测满分大于0）
+ * 2. 已存在提交代码的可执行文件
+ * 3. 已存在随机输入生成器与题目答案源文件
+ * 
+ * 评分规则
+ * 得分=（通过的测试数）/（总测试数）× 总分。
+ */
 static void summarize_random_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &random_check_json) {
     random_check_report random_check;
     random_check.pass_cases = 0;
@@ -446,6 +465,37 @@ static void summarize_standard_check(judge_report &report, submission &submit, c
     standard_check.grade = boost::rational_cast<double>(score);
     standard_check.full_grade = boost::rational_cast<double>(full_score);
     report.grade += standard_check.grade;
+}
+
+/**
+ * 静态检查目前只支持C/C++
+ * 采用oclint进行静态检查，用于检测部分代码风格和代码设计问题
+ * 
+ * 执行条件
+ * 1. 配置中开启静态检查（静态检查满分大于0）
+ * 
+ * 评分规则
+ * oclint评测违规分3个等级：priority 1、priority 2、priority 3
+ * 评测代码每违规一个 priority 1 扣 2 分，每违规一个 priority 2 扣 1 分，违规 priority 3 不扣分。扣分扣至 0 分为止.
+ */
+static void summarize_static_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
+    
+}
+
+/**
+ * 采用 valgrind 进行内存检测，用于发现内存泄露、访问越界等问题
+ * 内存检测需要提交代码的可执行文件，并且基于标准测试或随机测试（优先选用标准测试），因此只有当标准测试或随机测试的条件满足时才能进行内存测试
+ * 
+ * 执行条件
+ * 1. 配置中开启内存检测（内存检测满分大于0）
+ * 2. 已存在提交代码的可执行文件
+ * 3. 已存在标准测试输入（优先选择）或随机输入生成器
+ * 
+ * 评分规则
+ * 内存检测会多次运行提交代码，未检测出问题则通过，最后总分为通过数/总共运行次数 × 内存检测满分分数
+ */
+static void summarize_memory_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
+    
 }
 
 void configuration::summarize(submission &submit, const vector<judge::message::task_result> &task_results) {

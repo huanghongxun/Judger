@@ -66,6 +66,25 @@ extern filesystem::path EXEC_DIR;
  */
 extern filesystem::path CACHE_DIR;
 
+
+/**
+ * @brief 只存放将要评测的测试数据的文件夹，测试完成后数据将被删除
+ * 若将这个文件夹放进内存盘，可以加速选手程序的 IO 性能，
+ * 避免系统进入 IO 瓶颈导致评测的不公平。
+ * 
+ * DATA_DIR
+ * ├── ABCDEFG // 随机生成的 uuid
+ * │   ├── input // 当前测试数据组的输入数据文件夹
+ * │   └── output // 当前测试数据组的输出数据文件夹
+ * └── ...
+ */
+extern filesystem::path DATA_DIR;
+
+/**
+ * @brief 是否启用 DATA_DIR
+ */
+extern bool USE_DATA_DIR;
+
 /**
  * @brief 选手程序编译及运行的根目录
  * RUN_DIR 的文件结构如下：

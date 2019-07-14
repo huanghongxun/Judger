@@ -17,7 +17,7 @@ const unordered_map<status, const char *> status_string = boost::assign::map_lis
     (status::PENDING, "Waiting")
     (status::RUNNING, "Judging")
     (status::ACCEPTED, "Accepted")
-    (status::PARTIAL_CORRECT, "Wrong Answer")
+    (status::PARTIAL_CORRECT, "Wrong Answer") // Sicily 不支持部分分
     (status::COMPILATION_ERROR, "Compile Error")
     (status::EXECUTABLE_COMPILATION_ERROR, "Other") // 假定我们默认提供的 executable 是正确的，因此不存在这个 status
     (status::WRONG_ANSWER, "Wrong Answer")
@@ -55,6 +55,7 @@ void configuration::init(const filesystem::path &config_path) {
     fin >> config;
     string testdata = config.at("data-dir").get<string>();
     this->testdata = filesystem::path(testdata);
+    // 设置数据库连接信息
     string host = config.at("host").get<string>();
     string user = config.at("user").get<string>();
     string password = config.at("password").get<string>();
@@ -106,9 +107,9 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
         kase.check_script = "compile";
         kase.is_random = false;
         kase.score = 0;
-        kase.check_type = 0;
+        kase.check_type = message::client_task::COMPILE_TYPE;
         kase.testcase_id = 0;
-        kase.depends_on = -1;
+        kase.depends_on = -1;  // 编译任务没有依赖，因此可以先执行
         submit.test_cases.push_back(kase);
     }
 
@@ -131,12 +132,13 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
             kase.score = 0;
             kase.check_type = 1;
             kase.testcase_id = i;
-            kase.depends_on = i;  // 当前的 kase 是第 i + 1 组测试点
+            kase.depends_on = i;  // 当前的 kase 是第 i + 1 组测试点，依赖第 i 组测试点，最开始的测试数据将依赖编译
             kase.depends_cond = test_check::depends_condition::ACCEPTED;
             submit.test_cases.push_back(kase);
         }
     }
 
+    // Sicily 评测需要处理比赛信息
     if (!submit.contest_id.empty()) {
         string starttime;
         int duration;
@@ -150,6 +152,7 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
 
             strptime(starttime.c_str(), "%Y-%m-%d %T", &mytm);
 
+            // 收集当前提交所属比赛的信息，用来判断是否 Out of Contest Time
             submit.contest_start_time = mktime(&mytm);
             submit.contest_end_time = duration * 3600 + submit.contest_start_time;
         }
@@ -165,15 +168,20 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
         if (spj) {
             // 由于 Sicily 的 special judge 的比较格式和本评测的不一致，因此我们需要借助 bash 脚本进行转换
             unique_ptr<source_code> spj = make_unique<source_code>(sicily.exec_mgr);
-            spj->language = "bash";
+            spj->language = "bash"; // bash 语言不需要执行编译步骤，实际上 bash 语言允许任何其他编译语言的执行
             spj->source_files.push_back(make_unique<local_asset>("run", EXEC_DIR / "sicily_spjudge.sh"));
             spj->assist_files.push_back(make_unique<local_asset>("spjudge", get_data_path(sicily.testdata, submit.prob_id, "spjudge")));
             submit.compare = move(spj);
         } else {
+            // Sicily 默认使用完全比较，格式错误时返回 Presentation Error
             submit.compare = sicily.exec_mgr.get_compare_script("diff-all");
         }
 
         if (has_framework) {
+            // framework 提交：
+            // framework.cpp 中包含 #include "source.cpp" 的形式来支持添加隐藏代码，比如不提供 main 函数的具体实现
+            // 这种情况下，source.cpp 不能参与编译，否则会发生链接错误，因此 source.cpp 被加入 assist_files
+            // 我们只编译 framework.cpp 即可
             prog->source_files.clear();
             prog->assist_files.push_back(make_unique<text_asset>("source.cpp", sourcecode));
             prog->source_files.push_back(
@@ -255,7 +263,14 @@ static void update_user(configuration &sicily, bool solved, const submission &su
     }
 }
 
+/**
+ * @brief 更新提交的指定测试点的评测状态
+ * @param sicily Sicily 服务器配置信息
+ * @param task_result 当前测试点的评测结果
+ * @param current_case 当前测试点编号
+ */
 static void set_status(configuration &sicily, const judge::message::task_result &task_result, int current_case, const submission &submit) {
+    // final_status 保存可以统计运行时间和运行内存占用的评测结果状态
     static set<status> final_status = {status::COMPILING, status::RUNNING, status::ACCEPTED, status::PRESENTATION_ERROR,
                                        status::WRONG_ANSWER, status::TIME_LIMIT_EXCEEDED, status::MEMORY_LIMIT_EXCEEDED,
                                        status::RUNTIME_ERROR, status::SEGMENTATION_FAULT, status::FLOATING_POINT_ERROR};
@@ -268,7 +283,7 @@ static void set_status(configuration &sicily, const judge::message::task_result 
             status_string.at(task_result.status),
             is_multiple_cases ? current_case : -1,
             task_result.run_time,
-            task_result.memory_used >> 10,
+            task_result.memory_used >> 10, // Sicily 的内存占用单位是 KB
             submit.sub_id);
     } else {
         sicily.db.query<std::tuple<>>(
@@ -292,12 +307,14 @@ bool configuration::fetch_submission(submission &submit) {
 
 void configuration::summarize(submission &submit, const vector<judge::message::task_result> &task_results) {
     popup_queue(*this, submit);
+    set_compilelog(*this, task_results[0].error_log, submit);
 
     if (task_results[0].status != judge::status::ACCEPTED) {
+        // 先检查是否存在编译错误的情况
         set_status(*this, task_results[0], 0, submit);
-        set_compilelog(*this, task_results[0].error_log, submit);
         update_user(*this, false, submit);
     } else {
+        // 对于选手程序运行结果
         judge::message::task_result final_result;
         final_result.status = judge::status::ACCEPTED;
         final_result.run_time = 0;     // Sicily 需要计算总的运行时间
@@ -305,6 +322,8 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
         for (size_t i = 1; i < task_results.size(); ++i) {
             final_result.run_time += task_results[i].run_time;
             final_result.memory_used = max(final_result.memory_used, task_results[i].memory_used);
+            // 对于评测，第一个非 AC 的点一定不是 DEPENDENCY_NOT_SATISFIED，因此可以直接将这个认为是本次提交的评测结果
+            // 我们确保了 test_cases 的依赖项一定在前面，因此第一个非 AC 的不可能会存在不满足依赖的情况
             if (task_results[i].status != judge::status::ACCEPTED) {
                 set_status(*this, task_results[i], i - 1, submit);
                 update_user(*this, false, submit);
@@ -312,6 +331,7 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
             }
         }
 
+        // 可能存在没有测试数据的情况，这种情况我们直接返回 Accepted
         set_status(*this, final_result, submit.test_data.size(), submit);
         update_user(*this, true, submit);
     }
