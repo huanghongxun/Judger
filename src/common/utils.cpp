@@ -3,14 +3,6 @@
 #include <unistd.h>
 using namespace std;
 
-namespace std {
-
-std::string to_string(const std::filesystem::path &path) {
-    return path.string();
-}
-
-}  // namespace std
-
 int exec_program(const char **argv) {
     // 使用 POSIX 提供的函数来实现外部程序调用
     pid_t pid;

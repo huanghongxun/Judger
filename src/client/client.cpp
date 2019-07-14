@@ -2,6 +2,7 @@
 #include <glog/logging.h>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include <unistd.h>
 #include <boost/lexical_cast.hpp>
 #include <fstream>
@@ -106,27 +107,34 @@ static judge::message::task_result judge(judge::message::client_task &client_tas
                         return result;
                     } break;
                 }
+            } else {
+                int number = random(0, MAX_RANDOM_DATA_NUM - 1);
+                task.testcase_id = number;  // 标记当前测试点使用了哪个随机测试
+                datadir = random_data_dir / to_string(number);
             }
-        }
-        else {
-            int number = random(0, MAX_RANDOM_DATA_NUM - 1);
-            task.testcase_id = number;  // 标记当前测试点使用了哪个随机测试
-            datadir = random_data_dir / to_string(number);
         }
     } else {
         // 下载标准测试数据
         filesystem::path standard_data_dir = cachedir / "standard_data";
-        datadir = standard_data_dir / to_string(task.testcase_id);
-        ip::file_lock file_lock = lock_directory(standard_data_dir);
-        ip::scoped_lock scoped_lock(file_lock);
-        auto &test_data = submit.test_data[task.testcase_id];
-        if (!filesystem::exists(datadir)) {
-            filesystem::create_directories(datadir / "input");
-            filesystem::create_directories(datadir / "output");
-            for (auto &asset : test_data.inputs)
-                asset->fetch(datadir / "input");
-            for (auto &asset : test_data.outputs)
-                asset->fetch(datadir / "output");
+
+        if (father && !father->is_random) {  // 如果父测试也是标准测试，那么使用同一个测试数据组
+            int number = father->testcase_id;
+            if (number < 0) LOG(FATAL) << "Unknown test case";
+            datadir = standard_data_dir / to_string(task.testcase_id);
+            // FIXME: 我们假定父测试存在的时候数据必定存在，如果数据被清除掉可能会导致问题
+        } else {
+            datadir = standard_data_dir / to_string(task.testcase_id);
+            ip::file_lock file_lock = lock_directory(standard_data_dir);
+            ip::scoped_lock scoped_lock(file_lock);
+            auto &test_data = submit.test_data[task.testcase_id];
+            if (!filesystem::exists(datadir)) {
+                filesystem::create_directories(datadir / "input");
+                filesystem::create_directories(datadir / "output");
+                for (auto &asset : test_data.inputs)
+                    asset->fetch(datadir / "input");
+                for (auto &asset : test_data.outputs)
+                    asset->fetch(datadir / "output");
+            }
         }
     }
 
@@ -134,7 +142,7 @@ static judge::message::task_result judge(judge::message::client_task &client_tas
     result.data_dir = datadir;
 
     if (USE_DATA_DIR) { // 如果要拷贝测试数据，我们随机 UUID 并创建文件夹拷贝数据
-        filesystem::path newdir = DATA_DIR / to_string(boost::uuids::random_generator()());
+        filesystem::path newdir = DATA_DIR / boost::lexical_cast<string>(boost::uuids::random_generator()());
         filesystem::copy(datadir, newdir, filesystem::copy_options::recursive);
         datadir = newdir;
     }

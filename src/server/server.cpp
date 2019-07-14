@@ -73,7 +73,7 @@ static void process_nolock(message::queue &testcase_queue, const judge::message:
     for (size_t i = 0; i < submit.test_cases.size(); ++i) {
         test_check &kase = submit.test_cases[i];
         // 寻找依赖当前评测点的评测点
-        if (kase.depends_on == task_result.id) {
+        if (kase.depends_on == (int)task_result.id) {
             bool satisfied;
             switch (kase.depends_cond) {
                 case test_check::depends_condition::ACCEPTED:
@@ -121,17 +121,17 @@ void process(message::queue &testcase_queue, const message::task_result &task_re
     process_nolock(testcase_queue, task_result);
 }
 
-static bool verify_submission(message::queue &testcase_queue, submission &&submit) {
-    LOG(INFO) << "Judging submission [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "]";
+static bool verify_submission(message::queue &testcase_queue, submission &&origin) {
+    LOG(INFO) << "Judging submission [" << origin.category << "-" << origin.prob_id << "-" << origin.sub_id << "]";
 
-    // 检查 judge_server 获取的 submit 是否包含编译任务，且确保至多一个编译任务
+    // 检查 judge_server 获取的 origin 是否包含编译任务，且确保至多一个编译任务
     bool has_compile_case = false;
-    for (size_t i = 0; i < submit.test_cases.size(); ++i) {
-        auto &test_case = submit.test_cases[i];
+    for (size_t i = 0; i < origin.test_cases.size(); ++i) {
+        auto &test_case = origin.test_cases[i];
 
-        if (test_case.depends_on >= i) {  // 如果每个任务都只依赖前面的任务，那么这个图将是森林，确保不会出现环
-            LOG(WARNING) << "submit from [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "] may contains circular dependency.";
-            report_failure(submit);
+        if (test_case.depends_on >= (int)i) {  // 如果每个任务都只依赖前面的任务，那么这个图将是森林，确保不会出现环
+            LOG(WARNING) << "Submission from [" << origin.category << "-" << origin.prob_id << "-" << origin.sub_id << "] may contains circular dependency.";
+            report_failure(origin);
             return false;
         }
 
@@ -139,20 +139,35 @@ static bool verify_submission(message::queue &testcase_queue, submission &&submi
             if (!has_compile_case) {
                 has_compile_case = true;
             } else {
-                LOG(WARNING) << "submit from [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "] has multiple compilation subtasks.";
-                report_failure(submit);
+                LOG(WARNING) << "Submission from [" << origin.category << "-" << origin.prob_id << "-" << origin.sub_id << "] has multiple compilation subtasks.";
+                report_failure(origin);
                 return false;
             }
         }
     }
 
+    if (!origin.submission) return false;
+
+    // 检查是否存在可以直接评测的测试点，如果不存在则直接返回
+    bool sent_testcase = false;
+    for (size_t i = 0; i < origin.test_cases.size(); ++i)
+        if (origin.test_cases[i].depends_on < 0) {
+            sent_testcase = true;
+            break;
+        }
+
+    if (!sent_testcase) {
+        // 如果不存在评测任务，直接返回
+        LOG(WARNING) << "Submission from [" << origin.category << "-" << origin.prob_id << "-" << origin.sub_id << "] does not have entry test task.";
+        report_failure(origin);
+        return false;
+    }
+
     // 给当前提交分配一个 judge_id 给评测服务端和客户端进行识别
     // global_judge_id++ 就算溢出也无所谓，一般情况下不会同时评测这么多提交
     unsigned judge_id = global_judge_id++;
-    submissions[judge_id] = move(submit);
-    auto &submit = submissions.at(judge_id);
-
-    if (!submit.submission) return false;
+    submissions[judge_id] = move(origin);
+    auto &submit = submissions[judge_id];
 
     // 初始化当前提交的所有评测任务状态为 PENDING
     vector<judge::message::task_result> task_results;
@@ -166,9 +181,8 @@ static bool verify_submission(message::queue &testcase_queue, submission &&submi
     judge::server::task_results[judge_id] = move(task_results);
 
     // 寻找没有依赖的评测点，并发送评测消息
-    bool sent_testcase = false;
     for (size_t i = 0; i < submit.test_cases.size(); ++i) {
-        if (submit.test_cases[i].depends_on < 0) { // 不依赖任何任务的任务可以直接开始评测
+        if (submit.test_cases[i].depends_on < 0) {  // 不依赖任何任务的任务可以直接开始评测
             judge::message::client_task client_task = {
                 .judge_id = judge_id,
                 .submit = &submit,
@@ -176,16 +190,9 @@ static bool verify_submission(message::queue &testcase_queue, submission &&submi
                 .id = i,
                 .type = submit.test_cases[i].check_type};
             testcase_queue.send_as_pod(client_task);
-            sent_testcase = true;
         }
     }
-
-    if (!sent_testcase) {
-        // 如果不存在评测任务，直接返回
-        summarize(judge_id);
-    }
-
-    return sent_testcase;
+    return true;
 }
 
 static bool fetch_submission_nolock(message::queue &testcase_queue) {

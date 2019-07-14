@@ -321,7 +321,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
                     for (size_t i = 0; i < 10; ++i) {
                         testcase.testcase_id = i;
                         testcase.depends_on = 0; // 依赖编译任务
-                        testcase.depends_cond = test_check::depends_cond::ACCEPTED;
+                        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
                         submit.test_cases.push_back(testcase);
                     }
                 }
@@ -352,7 +352,7 @@ bool configuration::fetch_submission(submission &submit) {
     return false;
 }
 
-void configuration::summarize_invalid(submission &submit) {
+void configuration::summarize_invalid(submission &) {
     throw runtime_error("Invalid submission");
 }
 
@@ -412,7 +412,7 @@ static void summarize_random_check(judge_report &report, submission &submit, con
                 score += submit.test_cases[i].score;
                 ++random_check.pass_cases;
             } else if (task_result.status == status::PARTIAL_CORRECT) {
-                score += boost::rational_cast<double>(task_result.score * submit.test_cases[i].score);
+                score += task_result.score * submit.test_cases[i].score;
             } else if (task_result.status == status::SYSTEM_ERROR ||
                         task_result.status == status::RANDOM_GEN_ERROR ||
                         task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||

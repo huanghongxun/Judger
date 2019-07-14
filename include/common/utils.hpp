@@ -1,15 +1,10 @@
 #pragma once
 
 #include <fmt/core.h>
+#include <boost/lexical_cast.hpp>
 #include <filesystem>
 #include <string>
 #include <vector>
-
-namespace std {
-
-std::string to_string(const std::filesystem::path &path);
-
-}  // namespace std
 
 namespace fmt {
 template <>
@@ -70,9 +65,9 @@ template <typename ContainerT, typename Head, typename... Args>
 void to_string_list(ContainerT &cont, Head &head, Args &... args) {
     if constexpr (is_container<Head>::value) {
         for (auto &value : head)
-            cont.push_back(std::to_string(value));
+            cont.push_back(boost::lexical_cast<std::string>(value));
     } else {
-        cont.push_back(std::to_string(head));
+        cont.push_back(boost::lexical_cast<std::string>(head));
     }
     if constexpr (sizeof...(args) > 0)
         to_string_list(cont, args...);

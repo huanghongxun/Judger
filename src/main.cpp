@@ -80,9 +80,19 @@ void put_error_codes() {
 }
 
 int main(int argc, char* argv[]) {
-    gflags::ParseCommandLineFlags(&argc, &argv, true);
+    gflags::ParseCommandLineFlags(&argc, &argv, false);
     google::InitGoogleLogging(argv[0]);
 
+    // 默认情况下，假设运行环境是拉取代码直接编译的环境，此时我们可以假定 runguard 的运行路径
+    if (!getenv("RUNGUARD")) {
+        filesystem::path current(argv[0]);
+        filesystem::path runguard(filesystem::weakly_canonical(current).parent_path().parent_path() / "runguard" / "bin" / "runguard");
+        cout << filesystem::weakly_canonical(runguard).string() << endl;
+        if (filesystem::exists(runguard)) {
+            set_env("RUNGUARD", filesystem::weakly_canonical(runguard).string());
+        }
+    }
+  
     CHECK(getenv("RUNGUARD"))  // RUNGUARD 环境变量将传给 exec/check/standard/run 评测脚本使用
         << "RUNGUARD environment variable should be specified. This env points out where the runguard executable locates in.";
 
@@ -101,9 +111,9 @@ int main(int argc, char* argv[]) {
         ("enable-3", po::value<vector<string>>(), "run Matrix Judge System 3.0 submission fetcher, with configuration file path.")
         ("enable-2", po::value<vector<string>>(), "run Matrix Judge System 2.0 submission fetcher, with configuration file path.")
         ("monitor-port", po::value<unsigned>(), "set the port the monitor server listens to, default to 80")
-        ("server", po::value<unsigned>(), "set the core the monitor server occupies")
         ("clients", po::value<unsigned>(), "set number of single thread judge clients to be kept")
         ("client", po::value<vector<cpuset>>(), "run a judge client which cpuset is given")
+        ("auto-clients", po::value<vector<cpuset>>(), "start clients with number of hardware concurrency")
         ("exec-dir", po::value<string>(), "set the default predefined executables for falling back")
         ("cache-dir", po::value<string>(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
         ("data-dir", po::value<string>(), "set the directory to store test data to be judged, for ramdisk to speed up IO performance of user program.")
@@ -197,16 +207,6 @@ int main(int argc, char* argv[]) {
         // TODO: not implemented
     }
 
-    int server_cpuid = -1;
-    if (vm.count("server")) {
-        auto i = vm.at("server").as<unsigned>();
-        if (i >= cpus) {
-            cerr << "Not enough cores" << endl;
-            return EXIT_FAILURE;
-        }
-        server_cpuid = i;
-    }
-
     if (getuid() != 0) {
         cerr << "You should run this program in privileged mode" << endl;
         return EXIT_FAILURE;
@@ -215,10 +215,19 @@ int main(int argc, char* argv[]) {
     set<unsigned> cores;
     vector<thread> client_threads;
 
-    // 评测服务端需要占用一个 cpu 核心
-    for (unsigned i = 0; i < cpus; ++i) {
-        if (i != server_cpuid)
+    if (vm.count("auto-clients")) {
+        // 对于自动设置客户端的情况，我们为每个 CPU 都生成一个 client
+        cpu_set_t cpuset;
+        for (unsigned i = 0; i < cpus; ++i) {
+            CPU_ZERO(&cpuset);
+            CPU_SET(i, &cpuset);
+            client_threads.push_back(move(judge::client::start_client(cpuset, to_string(i), testcase_queue)));
+        }
+    } else {
+        // 对于手动设置客户端的情况，我们记录可以使用的核心
+        for (unsigned i = 0; i < cpus; ++i) {
             cores.insert(i);
+        }
     }
 
     if (vm.count("client")) {

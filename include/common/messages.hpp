@@ -37,7 +37,7 @@ struct client_task {
      * @brief 本测试点的 id，为当前评测点在 submit.test_cases 的下标
      * 用于返回评测结果的时候统计
      */
-    uint8_t id;
+    size_t id;
 
     /**
      * @brief 本测试点的类型
@@ -69,7 +69,7 @@ struct task_result {
     static constexpr long ID = 1;
 
     task_result();
-    task_result(unsigned judge_id, uint8_t id, uint8_t type);
+    task_result(unsigned judge_id, size_t id, uint8_t type);
 
     unsigned judge_id;
 
@@ -79,7 +79,7 @@ struct task_result {
      * @brief 本测试点的 id，是 submission.test_cases 的下标
      * 用于返回评测结果的时候统计
      */
-    uint8_t id;
+    size_t id;
 
     /**
      * @brief 本测试点的类型

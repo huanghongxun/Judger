@@ -64,7 +64,7 @@ void configuration::init(const filesystem::path &config_path) {
     db.connect(host.c_str(), user.c_str(), password.c_str(), database.c_str());
 }
 
-void configuration::summarize_invalid(submission &submit) {
+void configuration::summarize_invalid(submission &) {
     throw runtime_error("Invalid submission");
 }
 
