@@ -64,7 +64,7 @@ string executable::get_compilation_log(const fs::path &) {
 }
 
 filesystem::path executable::get_run_path(const filesystem::path &) {
-    return runpath;
+    return dir / "compile";
 }
 
 local_executable_asset::local_executable_asset(const string &type, const string &id, const fs::path &execdir)
@@ -163,7 +163,7 @@ string source_code::get_compilation_log(const fs::path &workdir) {
 
 fs::path source_code::get_run_path(const fs::path &path) {
     // run 参见 compile.sh，path 为 $WORKDIR
-    return path / "compile" / "run";
+    return path / "compile";
 }
 
 }  // namespace judge::server

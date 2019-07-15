@@ -171,7 +171,11 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
     unique_ptr<source_code> standard = make_unique<source_code>(server.exec_mgr);
 
     string language = j.at("language").get<string>();
-    submission->language = standard->language = language;
+    // 硬编码将 c++ 改成 cpp
+    if (language == "c++")
+        submission->language = standard->language = "cpp";
+    else
+        submission->language = standard->language = language;
 
     const json &files = config.at("files").at(language);
     if (files.count("support")) {
@@ -493,7 +497,34 @@ static void summarize_static_check(judge_report &report, submission &submit, con
  * 评分规则
  * 内存检测会多次运行提交代码，未检测出问题则通过，最后总分为通过数/总共运行次数 × 内存检测满分分数
  */
-static void summarize_memory_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
+static void summarize_memory_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &memory_check_json) {
+    memory_check_report memory_check;
+    memory_check.pass_cases = 0;
+    memory_check.total_cases = 0;
+    boost::rational<int> score, full_score;
+    for (size_t i = 0; i < task_results.size(); ++i) {
+        auto &task_result = task_results[i];
+        if (task_result.type == memory_check_report::TYPE) {
+            if (task_result.status == status::ACCEPTED) {
+                score += submit.test_cases[i].score;
+                ++memory_check.pass_cases;
+            } else if (task_result.status == status::WRONG_ANSWER) {
+                memory_check_report_report kase;
+                kase.valgrindoutput = read_file_content(task_result.run_dir / "feedback" / "report.txt");
+                kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
+                memory_check.report.push_back(kase);
+            } else {
+                memory_check_json = get_error_report(task_result);
+                return;
+            }
+
+            full_score += submit.test_cases[i].score;
+            ++memory_check.total_cases;
+        }
+    }
+    memory_check.grade = boost::rational_cast<double>(score);
+    memory_check.full_grade = boost::rational_cast<double>(full_score);
+    report.grade += memory_check.grade;
 }
 
 void configuration::summarize(submission &submit, const vector<judge::message::task_result> &task_results) {
@@ -506,7 +537,8 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
     json compile_check_json;
     summarize_compile_check(report, submit, task_results, compile_check_json);
 
-    memory_check_report memory_check;
+    json memory_check_json;
+    summarize_memory_check(report, submit, task_results, memory_check_json);
 
     json random_check_json;
     summarize_random_check(report, submit, task_results, random_check_json);
@@ -518,7 +550,7 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
     gtest_check_report gtest_check;
 
     report.report = {{"CompileCheck", compile_check_json},
-                     {"MemoryCheck", memory_check},
+                     {"MemoryCheck", memory_check_json},
                      {"RandomCheck", random_check_json},
                      {"StandardCheck", standard_check_json},
                      {"StaticCheck", static_check},

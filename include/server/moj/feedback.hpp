@@ -344,9 +344,9 @@ void to_json(json &j, const memory_check_report_report &report);
  * {
  *   "grade": 0,
  *   "full_grade": 0,
- *   "report": {
- *     "valgrindoutput": [
- *       {
+ *   "report": [
+ *     {
+ *       "valgrindoutput": {
  *         "unique": "0x0",
  *         "tid": "1",
  *         "kind": "Leak_DefinitelyLost",
@@ -370,7 +370,10 @@ void to_json(json &j, const memory_check_report_report &report);
  *           ]
  *         }
  *       },
- *       {
+ *       "stdin": "content of testdata.in"
+ *     },
+ *     {
+ *       "valgrindoutput": {
  *         "unique": "0x1",
  *         "tid": "1",
  *         "kind": "Leak_DefinitelyLost",
@@ -393,10 +396,10 @@ void to_json(json &j, const memory_check_report_report &report);
  *             }
  *           ]
  *         }
- *       }
- *     ],
- *     "stdin": ""
- *   },
+ *       },
+ *       "stdin": "content of testdata.in"
+ *     }
+ *   ],
  *   "pass_cases": 0,
  *   "total_cases": 0
  * }
@@ -428,7 +431,7 @@ struct memory_check_report {
     /**
      * @brief Valgrind 测试的输出
      */
-    memory_check_report_report report;
+    vector<memory_check_report_report> report;
 };
 
 void to_json(json &j, const memory_check_report &report);

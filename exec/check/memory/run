@@ -1,8 +1,8 @@
 #!/bin/sh
 #
-# 评测提交的脚本
+# 内存测试脚本
 #
-# 用法：$0 <datadir> <timelimit> <memlimit> <chrootdir> <workdir> <run-uuid> <run> <compare>
+# 用法：$0 <datadir> <timelimit> <memlimit> <chrootdir> <workdir> <run-uuid> <run>
 #
 # <datadir>      包含数据文件的文件夹的绝对路径
 # <timelimit>    运行时间限制，格式为 %d:%d，如 1:3 表示测试点时间限制
@@ -13,7 +13,6 @@
 #                为空文件夹，特别是保证不可以包含标准输出文件
 # <run-uuid>     运行的 uuid，用于索引运行文件夹位置
 # <run>          运行程序的脚本的绝对路径
-# <compare>      比较程序/脚本文件夹的绝对路径
 #
 # 必须包含的环境变量：
 # "RUNGUARD"     runguard 的路径
@@ -90,8 +89,6 @@ CHROOTDIR="$1"; shift
 WORKDIR="$1"; shift
 RUN_UUID="$1"; shift
 RUN_SCRIPT="$1"
-COMPARE_SCRIPT="$2"
-COMPARE_ARGS="$3"
 
 TESTIN="$DATADIR/input"
 TESTOUT="$DATADIR/output"
@@ -103,8 +100,8 @@ if [ ! -d "$WORKDIR" ] || [ ! -w "$WORKDIR" ] || [ ! -x "$WORKDIR" ]; then
 fi
 
 [ -x "$WORKDIR/$PROGRAM" ] || error "Program does not exist"
-[ ! -d "$COMPARE_SCRIPT" ] || error "Compare script does not exist"
-[ ! -d "$RUN_SCRIPT" ] || error "Run script does not exist"
+[ -x "$COMPARE_SCRIPT" ] || error "Compare script does not exist"
+[ -x "$RUN_SCRIPT" ] || error "Run script does not exist"
 [ -x "$RUNGUARD" ] || error "runguard does not exist"
 
 chmod a+x "$WORKDIR"
@@ -127,14 +124,11 @@ mkdir -p "$RUNDIR/feedback"
 mkdir -p "$RUNDIR/work"
 mkdir -p "$RUNDIR/work/judge"
 mkdir -p "$RUNDIR/work/judge_utils"
-mkdir -p "$RUNDIR/work/compare"
 mkdir -p "$RUNDIR/work/run"
-mkdir -p "$RUNDIR/work/feedback"
 mkdir -p "$RUNDIR/merged"
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
 mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro "$RUNDIR/work/judge"
 mount --bind -o ro "$JUDGE_UTILS" "$RUNDIR/work/judge_utils"
-mount --bind -o ro "$COMPARE_SCRIPT" "$RUNDIR/work/compare"
 mount --bind -o ro "$RUN_SCRIPT" "$RUNDIR/work/run"
 mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
 
@@ -150,65 +144,26 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --wall-time $TIMELIMIT \
     --memory-limit $MEMLIMIT \
     --file-limit $FILELIMIT \
+    --standard-output-file valgrind.xml \
     --standard-error-file program.err \
     --outmeta program.meta -- \
+    valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-fd=1 -- \
     /run/run testdata.in program.out /judge/run 2>runguard.err
 
-# 比较选手程序输出
-logmsg $LOG_INFO "Comparing output"
-umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
-mount --bind "$RUNDIR/feedback" "$RUNDIR/work/feedback"
-mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro:"$TESTOUT"=ro "$RUNDIR/work/judge"
-
-exitcode=0
-runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
-    --root "$CHROOTDIR" \
-    --work "/judge" \
-    --user "$RUNUSER" \
-    --group "$RUNGROUP" \
-    --memory-limit $SCRIPTMEMLIMIT \
-    --wall-time $SCRIPTTIMELIMIT \
-    --file-limit $SCRIPTFILELIMIT \
-    --outmeta compare.meta \
-    -VJUDGE_UTILS=/judge_utils -- \
-    "/compare/run" testdata.in program.out testdata.out /feedback > compare.tmp 2>&1
-
-# 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/run-$uuid 中，因此删除挂载点即可。
 umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
 umount -f "$RUNDIR/work/judge_utils" >/dev/null 2>&1  || /bin/true
-umount -f "$RUNDIR/work/compare" >/dev/null 2>&1  || /bin/true
 umount -f "$RUNDIR/work/run" >/dev/null 2>&1  || /bin/true
-umount -f "$RUNDIR/work/feedback" >/dev/null 2>&1  || /bin/true
 umount -f "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
 rm -rf "$RUNDIR/run"
 rm -rf "$RUNDIR/merged"
 rm -rf "$RUNDIR/work"
-# RUNDIR 还剩下 compare.meta, compare.out, program.meta, program.err, system.out, runguard.err 供评测客户端检查
+# RUNDIR 还剩下 program.meta, program.err, system.out, runguard.err 供评测客户端检查
 # RUNDIR 由评测客户端删除
 
 # Make sure that all feedback files are owned by the current
 # user/group, so that we can append content.
 $GAINROOT chown -R "$(id -un):" "$RUNDIR/feedback"
 chmod -R go-w feedback
-
-# Append output validator error messages
-# TODO: display extra
-if [ -s feedback/judgeerror.txt ]; then
-	printf "\\n---------- output validator (error) messages ----------\\n" >> feedback/judgemessage.txt
-	cat feedback/judgeerror.txt >> feedback/judgemessage.txt
-fi
-
-# Append output validator stdin/stderr - display extra?
-if [ -s compare.tmp ]; then
-	printf "\\n---------- output validator stdout/stderr messages ----------\\n" >> feedback/judgemessage.txt
-	cat compare.tmp >> feedback/judgemessage.txt
-fi
-
-logmsg $LOG_DEBUG "checking compare script exit-status: $exitcode"
-if grep '^time-result: .*timelimit' compare.meta >/dev/null 2>&1; then
-    logmsg $LOG_ERR "Comparing aborted after $SCRIPTTIMELIMIT seconds, compare script output: \\n$(cat compare.tmp)"
-    cleanexit ${E_COMPARE_ERROR:-1}
-fi
 
 if [ ! -r program.meta ]; then
     error "'program.meta' is not readable"
@@ -240,60 +195,18 @@ if grep -E '^output-truncated: ([a-z]+,)*stdout(,[a-z]+)*' program.meta >/dev/nu
     cleanexit ${E_OUTPUT_LIMIT:-1}
 fi
 
-if [ ! -z $signal ]; then
-    case $signal in
-        11) # SIGSEGV
-            echo "Segmentation Fault" >> system.out
-            echo "$resource_usage" >> system.out
-            cleanexit ${E_SEG_FAULT:-1}
-            ;;
-        8) # SIGFPE
-            echo "Floating Point Exception" >> system.out
-            echo "$resource_usage" >> system.out
-            cleanexit ${E_FLOATING_POINT:-1}
-            ;;
-        *)
-            echo "Runtime Error" >> system.out
-            echo "$resource_usage" >> system.out
-            cleanexit ${E_RUNTIME_ERROR:-1}
-            ;;
-    esac
-fi
-
-# FIXME: C 语言程序可能会因为没有写 return 0; 导致非零
-# 返回值而误判为 Runtime Error
-# 经过测试，现在 gcc/g++ 会自动解决 main 函数没有 return 0 的问题，暂时不需要解决
-if [ "$progexit" -ne 0 ]; then
-    echo "Non-zero exitcode $progexit" >> system.out
-    echo "$resource_usage" >> system.out
-    cleanexit ${E_RUNTIME_ERROR:-1}
-fi
-
-if [ $exitcode -eq $RESULT_PC ] && [ ! -f "$RUNDIR/feedback/score.txt" ]; then
-    logmsg $LOG_ERR "Compare script reports partial correct without score record."
-    cleanexit ${E_COMPARE_ERROR:-1}
-fi
-
+runcheck python3 "$PROGNAME/convert.py" valgrind.xml $RUNDIR/feedback/report.txt 2>feedback/judgemessage.txt
 case $exitcode in
-    $RESULT_AC)
+    0)
         echo "Accepted" >> system.out
         echo "$resource_usage" >> system.out
         cleanexit ${E_ACCEPTED:-1}
         ;;
-    $RESULT_WA)
+    1)
         echo "Wrong Answer" >> system.out
         echo "$resource_usage" >> system.out
         cleanexit ${E_WRONG_ANSWER:-1}
         ;;
-    $RESULT_PE)
-        echo "Presentation Error" >> system.out
-        echo "$resource_usage" >> system.out
-        cleanexit ${E_PRESENTATION_ERROR:-1}
-        ;;
-    $RESULT_PC)
-        echo "Partial Correct" >> system.out
-        echo "$resouce_usage" >> system.out
-        cleanexit ${E_PARTIAL_CORRECT:-1}
     *)
         logmsg $LOG_ERR "Comparing failed with exitcode $exitcode, compare script output:\\n$(cat feedback/judgemessage.txt)"
         cleanexit ${E_COMPARE_ERROR:-1}

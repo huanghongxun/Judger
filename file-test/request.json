@@ -2,18 +2,18 @@
     "version": 2,
     "prob_id": 1234,
     "sub_id": 12340,
-    "language": "cpp",
+    "language": "c++",
     "last_update": 1,
     "config": {
         "grading": {
-            "cpp": {
+            "c++": {
                 "CompileCheck": 20,
                 "StandardCheck": 40,
                 "RandomCheck": 40
             }
         },
         "files": {
-            "cpp": {
+            "c++": {
                 "support": {
                     "source_files": [
                         "main.cpp"
@@ -53,7 +53,7 @@
             }
         },
         "compile": {
-            "cpp": [
+            "c++": [
                 "{INPUT}",
                 "-Werror",
                 "-g",
@@ -63,13 +63,13 @@
             ]
         },
         "limits": {
-            "cpp": {
+            "c++": {
                 "memory": 32,
                 "time": 1000
             }
         },
         "random": {
-            "cpp": {
+            "c++": {
                 "language": "c",
                 "compile": [
                     "{INPUT}",
