@@ -2,8 +2,9 @@
 #
 # 本脚本用于创建 cgroup
 # 该脚本必须在每次开机后执行一次，你可以把本脚本设置为启动脚本
+# 用法： $0 <judgehostuser>
 
-JUDGEHOSTUSER=iladmin
+JUDGEHOSTUSER=$1; shift
 CGROUPBASE=/sys/fs/cgroup
 
 for i in cpuset memory; do

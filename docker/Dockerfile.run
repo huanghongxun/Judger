@@ -1,13 +1,12 @@
 FROM ubuntu:19.04
 
-RUN apt update && apt install curl golang rustc xz-utils default-jdk-headless pypy python3 clang ruby scala libboost-all-dev cmake libgtest-dev gcc g++ gcc-multilib g++-multilib libsqlite3-dev libmysqlclient-dev libpq-dev fp-compiler valgrind locales
+RUN apt update && apt install curl make golang rustc xz-utils default-jdk-headless pypy python3 clang ruby scala libboost-all-dev cmake libgtest-dev gcc-9 g++-9 gcc-multilib g++-multilib libsqlite3-dev libmysqlclient-dev libpq-dev fp-compiler valgrind locales
 
 WORKDIR /opt/judge-system
 COPY . ./
 WORKDIR /opt/judge-system/build
-RUN cmake -DBUILD_ENTRY=ON .. && make
+RUN CC=gcc-9 CXX=g++-9 cmake -DBUILD_ENTRY=ON .. && make
 WORKDIR /opt/judge-system/runguard/build
 RUN cmake .. && make
 
-ENV RUNGUARD=/opt/judge-system/runguard/bin/runguard
 ENTRYPOINT ["/opt/judge-system/run.sh"]

@@ -65,7 +65,6 @@ Available architectures:
 Ubuntu: $UBUNTU_ARCHLIST
 
 Variables:
-  \$DEBMIRROR            Ubuntu apt mirror.
   \$DEBPROXY             caching proxy for apt-get.
 EOF
 }
