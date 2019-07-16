@@ -95,7 +95,8 @@ void set_restrictions(const struct runguard_options &opt) {
 
     for (auto &entry : opt.env) {
         std::string env = entry;
-        putenv(env.data());
+        auto idx = env.find('=');
+        setenv(env.substr(0, idx).c_str(), env.substr(idx + 1).c_str(), true);
     }
 
     if (opt.use_cpu_limit) {

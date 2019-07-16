@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # 编译脚本
 #
@@ -38,11 +38,14 @@ cleanexit ()
 {
     trap - EXIT
 
-    chmod go= "$WORKDIR/compile"
+    #chmod go= "$WORKDIR/compile"
     logmsg $LOG_DEBUG "exiting, code = '$1'"
     exit $1
 }
 
+# 导入 runcheck 函数
+. "$JUDGE_UTILS/utils.sh"
+. "$JUDGE_UTILS/logging.sh"
 
 CPUSET=""
 CPUSET_OPT=""
@@ -62,7 +65,7 @@ shift $((OPTIND-1))
 [ "$1" == "--" ] && shift
 
 if [ -n "$CPUSET" ]; then
-    CPUSET_OPT="-P $CPUSET"
+    CPUSET_OPT="--cpuset $CPUSET"
     LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1)-$CPUSET.log"
 else
     LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1).log"
@@ -111,11 +114,15 @@ RUNDIR="$WORKDIR/run-compile"
 mkdir -p "$RUNDIR"
 chmod a+rwx "$RUNDIR"
 
+chmod -R +x "$COMPILE_SCRIPT"
+
 mkdir -p "$RUNDIR/work"
 mkdir -p "$RUNDIR/work/judge"
+mkdir -p "$RUNDIR/work/compile"
 mkdir -p "$RUNDIR/merged"
-mount -t overlayfs overlayfs -o upperdir="$WORKDIR/compile" "$RUNDIR/work/judge"
-mount -t overlayfs overlayfs -o lowerdir="$CHROOTDIR",upperdir="$RUNDIR/work" "$RUNDIR/merged"
+mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
+mount -t aufs none -odirs="$WORKDIR/compile"=rw "$RUNDIR/merged/judge"
+mount --bind -o ro "$COMPILE_SCRIPT" "$RUNDIR/merged/compile"
 
 # 调用 runguard 来执行编译命令
 exitcode=0
@@ -124,21 +131,21 @@ $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --work /judge \
         --user "$RUNUSER" \
         --group "$RUNGROUP" \
-        --memory-limit $SCRIPTMEMLIMIT \
-        --wall-time $SCRIPTTIMELIMIT \
-        --file-limit $SCRIPTFILELIMIT \
-        --outmeta compile.meta \
+        --memory-limit "$SCRIPTMEMLIMIT" \
+        --wall-time "$SCRIPTTIMELIMIT" \
+        --out-meta compile.meta \
         $ENVIRONMENT_VARS -- \
-        "$COMPILE_SCRIPT" run "$MEMLIMIT" "$@" > compile.tmp 2>&1 || \
+        "/compile/run" run "$MEMLIMIT" "$@" > compile.tmp 2>&1 || \
         exitcode=$?
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/compile 中，因此删除挂载点即可。
-umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
+umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
+umount -f "$RUNDIR/merged/compile" >/dev/null 2>&1  || /bin/true
 umount -f "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
 rm -rf "$RUNDIR"
 
 $GAINROOT chown -R "$(id -un):" "$WORKDIR/compile"
-chmod -R go-w "$WORKDIR/compile"
+chmod -R go-w+x "$WORKDIR/compile"
 
 # 检查是否编译超时，time-result 可能为空、soft-timelimit、hard-timelimit，空表示没有超时
 if grep '^time-result: .*timelimit' compile.meta >/dev/null 2>&1; then

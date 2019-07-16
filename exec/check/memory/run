@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # 内存测试脚本
 #
@@ -146,7 +146,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --file-limit $FILELIMIT \
     --standard-output-file valgrind.xml \
     --standard-error-file program.err \
-    --outmeta program.meta -- \
+    --out-meta program.meta -- \
     valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-fd=1 -- \
     /run/run testdata.in program.out /judge/run 2>runguard.err
 

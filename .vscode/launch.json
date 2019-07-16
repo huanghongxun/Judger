@@ -30,6 +30,36 @@
             ]
         },
         {
+            "name": "(gdb) file-test",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/judge-system",
+            "args": [
+                "--enable-3=config-moj.json",
+                "--client=1",
+                "--exec-dir=${workspaceFolder}/exec",
+                "--cache-dir=/tmp",
+                "--run-dir=/tmp",
+                "--chroot-dir=/chroot",
+                "--cache-random-data=100",
+                "--run-user=huangyuhui",
+                "--run-group=huangyuhui"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/file-test",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb-sudo",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb and add better child debugging",
+                    "text": "-enable-pretty-printing -gdb-set detach-on-fork off",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "(gdb) Attach to gdb server",
             "type": "cppdbg",
             "request": "attach",

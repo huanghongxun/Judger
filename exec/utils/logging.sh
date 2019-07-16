@@ -12,7 +12,7 @@ logmsg ()
 {
     local msglevel stamp msg
 
-    msglevel = "$1"; shift
+    msglevel="$1"; shift
     msec=`date '+%N'`
     msg=`printf '%b' "$(echo "$@")"`
 
@@ -28,7 +28,6 @@ logmsg ()
         fi
     fi
 }
-:q
 
 error ()
 {

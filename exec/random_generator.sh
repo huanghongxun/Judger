@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # 编译 executable 的脚本
 #
@@ -101,9 +101,11 @@ chmod a+rwx "$RUNDIR"
 
 mkdir -p "$RUNDIR/work"
 mkdir -p "$RUNDIR/work/judge"
+mkdir -p "$RUNDIR/work/run"
 mkdir -p "$RUNDIR/merged"
-mount -t overlayfs overlayfs -o lowerdir="$RAN_GEN",upperdir="$WORKDIR/input" "$RUNDIR/work/judge"
-mount -t overlayfs overlayfs -o lowerdir="$CHROOTDIR",upperdir="$RUNDIR/work" "$RUNDIR/merged"
+mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
+mount -t aufs none -odirs="$WORKDIR/input"=rw:"$RAN_GEN"=ro "$RUNDIR/merged/judge"
+mount --bind -o ro "$RUN_SCRIPT" "$RUNDIR/merged/run"
 
 # 调用 runguard 来执行随机生成器
 exitcode=0
@@ -115,13 +117,13 @@ $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --memory-limit $SCRIPTMEMLIMIT \
         --wall-time $SCRIPTTIMELIMIT \
         --file-limit $SCRIPTFILELIMIT \
-        --outmeta random.meta \
+        --out-meta random.meta \
         -- \
-        run > random.tmp 2>&1 || \
+        run > "$WORKDIR/input/testdata.in" 2>&1 || \
         exitcode=$?
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/random 中，因此删除挂载点即可。
-umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
+umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
 
 # 检查是否运行超时，time-result 可能为空、soft-timelimit、hard-timelimit，空表示没有超时
 if grep '^time-result: .*timelimit' random.meta >/dev/null 2>&1; then
@@ -144,7 +146,7 @@ cat random.tmp >> random.out
 
 #################################
 
-mount -t overlayfs overlayfs -o lowerdir="$STD_PROG",lowerdir="$WORKDIR/input",upperdir="$WORKDIR/output" "$RUNDIR/work/judge"
+mount -t aufs none -odirs="$WORKDIR/output"=rw:"$STD_PROG"=ro:"$WORKDIR/input"=ro "$RUNDIR/merged/judge"
 
 # 调用 runguard 来执行标准程序
 exitcode=0
@@ -159,12 +161,12 @@ $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --memory-limit $MEMLIMIT \
         --wall-time $TIMELIMIT \
         --file-limit $FILELIMIT \
-        --outmeta standard.meta \
-        -- run > standard.tmp 2>&1 || \
+        --out-meta standard.meta \
+        -- /run/run testdata.in testdata.out /judge/run > standard.tmp 2>&1 || \
         exitcode=$?
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/standard 中，因此删除挂载点即可。
-umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
+umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
 umount -f "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
 rm -rf "$RUNDIR"
 

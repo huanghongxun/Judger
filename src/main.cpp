@@ -7,7 +7,8 @@
 #include <set>
 #include <thread>
 #include "client/client.hpp"
-#include "common/msg_queue.hpp"
+#include "common/concurrent_queue.hpp"
+#include "common/messages.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
 #include "server/moj/moj.hpp"
@@ -15,7 +16,7 @@
 #include "server/sicily/sicily.hpp"
 using namespace std;
 
-judge::message::queue testcase_queue;
+judge::concurrent_queue<judge::message::client_task> testcase_queue;
 set<int> client_pid;
 
 struct cpuset {
@@ -116,6 +117,11 @@ int main(int argc, char* argv[]) {
         ("data-dir", po::value<string>(), "set the directory to store test data to be judged, for ramdisk to speed up IO performance of user program.")
         ("run-dir", po::value<string>(), "set the directory to run user programs, store compiled user program")
         ("chroot-dir", po::value<string>(), "set the chroot directory")
+        ("script-mem-limit", po::value<unsigned>(), "set memory limit in KB for random data generator, scripts, default to 262144(256MB).")
+        ("script-time-limit", po::value<unsigned>(), "set time limit in seconds for random data generator, scripts, default to 10(10 second).")
+        ("script-file-limit", po::value<unsigned>(), "set file limit in KB for random data generator, scripts, default to 524288(512MB).")
+        ("run-user", po::value<string>()->required(), "set run user")
+        ("run-group", po::value<string>()->required(), "set run group")
         ("cache-random-data", po::value<size_t>(), "set the maximum number of cached generated random data, default to 100.")
         ("help", "display this help text")
         ("version", "display version of this application");
@@ -139,9 +145,6 @@ int main(int argc, char* argv[]) {
              << "This app requires root privilege" << endl
              << "Required Environment Variables:" << endl
              << "\tRUNGUARD: location of runguard" << endl
-             << "\tSCRIPTTIMELIMIT: time limit for scripts in seconds" << endl
-             << "\tSCRIPTMEMLIMIT: memory limit for scripts in KB" << endl
-             << "\tSCRIPTFILELIMIT: file limit for scripts in bytes" << endl
              << "Usage: " << argv[0] << " [options]" << endl;
         cout << desc << endl;
         return EXIT_SUCCESS;
@@ -154,7 +157,7 @@ int main(int argc, char* argv[]) {
 
     if (vm.count("exec-dir")) {
         judge::EXEC_DIR = filesystem::path(vm.at("exec-dir").as<string>());
-        set_env("JUDGE_UTILS", judge::EXEC_DIR, true);
+        set_env("JUDGE_UTILS", judge::EXEC_DIR / "utils", true);
         CHECK(filesystem::is_directory(judge::EXEC_DIR))
             << "Executables directory " << judge::EXEC_DIR << " does not exist";
     }
@@ -182,6 +185,29 @@ int main(int argc, char* argv[]) {
         judge::CHROOT_DIR = filesystem::path(vm.at("chroot-dir").as<string>());
         CHECK(filesystem::is_directory(judge::CHROOT_DIR))
             << "Chroot directory " << judge::CHROOT_DIR << " does not exist";
+    }
+
+    if (vm.count("script-mem-limit")) {
+        judge::SCRIPT_MEM_LIMIT = vm["script-mem-limit"].as<unsigned>();
+    }
+    set_env("SCRIPTMEMLIMIT", to_string(judge::SCRIPT_MEM_LIMIT), false);
+
+    if (vm.count("script-time-limit")) {
+        judge::SCRIPT_TIME_LIMIT = vm["script-time-limit"].as<unsigned>();
+    }
+    set_env("SCRIPTTIMELIMIT", to_string(judge::SCRIPT_TIME_LIMIT), false);
+
+    if (vm.count("script-file-limit")) {
+        judge::SCRIPT_FILE_LIMIT = vm["script-file-limit"].as<unsigned>();
+    }
+    set_env("SCRIPTFILELIMIT", to_string(judge::SCRIPT_FILE_LIMIT), false);
+
+    if (vm.count("run-user")) {
+        set_env("RUNUSER", vm["run-user"].as<string>());
+    }
+
+    if (vm.count("run-group")) {
+        set_env("RUNGROUP", vm["run-group"].as<string>());
     }
 
     if (vm.count("cache-random-data")) {

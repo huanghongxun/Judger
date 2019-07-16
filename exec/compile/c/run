@@ -5,5 +5,5 @@
 DEST="$1"; shift
 MEMLIMIT="$1"; shift
 
-gcc-8 -x c -DONLINE_JUDGE -fopenmp -march=native -std=c11 -Wall -Wextra -O2 -static -o "$DEST" "$@" -lm -lpthread
+gcc-9 -x c -DONLINE_JUDGE -fopenmp -march=native -std=c11 -Wall -Wextra -O2 -static -o "$DEST" "$@" -lm -lpthread
 exit $?

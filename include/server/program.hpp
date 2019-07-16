@@ -124,7 +124,7 @@ struct local_executable_asset : public asset {
 
     local_executable_asset(const string &type, const string &id, const filesystem::path &execdir);
 
-    void fetch(const filesystem::path &path) override;
+    void fetch(const filesystem::path &dir) override;
 };
 
 /**
@@ -139,7 +139,7 @@ struct remote_executable_asset : public asset {
 
     remote_executable_asset(asset_uptr &&remote_asset, const string &md5sum);
 
-    void fetch(const filesystem::path &path) override;
+    void fetch(const filesystem::path &dir) override;
 };
 
 /**

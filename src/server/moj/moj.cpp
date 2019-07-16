@@ -188,6 +188,19 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         append(standard->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
     }
 
+    const json &compile = config.at("compile").at(language);
+    compile.get_to(submission->compile_command);
+    compile.get_to(standard->compile_command);
+
+    const json &limits = config.at("limits").at(language);
+    limits.at("memory").get_to(submit.memory_limit);
+    submit.memory_limit <<= 10;
+    submission->memory_limit = standard->memory_limit = submit.memory_limit;
+    limits.at("time").get_to(submit.time_limit);
+    submit.time_limit /= 1000;
+    submit.proc_limit = -1;
+    submit.file_limit = 32768;  // 32M
+
     if (files.count("submission")) {
         auto src_url = files.at("submission").at("source_files").get<vector<string>>();
         // 选手提交的下载地址：FILE_API/submission/<sub_id>/<filename>
@@ -196,6 +209,8 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         auto hdr_url = files.at("submission").at("header_files").get<vector<string>>();
         // 选手提交的下载地址：FILE_API/submission/<sub_id>/<filename>
         append(submission->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("submission/{}", submit.sub_id)));
+
+        submit.submission = move(submission);
     }
 
     if (files.count("standard")) {
@@ -210,7 +225,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
 
         auto input_url = standard_json.at("input").get<vector<string>>();
         auto output_url = standard_json.at("output").get<vector<string>>();
-        for (size_t i = 0; i < input_url.size() && output_url.size(); ++i) {
+        for (size_t i = 0; i < input_url.size() && i < output_url.size(); ++i) {
             test_case_data datacase;
             // 标准输入的的下载地址：FILE_API/problem/<prob_id>/standard_input/<filename>
             datacase.inputs.push_back(moj_url_to_remote_file(server, fmt::format("problem/{}/standard_input", submit.prob_id))(input_url[i]));
@@ -220,19 +235,13 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
             datacase.outputs[0]->name = "testdata.out";  // 我们要求输出数据文件名必须为 testdata.out
             submit.test_data.push_back(move(datacase));
         }
+
+        submit.standard = move(standard);
     }
-
-    const json &compile = config.at("compile").at(language);
-    compile.get_to(submission->compile_command);
-    compile.get_to(standard->compile_command);
-
-    const json &limits = config.at("limits").at(language);
-    limits.at("memory").get_to(submit.memory_limit);
-    submit.memory_limit <<= 10;
-    limits.at("time").get_to(submit.time_limit);
 
     if (config.count("random")) {
         auto random_ptr = make_unique<source_code>(server.exec_mgr);
+        random_ptr->memory_limit = SCRIPT_MEM_LIMIT;
         const json &random = config.at("random").at(language);
         random.at("language").get_to(random_ptr->language);
         random.at("compile").get_to(random_ptr->compile_command);
@@ -248,8 +257,6 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         submit.random = move(random_ptr);
     }
 
-    submit.submission = move(submission);
-    submit.standard = move(standard);
     submit.compare = server.exec_mgr.get_compare_script("diff-ign-space");
 
     const json &grading = config.at("grading").at(language);
@@ -265,7 +272,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         if (!grade) continue;
         if (check.key() == "CompileCheck") {
             testcase.is_random = false;
-            testcase.score = 0;
+            // testcase.score = 0;
             testcase.check_type = message::client_task::COMPILE_TYPE;
             testcase.testcase_id = -1;
             testcase.depends_on = -1;
@@ -273,6 +280,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         } else if (check.key() == "RandomCheck") {
             testcase.check_type = random_check_report::TYPE;
             testcase.check_script = "standard";
+            testcase.run_script = "standard";
             testcase.is_random = true;
             testcase.depends_on = 0;  // 依赖编译任务
             testcase.depends_cond = test_check::depends_condition::ACCEPTED;
@@ -286,9 +294,10 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         } else if (check.key() == "StandardCheck") {
             testcase.check_type = standard_check_report::TYPE;
             testcase.check_script = "standard";
+            testcase.run_script = "standard";
             testcase.is_random = false;
 
-            for (size_t i = 0; i < submit.test_cases.size(); ++i) {
+            for (size_t i = 0; i < submit.test_data.size(); ++i) {
                 testcase.testcase_id = i;
                 // 将当前的标准测试点编号记录下来，给内存测试依赖
                 standard_checks.push_back(submit.test_cases.size());
@@ -312,6 +321,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         if (check.key() == "MemoryCheck") {
             testcase.check_type = memory_check_report::TYPE;
             testcase.check_script = "memory";
+            testcase.run_script = "standard";
             testcase.is_random = submit.test_cases.empty();
 
             if (testcase.is_random) {

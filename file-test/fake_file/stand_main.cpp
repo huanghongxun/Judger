@@ -1,5 +1,3 @@
-#include <iostream>
+#include "stand_header.h"
 
-int main() {
-  return 0;
-}
+int calc(int a) { return a * 10; }

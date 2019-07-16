@@ -3,4 +3,6 @@
 
 #include <cmath>
 
+int calc(int a);
+
 #endif

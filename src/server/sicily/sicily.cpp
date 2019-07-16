@@ -128,6 +128,7 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
             // 添加评测任务，sicily 只有标准测试，因此为每个测试数据添加一个标准测试数据组
             test_check kase;
             kase.check_script = "standard";
+            kase.run_script = "standard";
             kase.is_random = false;
             kase.score = 0;
             kase.check_type = 1;
@@ -164,6 +165,9 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
     if (!probrows.empty()) {
         int spj, has_framework;
         tie(submit.time_limit, submit.memory_limit, spj, has_framework) = probrows[0];
+        submit.time_limit /= 1000;
+        submit.proc_limit = -1;
+        submit.file_limit = 32768;  // 32M
 
         if (spj) {
             // 由于 Sicily 的 special judge 的比较格式和本评测的不一致，因此我们需要借助 bash 脚本进行转换

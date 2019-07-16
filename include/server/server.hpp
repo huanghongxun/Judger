@@ -1,6 +1,7 @@
 #pragma once
 
-#include "common/msg_queue.hpp"
+#include "common/concurrent_queue.hpp"
+#include "common/messages.hpp"
 #include "server/judge_server.hpp"
 
 /**
@@ -44,7 +45,7 @@ submission &get_submission_by_judge_id(unsigned judge_id);
  * 
  * @param task_result 评测结果
  */
-void process(message::queue &testcase_queue, const message::task_result &task_result);
+void process(concurrent_queue<message::client_task> &testcase_queue, const message::task_result &task_result);
 
 /**
  * @brief 向每个评测服务器拉取一个提交
@@ -54,6 +55,6 @@ void process(message::queue &testcase_queue, const message::task_result &task_re
  * @param testcase_queue 评测服务端发送评测信息的队列
  * @return true 如果获取到了提交
  */
-bool fetch_submission(message::queue &testcase_queue);
+bool fetch_submission(concurrent_queue<message::client_task> &testcase_queue);
 
 }  // namespace judge::server

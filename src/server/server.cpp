@@ -51,7 +51,7 @@ static void report_failure(submission &submit) {
  * 
  * @param task_result client 返回的评测结果
  */
-static void process_nolock(message::queue &testcase_queue, const judge::message::task_result &task_result) {
+static void process_nolock(concurrent_queue<message::client_task> &testcase_queue, const judge::message::task_result &task_result) {
     unsigned judge_id = task_result.judge_id;
     if (!submissions.count(judge_id)) {
         LOG(ERROR) << "Test case exceeded [judge_id: " << judge_id << "]";
@@ -95,7 +95,15 @@ static void process_nolock(message::queue &testcase_queue, const judge::message:
                     break;
             }
 
-            if (!satisfied) {
+            if (satisfied) {
+                judge::message::client_task client_task = {
+                    .judge_id = judge_id,
+                    .submit = &submit,
+                    .test_check = &submit.test_cases[i],
+                    .id = i,
+                    .type = submit.test_cases[i].check_type};
+                testcase_queue.push(client_task);
+            } else {
                 message::task_result next_result = task_result;
                 next_result.status = status::DEPENDENCY_NOT_SATISFIED;
                 next_result.id = i;
@@ -116,12 +124,12 @@ static void process_nolock(message::queue &testcase_queue, const judge::message:
     }
 }
 
-void process(message::queue &testcase_queue, const message::task_result &task_result) {
+void process(concurrent_queue<message::client_task> &testcase_queue, const message::task_result &task_result) {
     lock_guard<mutex> guard(server_mutex);
     process_nolock(testcase_queue, task_result);
 }
 
-static bool verify_submission(message::queue &testcase_queue, submission &&origin) {
+static bool verify_submission(concurrent_queue<message::client_task> &testcase_queue, submission &&origin) {
     LOG(INFO) << "Judging submission [" << origin.category << "-" << origin.prob_id << "-" << origin.sub_id << "]";
 
     // 检查 judge_server 获取的 origin 是否包含编译任务，且确保至多一个编译任务
@@ -189,13 +197,13 @@ static bool verify_submission(message::queue &testcase_queue, submission &&origi
                 .test_check = &submit.test_cases[i],
                 .id = i,
                 .type = submit.test_cases[i].check_type};
-            testcase_queue.send_as_pod(client_task);
+            testcase_queue.push(client_task);
         }
     }
     return true;
 }
 
-static bool fetch_submission_nolock(message::queue &testcase_queue) {
+static bool fetch_submission_nolock(concurrent_queue<message::client_task> &testcase_queue) {
     bool success = false;  // 是否成功拉到评测任务
     // 尝试从服务器拉取提交，每次都向所有的评测服务器拉取评测任务
     for (auto &[category, server] : judge_servers) {
@@ -211,7 +219,7 @@ static bool fetch_submission_nolock(message::queue &testcase_queue) {
 // 限制拉取提交的总数
 // TODO: 将拉取了的提交保存到本地持久化以便评测系统挂掉后重启可以 rejudge
 // TODO: 主动 fetch 未评测的数据
-bool fetch_submission(message::queue &testcase_queue) {
+bool fetch_submission(concurrent_queue<message::client_task> &testcase_queue) {
     lock_guard<mutex> guard(server_mutex);
     return fetch_submission_nolock(testcase_queue);
 }

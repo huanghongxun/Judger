@@ -27,6 +27,12 @@ enum error_codes {
 
 extern int MAX_RANDOM_DATA_NUM;
 
+extern int SCRIPT_MEM_LIMIT;
+
+extern int SCRIPT_TIME_LIMIT;
+
+extern int SCRIPT_FILE_LIMIT;
+
 /**
  * @brief 存放 executable 的路径，为项目根目录下的 exec 文件夹
  * 这个只是用来在无法查找到服务器提供的 executable 时的 fallback

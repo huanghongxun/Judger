@@ -3,13 +3,15 @@
 #include <unistd.h>
 using namespace std;
 
-int exec_program(const char **argv) {
+int exec_program(const map<string, string> &env, const char **argv) {
     // 使用 POSIX 提供的函数来实现外部程序调用
     pid_t pid;
     switch (pid = fork()) {
         case -1:  // fork 失败
             throw system_error();
         case 0:  // 子进程
+            for (auto &[key, value] : env)
+                set_env(key, value);
             execvp(argv[0], (char **)argv);
             _exit(EXIT_FAILURE);
         default:  // 父进程

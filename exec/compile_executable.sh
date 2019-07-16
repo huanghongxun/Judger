@@ -90,8 +90,8 @@ chmod a+rwx "$RUNDIR"
 mkdir -p "$RUNDIR/work"
 mkdir -p "$RUNDIR/work/judge"
 mkdir -p "$RUNDIR/merged"
-mount -t overlayfs overlayfs -o upperdir="$WORKDIR/compile" "$RUNDIR/work/judge"
-mount -t overlayfs overlayfs -o lowerdir="$CHROOTDIR",upperdir="$RUNDIR/work" "$RUNDIR/merged"
+mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
+mount --bind "$WORKDIR/compile" "$RUNDIR/merged/judge"
 
 # 调用 runguard 来执行编译命令
 exitcode=0
@@ -103,13 +103,13 @@ $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --memory-limit $SCRIPTMEMLIMIT \
         --wall-time $SCRIPTTIMELIMIT \
         --file-limit $SCRIPTFILELIMIT \
-        --outmeta compile.meta \
+        --out-meta compile.meta \
         -- \
         "./build" > compile.tmp 2>&1 || \
         exitcode=$?
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/compile 中，因此删除挂载点即可。
-umount -f "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
+umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
 umount -f "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
 rm -rf "$RUNDIR"
 

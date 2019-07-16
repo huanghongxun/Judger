@@ -81,6 +81,12 @@ struct test_check {
     string check_script;
 
     /**
+     * @brief 本测试点使用的 run script
+     * 不同的测试点可能有不同的 run script
+     */
+    string run_script;
+
+    /**
      * @brief 本测试点总分
      */
     boost::rational<int> score;
@@ -97,7 +103,7 @@ struct test_check {
      * @brief 标准测试数据 id，在 submission.test_cases 中进行索引
      * 若为随机测试，此项在评测完成后将会被修改成随机测试使用的数据点
      */
-    unsigned testcase_id;
+    int testcase_id;
 
     /**
      * @brief 本测试点依赖哪个测试点，负数表示不依赖任何测试点
@@ -226,9 +232,21 @@ struct submission {
 
     /**
      * @brief 时间限制，限制应用程序的实际运行时间
-     * @note 单位为毫秒
+     * @note 单位为秒
      */
     double time_limit;
+
+    /**
+     * @brief 文件输出限制，限制应用程序实际最多能写入磁盘多少数据
+     * @note 单位为 KB，小于 0 的数表示不限制内存空间申请
+     */
+    int file_limit;
+
+    /**
+     * @brief 进程数限制，限制应用程序实际最多能打开多少个进程
+     * @note ，小于 0 的数表示不限制进程数
+     */
+    int proc_limit;
 
     /**
      * @brief 随机测试组数

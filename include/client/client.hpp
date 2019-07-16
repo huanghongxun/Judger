@@ -2,7 +2,8 @@
 
 #include <set>
 #include <thread>
-#include "common/msg_queue.hpp"
+#include "common/concurrent_queue.hpp"
+#include "common/messages.hpp"
 
 namespace judge::client {
 using namespace std;
@@ -21,7 +22,7 @@ using namespace std;
  * 对于需要进行缓存的文件：
  *     CACHE_DIR
  */
-void client(const string &execcpuset, message::queue &testcase_queue);
+void client(const string &execcpuset, concurrent_queue<message::client_task> &testcase_queue);
 
 /**
  * @brief 启动评测客户端线程
@@ -36,6 +37,6 @@ void client(const string &execcpuset, message::queue &testcase_queue);
  * 选手代码、测试数据、随机数据生成器、标准程序、SPJ 等资源的
  * 下载均由客户端完成。服务端只完成提交的拉取和数据点的分发。
  */
-thread start_client(const cpu_set_t &set, const string &execcpuset, message::queue &testcase_queue);
+thread start_client(const cpu_set_t &set, const string &execcpuset, concurrent_queue<message::client_task> &testcase_queue);
 
 }  // namespace judge::client

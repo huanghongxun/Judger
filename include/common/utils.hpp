@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <map>
 
 namespace fmt {
 template <>
@@ -56,6 +57,31 @@ struct has_begin_end {
 template <typename T>
 struct is_container : std::integral_constant<bool, has_const_iterator<T>::value && has_begin_end<T>::beg_value && has_begin_end<T>::end_value> {};
 
+template <typename T>
+struct to_string_cont {
+    template <typename ContainerT>
+    static void to_string(ContainerT &cont, const T &element) {
+        cont.push_back(boost::lexical_cast<std::string>(element));
+    }
+};
+
+template <>
+struct to_string_cont<std::filesystem::path> {
+    template <typename ContainerT>
+    static void to_string(ContainerT &cont, const std::filesystem::path &element) {
+        cont.push_back(element.string());
+    }
+};
+
+template <typename T>
+struct to_string_cont<std::vector<T>> {
+    template <typename ContainerT>
+    static void to_string(ContainerT &cont, const std::vector<T> &vec) {
+        for (const T &value : vec)
+            to_string_cont<T>::to_string(cont, value);
+    }
+};
+
 /**
  * @brief 将参数 args 的内容通过 to_string 转换为字符串并装入容器中
  * @param cont 字符串容器
@@ -63,22 +89,18 @@ struct is_container : std::integral_constant<bool, has_const_iterator<T>::value 
  */
 template <typename ContainerT, typename Head, typename... Args>
 void to_string_list(ContainerT &cont, Head &head, Args &... args) {
-    if constexpr (is_container<Head>::value) {
-        for (auto &value : head)
-            cont.push_back(boost::lexical_cast<std::string>(value));
-    } else {
-        cont.push_back(boost::lexical_cast<std::string>(head));
-    }
+    to_string_cont<std::decay_t<Head>>::to_string(cont, head);
     if constexpr (sizeof...(args) > 0)
         to_string_list(cont, args...);
 }
 
 /**
  * @brief 执行外部命令
+ * @param env additional environment variables
  * @param argv 外部命令的路径 (argv[0]) 和 参数 (argv)
  * @return 外部命令的返回值，如果外部命令因为信号崩溃而没有返回码，则返回 -1
  */
-int exec_program(const char **argv);
+int exec_program(const std::map<std::string, std::string> &env, const char **argv);
 
 /**
  * @brief 调用外部程序
@@ -93,14 +115,27 @@ int exec_program(const char **argv);
  * @endcode
  */
 template <typename... Args>
-int call_process(Args &&... args) {
+int call_process_env(std::map<std::string, std::string> const &env, Args &&... args) {
     std::vector<std::string> list;
     to_string_list(list, args...);
     const char *argv[list.size() + 1];
     for (size_t i = 0; i < list.size(); ++i)
         argv[i] = list[i].data();
     argv[list.size()] = nullptr;
-    return exec_program(argv);
+
+#ifndef NDEBUG
+    for (size_t i = 0; i < list.size(); ++i)
+        printf("%s ", argv[i]);
+    puts("");
+#endif
+
+    return exec_program(env, argv);
+}
+
+
+template <typename... Args>
+int call_process(Args &&... args) {
+    return call_process_env({}, args...);
 }
 
 /**

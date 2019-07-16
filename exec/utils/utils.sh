@@ -26,8 +26,8 @@ error()
     exit 1
 }
 
-RESULT_ERROR = 1
-RESULT_AC = 42 # Accepted
-RESULT_WA = 43 # Wrong Answer
-RESULT_PE = 44 # Presentation Error
-RESULT_PC = 54 # Partial Correct，在这种情况下，compare 会在 score.txt 存储分数（以分数的形式存储）
+RESULT_ERROR=1
+RESULT_AC=42 # Accepted
+RESULT_WA=43 # Wrong Answer
+RESULT_PE=44 # Presentation Error
+RESULT_PC=54 # Partial Correct，在这种情况下，compare 会在 score.txt 存储分数（以分数的形式存储）

@@ -23,13 +23,13 @@ struct asset {
 
     /**
      * @brief 获取远程文件
-     * @param path 下载好的本地文件位置
+     * @param path 要下载到的目录
      * @note 该函数在下载过程中将阻塞
      * @note 你必须为这个函数加锁
      * @note 你可以利用该函数实现远程文件的缓存
      * @note 该函数会抛出异常
      */
-    virtual void fetch(const filesystem::path &path) = 0;
+    virtual void fetch(const filesystem::path &dir) = 0;
 };
 
 /**
@@ -40,7 +40,7 @@ struct local_asset : public asset {
 
     local_asset(const string &name, const filesystem::path &path);
 
-    void fetch(const filesystem::path &path) override;
+    void fetch(const filesystem::path &dir) override;
 };
 
 /**
@@ -51,7 +51,7 @@ struct text_asset : public asset {
 
     text_asset(const string &name, const string &text);
 
-    void fetch(const filesystem::path &path) override;
+    void fetch(const filesystem::path &dir) override;
 };
 
 /**
@@ -62,7 +62,7 @@ struct remote_asset : public asset {
 
     remote_asset(const string &name, const string &url_get);
 
-    void fetch(const filesystem::path &path) override;
+    void fetch(const filesystem::path &dir) override;
 };
 
 typedef shared_ptr<asset> asset_ptr;

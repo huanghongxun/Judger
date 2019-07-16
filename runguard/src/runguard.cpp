@@ -1,10 +1,11 @@
 #include <glog/logging.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
+#include <boost/stacktrace.hpp>
 #include <iostream>
+#include "run.hpp"
 #include "system.hpp"
 #include "utils.hpp"
-#include "run.hpp"
 
 using namespace std;
 
@@ -45,7 +46,7 @@ void validate(boost::any& v, const vector<string>& values, struct time_limit*, i
 }
 
 int main(int argc, const char* argv[]) {
-    //google::InitGoogleLogging(argv[0]);
+    google::InitGoogleLogging(argv[0]);
 
     namespace po = boost::program_options;
     po::options_description desc("runguard options");
@@ -58,6 +59,7 @@ int main(int argc, const char* argv[]) {
     desc.add_options()
         ("root,r", po::value<string>(), "run command with root directory set to root. If this option is provided, running command is executed relative to the chroot.")
         ("user,u", po::value<string>(), "run command as user with username or user id")
+        ("work", po::value<string>(), "work directory for command")
         ("group,g", po::value<string>(), "run command under group with groupname or group id. If only 'user' is set, this defaults to the same")
         ("wall-time,T", po::value<time_limit>(), "kill command after wall time clock seconds (floating point is acceptable)")
         ("cpu-time,t", po::value<time_limit>(), "set maximum CPU time (floating point is acceptable) consumption of the command in seconds")
@@ -65,7 +67,7 @@ int main(int argc, const char* argv[]) {
         ("file-limit,f", po::value<size_t>(), "set maximum created file size of the command in KB")
         ("nproc,p", po::value<size_t>(), "set maximum process living simutanously")
         ("cpuset,P", po::value<string>(), "set the processor IDs that can only be used (e.g. \"0,2-3\")")
-        ("no-core-dumps", "disable core dumps")
+        ("no-core-dumps,c", "disable core dumps")
         ("standard-input-file,i", po::value<string>(), "redirect command standard input fd to file")
         ("standard-output-file,o", po::value<string>(), "redirect command standard output fd to file")
         ("standard-error-file,e", po::value<string>(), "redirect command standard error fd to file")
@@ -129,6 +131,8 @@ int main(int argc, const char* argv[]) {
             opt.group_id = get_groupid(group.c_str());
         }
     }
+
+    if (vm.count("work")) opt.work_dir = vm["work"].as<string>();
 
     if (vm.count("variable")) {
         opt.env = vm["variable"].as<vector<string>>();

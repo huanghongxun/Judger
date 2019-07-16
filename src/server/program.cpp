@@ -126,25 +126,24 @@ source_code::source_code(executable_manager &exec_mgr)
     : exec_mgr(exec_mgr) {}
 
 void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs::path &chrootdir) {
-    vector<fs::path> paths;
+    vector<string> paths;
+    auto compilepath = workdir / "compile";
+    fs::create_directories(compilepath);
     for (auto &file : source_files) {
         assert_safe_path(file->name);
-        auto filepath = workdir / "compile" / file->name;
-        fs::create_directories(filepath.parent_path());
-        paths.push_back(filepath);
-        file->fetch(filepath);
+        file->fetch(compilepath);
+        paths.push_back(file->name);
     }
 
     for (auto &file : assist_files) {
         assert_safe_path(file->name);
-        auto filepath = workdir / "compile" / file->name;
-        file->fetch(filepath);
+        file->fetch(compilepath);
     }
 
     auto exec = exec_mgr.get_compile_script(language);
     exec->fetch(cpuset, chrootdir);
-    // compile.sh <compile script> <cpuset> <chrootdir> <workdir> <memlimit> <files...>
-    if (auto ret = call_process(EXEC_DIR / "compile.sh", "-n", cpuset, /* compile script */ exec->get_run_path(), cpuset, chrootdir, workdir, memory_limit, /* source files */ paths); ret != 0) {
+    // compile.sh <compile script> <chrootdir> <workdir> <memlimit> <files...>
+    if (auto ret = call_process(EXEC_DIR / "compile.sh", "-n", cpuset, /* compile script */ exec->get_run_path(), chrootdir, workdir, memory_limit, /* source files */ paths); ret != 0) {
         switch (ret) {
             case E_COMPILER_ERROR:
                 throw compilation_error("Compilation failed", get_compilation_log(workdir));

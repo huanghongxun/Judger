@@ -1,5 +1,9 @@
 #include <iostream>
+#include "header.hpp"
 
 int main() {
-  return 0
+    int a;
+    std::cin >> a;
+    std::cout << calc(a) << std::endl;
+    return 0;
 }
