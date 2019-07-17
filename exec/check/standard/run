@@ -11,16 +11,21 @@
 # <workdir>      程序的工作文件夹，为了保证安全，请务必将运行路径设置
 #                为空文件夹，特别是保证不可以包含标准输出文件
 # <run-uuid>     运行的 uuid，用于索引运行文件夹位置
-# <run>          运行程序的脚本的绝对路径
-# <compare>      比较程序/脚本文件夹的绝对路径
+# <run>          运行程序的脚本的文件夹
+# <compare>      比较程序/脚本文件夹的文件夹
 #
 # 必须包含的环境变量：
-# RUNGUARD     runguard 的路径
+#   RUNGUARD        runguard 的路径
+#   RUNUSER         选手程序运行的账户
+#   RUNGROUP        选手程序运行的账户组
+#   SCRIPTMEMLIMIT  比较脚本运行内存限制
+#   SCRIPTTIMELIMIT 比较脚本执行时间
+#   SCRIPTFILELIMIT 比较脚本输出限制
 #
 # 可选环境变量
-# MEMLIMIT     运行内存限制，单位为 KB
-# PROCLIMIT    进程数限制
-# FILELIMIT    文件写入限制，单位为 KB
+#   MEMLIMIT     运行内存限制，单位为 KB
+#   PROCLIMIT    进程数限制
+#   FILELIMIT    文件写入限制，单位为 KB
 #
 # 默认的比较脚本都可以放在配置服务中
 
@@ -50,6 +55,7 @@ cleanexit ()
 # 导入 runcheck 函数
 . "$JUDGE_UTILS/utils.sh"
 . "$JUDGE_UTILS/logging.sh"
+. "$JUDGE_UTILS/chroot_setup.sh"
 
 CPUSET=""
 CPUSET_OPT=""
@@ -79,7 +85,7 @@ fi
 
 FILELIMIT_OPT=""
 if [ -n "$FILELIMIT" ]; then
-    FILELIMIT_OPT="--file-limit $FILELIMIT"
+    FILELIMIT_OPT="--file-limit $FILELIMIT --stream-size $FILELIMIT"
 fi
 
 PROCLIMIT_OPT=""
@@ -130,11 +136,10 @@ chmod a+x "$WORKDIR"
 # 检查运行脚本
 
 RUNDIR="$WORKDIR/run-$RUN_UUID"
-mkdir -p "$RUNDIR"
-chmod a+rwx "$RUNDIR"
+mkdir -m 0777 -p "$RUNDIR"
 
-chmod -R +x "$RUN_SCRIPT"
-chmod -R +x "$COMPARE_SCRIPT"
+chmod -R +x "$RUN_SCRIPT/run"
+chmod -R +x "$COMPARE_SCRIPT/run"
 
 cd "$RUNDIR"
 
@@ -153,11 +158,13 @@ mkdir -m 0777 -p "$RUNDIR/work/run"
 mkdir -m 0777 -p "$RUNDIR/work/feedback"
 mkdir -m 0777 -p "$RUNDIR/merged"
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
-mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
-mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro "$RUNDIR/merged/judge"
-mount --bind -o ro "$JUDGE_UTILS" "$RUNDIR/merged/judge_utils"
-mount --bind -o ro "$COMPARE_SCRIPT" "$RUNDIR/merged/compare"
-mount --bind -o ro "$RUN_SCRIPT" "$RUNDIR/merged/run"
+$GAINROOT mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
+$GAINROOT mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro "$RUNDIR/merged/judge"
+$GAINROOT mount --bind -o ro "$JUDGE_UTILS" "$RUNDIR/merged/judge_utils"
+$GAINROOT mount --bind -o ro "$COMPARE_SCRIPT" "$RUNDIR/merged/compare"
+$GAINROOT mount --bind -o ro "$RUN_SCRIPT" "$RUNDIR/merged/run"
+
+chroot_start "$CHROOTDIR" "$RUNDIR/merged"
 
 # 我们不检查选手程序的返回值，比如 C 程序的 main 函数没有写 return 会导致返回值非零，这种不是崩溃导致的
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
@@ -173,9 +180,9 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
 
 # 比较选手程序输出
 logmsg $LOG_INFO "Comparing output"
-umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
-mount --bind "$RUNDIR/feedback" "$RUNDIR/merged/feedback"
-mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro:"$TESTOUT"=ro "$RUNDIR/merged/judge"
+force_umount "$RUNDIR/merged/judge"
+$GAINROOT mount --bind "$RUNDIR/feedback" "$RUNDIR/merged/feedback"
+$GAINROOT mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro:"$TESTOUT"=ro "$RUNDIR/merged/judge"
 
 exitcode=0
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
@@ -191,23 +198,19 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     -VJUDGE_UTILS=/judge_utils -- \
     "/compare/run" testdata.in program.out testdata.out /feedback > compare.tmp 2>&1
 
+chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
+
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/run-$uuid 中，因此删除挂载点即可。
-umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
-umount -f "$RUNDIR/merged/judge_utils" >/dev/null 2>&1  || /bin/true
-umount -f "$RUNDIR/merged/compare" >/dev/null 2>&1  || /bin/true
-umount -f "$RUNDIR/merged/run" >/dev/null 2>&1  || /bin/true
-umount -f "$RUNDIR/merged/feedback" >/dev/null 2>&1  || /bin/true
-umount -f "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
-rm -rf "$RUNDIR/run"
+force_umount "$RUNDIR/merged/judge"
+force_umount "$RUNDIR/merged/judge_utils"
+force_umount "$RUNDIR/merged/compare"
+force_umount "$RUNDIR/merged/run"
+force_umount "$RUNDIR/merged/feedback"
+force_umount "$RUNDIR/merged"
 rm -rf "$RUNDIR/merged"
 rm -rf "$RUNDIR/work"
 # RUNDIR 还剩下 compare.meta, compare.out, program.meta, program.err, system.out, runguard.err 供评测客户端检查
 # RUNDIR 由评测客户端删除
-
-# Make sure that all feedback files are owned by the current
-# user/group, so that we can append content.
-$GAINROOT chown -R "$(id -un):" "$RUNDIR/feedback"
-chmod -R go-w feedback
 
 # Append output validator error messages
 # TODO: display extra

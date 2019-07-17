@@ -81,6 +81,8 @@ else
     export VERBOSE=$LOG_ERR
 fi
 
+GAINROOT="sudo -n"
+
 [ $# -ge 4 ] || error "Not enough arguments."
 COMPILE_SCRIPT="$1"; shift
 CHROOTDIR="$1"; shift
@@ -120,9 +122,9 @@ mkdir -p "$RUNDIR/work"
 mkdir -p "$RUNDIR/work/judge"
 mkdir -p "$RUNDIR/work/compile"
 mkdir -p "$RUNDIR/merged"
-mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
-mount -t aufs none -odirs="$WORKDIR/compile"=rw "$RUNDIR/merged/judge"
-mount --bind -o ro "$COMPILE_SCRIPT" "$RUNDIR/merged/compile"
+$GAINROOT mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
+$GAINROOT mount -t aufs none -odirs="$WORKDIR/compile"=rw "$RUNDIR/merged/judge"
+$GAINROOT mount --bind -o ro "$COMPILE_SCRIPT" "$RUNDIR/merged/compile"
 
 # 调用 runguard 来执行编译命令
 exitcode=0
@@ -139,9 +141,9 @@ $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         exitcode=$?
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/compile 中，因此删除挂载点即可。
-umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
-umount -f "$RUNDIR/merged/compile" >/dev/null 2>&1  || /bin/true
-umount -f "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
+$GAINROOT umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
+$GAINROOT umount -f "$RUNDIR/merged/compile" >/dev/null 2>&1  || /bin/true
+$GAINROOT umount -f "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
 rm -rf "$RUNDIR"
 
 $GAINROOT chown -R "$(id -un):" "$WORKDIR/compile"

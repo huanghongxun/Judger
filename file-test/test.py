@@ -34,7 +34,6 @@ def main():
     callback_queue = result.method.queue
     global queue_name, exchange
     channel.queue_bind(exchange=exchange, queue=callback_queue)
-    print(callback_queue)
     channel.basic_consume(on_response, no_ack=True, queue=callback_queue)
     channel.basic_publish(exchange=exchange, routing_key=queue_name,
                           properties=pika.BasicProperties(reply_to=callback_queue), body=json.dumps(req))

@@ -1,4 +1,6 @@
 #include <glog/logging.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
@@ -9,6 +11,7 @@
 #include "client/client.hpp"
 #include "common/concurrent_queue.hpp"
 #include "common/messages.hpp"
+#include "common/system.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
 #include "server/moj/moj.hpp"
@@ -94,6 +97,11 @@ int main(int argc, char* argv[]) {
     CHECK(getenv("RUNGUARD"))  // RUNGUARD 环境变量将传给 exec/check/standard/run 评测脚本使用
         << "RUNGUARD environment variable should be specified. This env points out where the runguard executable locates in.";
 
+    if (getuid() != 0) {
+        cerr << "You should run this program in privileged mode" << endl;
+        return EXIT_FAILURE;
+    }
+
     put_error_codes();
 
     const unsigned cpus = std::thread::hardware_concurrency();
@@ -116,6 +124,7 @@ int main(int argc, char* argv[]) {
         ("cache-dir", po::value<string>(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
         ("data-dir", po::value<string>(), "set the directory to store test data to be judged, for ramdisk to speed up IO performance of user program.")
         ("run-dir", po::value<string>(), "set the directory to run user programs, store compiled user program")
+        ("log-dir", po::value<string>(), "set the directory to store log files")
         ("chroot-dir", po::value<string>(), "set the chroot directory")
         ("script-mem-limit", po::value<unsigned>(), "set memory limit in KB for random data generator, scripts, default to 262144(256MB).")
         ("script-time-limit", po::value<unsigned>(), "set time limit in seconds for random data generator, scripts, default to 10(10 second).")
@@ -181,6 +190,14 @@ int main(int argc, char* argv[]) {
             << "Run directory " << judge::RUN_DIR << " does not exist";
     }
 
+    if (vm.count("log-dir")) {
+        string logdir = vm.at("log-dir").as<string>();
+        CHECK(filesystem::is_directory(filesystem::path(logdir)))
+            << "Log directory " << logdir << " does not exist";
+        set_env("LOGDIR", logdir);
+    }
+    set_env("LOGDIR", filesystem::weakly_canonical(filesystem::current_path()).string(), false);
+
     if (vm.count("chroot-dir")) {
         judge::CHROOT_DIR = filesystem::path(vm.at("chroot-dir").as<string>());
         CHECK(filesystem::is_directory(judge::CHROOT_DIR))
@@ -203,12 +220,17 @@ int main(int argc, char* argv[]) {
     set_env("SCRIPTFILELIMIT", to_string(judge::SCRIPT_FILE_LIMIT), false);
 
     if (vm.count("run-user")) {
-        set_env("RUNUSER", vm["run-user"].as<string>());
+        string runuser = vm["run-user"].as<string>();
+        set_env("RUNUSER", runuser);
     }
 
     if (vm.count("run-group")) {
-        set_env("RUNGROUP", vm["run-group"].as<string>());
+        string rungroup = vm["run-group"].as<string>();
+        set_env("RUNGROUP", rungroup);
     }
+
+    // 让评测系统写入的数据只允许当前用户写入
+    umask(0022);
 
     if (vm.count("cache-random-data")) {
         judge::MAX_RANDOM_DATA_NUM = vm["cache-random-data"].as<size_t>();
@@ -244,11 +266,6 @@ int main(int argc, char* argv[]) {
 
     if (vm.count("enable-2")) {
         // TODO: not implemented
-    }
-
-    if (getuid() != 0) {
-        cerr << "You should run this program in privileged mode" << endl;
-        return EXIT_FAILURE;
     }
 
     set<unsigned> cores;

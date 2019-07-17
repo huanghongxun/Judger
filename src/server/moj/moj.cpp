@@ -373,7 +373,7 @@ void configuration::summarize_invalid(submission &) {
 
 static json get_error_report(const judge::message::task_result &result) {
     error_report report;
-    report.message = result.error_log;
+    report.message = "SystemError: " + result.error_log;
     return report;
 }
 
@@ -382,20 +382,22 @@ static json get_error_report(const judge::message::task_result &result) {
  * 1. 配置中开启编译检测（编译检测满分大于0）
  * 2. 已存在提交代码的源文件
  */
-static void summarize_compile_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &compile_check_json) {
+static void summarize_compile_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &compile_check_json) {
     compile_check_report compile_check;
-    compile_check.full_grade = boost::rational_cast<double>(submit.test_cases[0].score);
+    compile_check.full_grade = (int)round(boost::rational_cast<double>(submit.test_cases[0].score));
     compile_check.report = task_results[0].error_log;
     if (task_results[0].status == status::ACCEPTED) {
-        compile_check.grade = compile_check.grade;
+        compile_check.grade = compile_check.full_grade;
+        compile_check.pass = true;
+        total_score += submit.test_cases[0].score;
         compile_check_json = compile_check;
     } else if (task_results[0].status == status::SYSTEM_ERROR) {
+        compile_check.grade = 0;
         compile_check_json = get_error_report(task_results[0]);
     } else {
         compile_check.grade = 0;
         compile_check_json = compile_check;
     }
-    report.grade += compile_check.grade;
 }
 
 /**
@@ -409,7 +411,7 @@ static void summarize_compile_check(judge_report &report, submission &submit, co
  * 评分规则
  * 得分=（通过的测试数）/（总测试数）× 总分。
  */
-static void summarize_random_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &random_check_json) {
+static void summarize_random_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &random_check_json) {
     random_check_report random_check;
     random_check.pass_cases = 0;
     random_check.total_cases = 0;
@@ -417,15 +419,14 @@ static void summarize_random_check(judge_report &report, submission &submit, con
     for (size_t i = 0; i < task_results.size(); ++i) {
         auto &task_result = task_results[i];
         if (task_result.type == random_check_report::TYPE) {
-            check_case_report kase;
-            kase.result = status_string.at(task_result.status);
-            kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
-            kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
-            kase.subout = read_file_content(task_result.run_dir / "program.out");
+            full_score += submit.test_cases[i].score;
+            ++random_check.total_cases;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.test_cases[i].score;
                 ++random_check.pass_cases;
+            } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
+                continue;
             } else if (task_result.status == status::PARTIAL_CORRECT) {
                 score += task_result.score * submit.test_cases[i].score;
             } else if (task_result.status == status::SYSTEM_ERROR ||
@@ -436,17 +437,21 @@ static void summarize_random_check(judge_report &report, submission &submit, con
                 return;
             }
 
-            full_score += submit.test_cases[i].score;
-            ++random_check.total_cases;
+            check_case_report kase;
+            kase.result = status_string.at(task_result.status);
+            kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
+            kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
+            kase.subout = read_file_content(task_result.run_dir / "run" / "program.out");
             random_check.report.push_back(kase);
         }
     }
-    random_check.grade = boost::rational_cast<double>(score);
-    random_check.full_grade = boost::rational_cast<double>(full_score);
-    report.grade += random_check.grade;
+    random_check.grade = (int)round(boost::rational_cast<double>(score));
+    random_check.full_grade = (int)round(boost::rational_cast<double>(full_score));
+    random_check_json = random_check;
+    total_score += score;
 }
 
-static void summarize_standard_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
+static void summarize_standard_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
     standard_check_report standard_check;
     standard_check.pass_cases = 0;
     standard_check.total_cases = 0;
@@ -454,15 +459,16 @@ static void summarize_standard_check(judge_report &report, submission &submit, c
     for (size_t i = 0; i < task_results.size(); ++i) {
         auto &task_result = task_results[i];
         if (task_result.type == standard_check_report::TYPE) {
-            check_case_report kase;
-            kase.result = status_string.at(task_result.status);
-            kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
-            kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
-            kase.subout = read_file_content(task_result.run_dir / "program.out");
+            full_score += submit.test_cases[i].score;
+            ++standard_check.total_cases;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.test_cases[i].score;
                 ++standard_check.pass_cases;
+            } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
+                continue;
+            } else if (task_result.status == status::PARTIAL_CORRECT) {
+                score += task_result.score * submit.test_cases[i].score;
             } else if (task_result.status == status::SYSTEM_ERROR ||
                        task_result.status == status::RANDOM_GEN_ERROR ||
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
@@ -471,14 +477,18 @@ static void summarize_standard_check(judge_report &report, submission &submit, c
                 return;
             }
 
-            full_score += submit.test_cases[i].score;
-            ++standard_check.total_cases;
+            check_case_report kase;
+            kase.result = status_string.at(task_result.status);
+            kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
+            kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
+            kase.subout = read_file_content(task_result.run_dir / "run" / "program.out");
             standard_check.report.push_back(kase);
         }
     }
-    standard_check.grade = boost::rational_cast<double>(score);
-    standard_check.full_grade = boost::rational_cast<double>(full_score);
-    report.grade += standard_check.grade;
+    standard_check.grade = (int)round(boost::rational_cast<double>(score));
+    standard_check.full_grade = (int)round(boost::rational_cast<double>(full_score));
+    standard_check_json = standard_check;
+    total_score += score;
 }
 
 /**
@@ -492,7 +502,7 @@ static void summarize_standard_check(judge_report &report, submission &submit, c
  * oclint评测违规分3个等级：priority 1、priority 2、priority 3
  * 评测代码每违规一个 priority 1 扣 2 分，每违规一个 priority 2 扣 1 分，违规 priority 3 不扣分。扣分扣至 0 分为止.
  */
-static void summarize_static_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
+static void summarize_static_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
 }
 
 /**
@@ -507,7 +517,7 @@ static void summarize_static_check(judge_report &report, submission &submit, con
  * 评分规则
  * 内存检测会多次运行提交代码，未检测出问题则通过，最后总分为通过数/总共运行次数 × 内存检测满分分数
  */
-static void summarize_memory_check(judge_report &report, submission &submit, const vector<judge::message::task_result> &task_results, json &memory_check_json) {
+static void summarize_memory_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &memory_check_json) {
     memory_check_report memory_check;
     memory_check.pass_cases = 0;
     memory_check.total_cases = 0;
@@ -532,8 +542,9 @@ static void summarize_memory_check(judge_report &report, submission &submit, con
             ++memory_check.total_cases;
         }
     }
-    memory_check.grade = boost::rational_cast<double>(score);
-    memory_check.full_grade = boost::rational_cast<double>(full_score);
+    memory_check.grade = (int)round(boost::rational_cast<double>(score));
+    memory_check.full_grade = (int)round(boost::rational_cast<double>(full_score));
+    memory_check_json = memory_check;
     report.grade += memory_check.grade;
 }
 
@@ -544,27 +555,31 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
     report.prob_id = boost::lexical_cast<unsigned>(submit.prob_id);
     report.is_complete = true;
 
+    boost::rational<int> total_score;
+
     json compile_check_json;
-    summarize_compile_check(report, submit, task_results, compile_check_json);
+    summarize_compile_check(report, total_score, submit, task_results, compile_check_json);
 
     json memory_check_json;
-    summarize_memory_check(report, submit, task_results, memory_check_json);
+    summarize_memory_check(report, total_score, submit, task_results, memory_check_json);
 
     json random_check_json;
-    summarize_random_check(report, submit, task_results, random_check_json);
+    summarize_random_check(report, total_score, submit, task_results, random_check_json);
 
     json standard_check_json;
-    summarize_standard_check(report, submit, task_results, standard_check_json);
+    summarize_standard_check(report, total_score, submit, task_results, standard_check_json);
 
-    static_check_report static_check;
-    gtest_check_report gtest_check;
+    json static_check_json;
+    json gtest_check_json;
+
+    report.grade = (int)round(boost::rational_cast<double>(total_score));
 
     report.report = {{"CompileCheck", compile_check_json},
                      {"MemoryCheck", memory_check_json},
                      {"RandomCheck", random_check_json},
                      {"StandardCheck", standard_check_json},
-                     {"StaticCheck", static_check},
-                     {"GTestCheck", gtest_check}};
+                     {"StaticCheck", static_check_json},
+                     {"GTestCheck", gtest_check_json}};
 
     json report_json = report;
     submission_reporter->report(report_json.dump());

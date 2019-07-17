@@ -88,8 +88,8 @@ static message::task_result judge(message::client_task &client_task, server::sub
                 filesystem::path standarddir = cachedir / "standard";
                 datadir = random_data_dir / to_string(number);
                 task.testcase_id = number;  // 标记当前测试点使用了哪个随机测试
-                // random_generator.sh <random generator> <standard program> <timelimit> <memlimit> <chrootdir> <workdir> <run>
-                int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), submit.time_limit, submit.memory_limit, CHROOT_DIR, datadir, run_script->get_run_path());
+                // random_generator.sh <random_gen> <std_program> <timelimit> <chrootdir> <datadir> <run>
+                int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), submit.time_limit, CHROOT_DIR, datadir, run_script->get_run_path());
                 switch (ret) {
                     case E_SUCCESS: {
                         // 随机数据已经准备好
@@ -226,12 +226,14 @@ static void compile(server::program *program, const filesystem::path &workdir, c
         task_result.status = status::ACCEPTED;
     } catch (server::executable_compilation_error &ex) {
         task_result.status = status::EXECUTABLE_COMPILATION_ERROR;
+        task_result.error_log = program->get_compilation_log(workdir);
     } catch (server::compilation_error &ex) {
         task_result.status = status::COMPILATION_ERROR;
+        task_result.error_log = program->get_compilation_log(workdir);
     } catch (exception &ex) {
         task_result.status = status::SYSTEM_ERROR;
+        task_result.error_log = ex.what();
     }
-    task_result.error_log = program->get_compilation_log(workdir);
 }
 
 /**

@@ -1,27 +1,30 @@
 #!/bin/bash
 #
-# 编译 executable 的脚本
+# 调用随机数据生成器生成随机数据的脚本
 #
-# 用法：$0 <random generator> <standard program> <timelimit> <memlimit> <chrootdir> <workdir> <run>
+# 用法：$0 <random_gen> <std_program> <timelimit> <chrootdir> <datadir> <run>
 #
-# <cpuset_opt> 编译使用的 CPU 集合
-# <workdir> executable 的文件夹，比如 /tmp/cache/executable/cpp
-#                   编译生成的可执行文件在该文件夹中，编译器输出也在该文件夹中
-# <chrootdir> executable 编译时的运行环境
+# <cpuset_opt>   编译使用的 CPU 集合
+# <random_gen>   随机测试生成器所属文件夹，编译生成的可执行文件在该文件夹中
+# <std_program>  标准程序所属文件夹，编译生成的可执行文件在该文件夹中
+# <timelimit>    运行时间限制，格式为 %d:%d，如 1:3 表示测试点时间限制
+#                为 1s，如果运行时间超过 3s 则结束程序
+# <chrootdir>    executable 编译时的运行环境
+# <datadir>      存放生成的数据的文件夹
+# <run>          运行程序的脚本的绝对路径
 #
-# 本脚本直接调用 executable 的 build 脚本进行编译
+# 必须包含的环境变量：
+#   RUNGUARD        runguard 的路径
+#   RUNUSER         选手程序运行的账户
+#   RUNGROUP        选手程序运行的账户组
+#   SCRIPTMEMLIMIT  随机数据生成器运行内存限制
+#   SCRIPTTIMELIMIT 随机数据生成器执行时间
+#   SCRIPTFILELIMIT 随机数据生成器输出限制
 #
-# 环境变量：
-#   $RUNGUARD
-#   $RUNUSER
-#   $RUNGROUP
-#   $SCRIPTMEMLIMIT 编译脚本运行内存限制
-#   $SCRIPTTIMELIMIT 编译脚本执行时间
-#   $SCRIPTFILELIMIT 编译脚本输出限制
-#   $PROCLIMIT 进程数限制
-#   $FILELIMIT 文件大小限制
-#   $E_COMPILER_ERROR 编译失败返回码
-#   $E_INTERNAL_ERROR 内部错误返回码
+# 可选环境变量
+#   MEMLIMIT     运行内存限制，单位为 KB
+#   PROCLIMIT    进程数限制
+#   FILELIMIT    文件写入限制，单位为 KB
 
 set -e
 trap error EXIT
@@ -30,10 +33,18 @@ cleanexit ()
 {
     trap - EXIT
 
+    force_umount "$RUNDIR/merged/judge"
+    force_umount "$RUNDIR/merged"
+    rm -rf "$RUNDIR" || /bin/true
+
     logmsg $LOG_DEBUG "exiting, code = '$1'"
     exit $1
 }
 
+# 导入 runcheck 函数
+. "$JUDGE_UTILS/utils.sh"
+. "$JUDGE_UTILS/logging.sh"
+. "$JUDGE_UTILS/chroot_setup.sh"
 
 CPUSET=""
 CPUSET_OPT=""
@@ -54,11 +65,24 @@ shift $((OPTIND-1))
 
 if [ -n "$CPUSET" ]; then
     CPUSET_OPT="-P $CPUSET"
-    LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1)-$CPUSET.log"
-else
-    LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1).log"
 fi
 
+MEMLIMIT_OPT=""
+if [ -n "$MEMLIMIT" ]; then
+    MEMLIMIT_OPT="--memory-limit $MEMLIMIT"
+fi
+
+FILELIMIT_OPT=""
+if [ -n "$FILELIMIT" ]; then
+    FILELIMIT_OPT="--file-limit $FILELIMIT --stream-size $FILELIMIT"
+fi
+
+PROCLIMIT_OPT=""
+if [ -n "$PROCLIMIT" ]; then
+    PROCLIMIT_OPT="--nproc $PROCLIMIT"
+fi
+
+LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1).log"
 LOGLEVEL=$LOG_DEBUG
 PROGNAME="$(basename "$0")"
 
@@ -69,23 +93,19 @@ else
     export VERBOSE=$LOG_ERR
 fi
 
-RANDOM_DIR=""
+GAINROOT="sudo -n"
 
 [ $# -ge 1 ] || error "Not enough arguments."
 RAN_GEN="$1"; shift
 STD_PROG="$1"; shift
 TIMELIMIT="$1"; shift
-MEMLIMIT="$1"; shift
 CHROOTDIR="$1"; shift
-WORKDIR="$1"; shift
+WORKDIR="$1"; shift # WORKDIR 包含了生成的输入数据、输出数据和程序运行临时文件
 RUN_SCRIPT="$1"; shift
 
 if [ ! -d "$WORKDIR" ] || [ ! -w "$WORKDIR" ] || [ ! -x "$WORKDIR" ]; then
     error "Work directory is not found or not writable: $WORKDIR"
 fi
-
-RAN_GEN=$(dirname "$RAN_GEN")
-STD_PROG=$(dirname "$STD_PROG")
 
 [ -x "$RUNGUARD" ] || error "runguard not found or not executable: $RUNGUARD"
 
@@ -96,20 +116,22 @@ mkdir -p "$WORKDIR/output"
 chmod a+rwx "$WORKDIR/output"
 
 RUNDIR="$WORKDIR/run"
-mkdir -p "$RUNDIR"
-chmod a+rwx "$RUNDIR"
+mkdir -m 0777 -p "$RUNDIR"
 
-mkdir -p "$RUNDIR/work"
-mkdir -p "$RUNDIR/work/judge"
-mkdir -p "$RUNDIR/work/run"
-mkdir -p "$RUNDIR/merged"
-mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
-mount -t aufs none -odirs="$WORKDIR/input"=rw:"$RAN_GEN"=ro "$RUNDIR/merged/judge"
-mount --bind -o ro "$RUN_SCRIPT" "$RUNDIR/merged/run"
+chmod -R +x "$RUN_SCRIPT/run"
+chmod -R +x "$RAN_GEN/run"
+chmod -R +x "$STD_PROG/run"
+
+mkdir -m 0777 -p "$RUNDIR/work"
+mkdir -m 0777 -p "$RUNDIR/work/judge"
+mkdir -m 0777 -p "$RUNDIR/work/run"
+mkdir -m 0777 -p "$RUNDIR/merged"
+$GAINROOT mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
+$GAINROOT mount -t aufs none -odirs="$WORKDIR/input"=rw:"$RAN_GEN"=ro "$RUNDIR/merged/judge"
+$GAINROOT mount --bind -o ro "$RUN_SCRIPT" "$RUNDIR/merged/run"
 
 # 调用 runguard 来执行随机生成器
-exitcode=0
-$GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
+runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --root "$RUNDIR/merged" \
         --work /judge \
         --user "$RUNUSER" \
@@ -119,11 +141,10 @@ $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --file-limit $SCRIPTFILELIMIT \
         --out-meta random.meta \
         -- \
-        run > "$WORKDIR/input/testdata.in" 2>&1 || \
-        exitcode=$?
+        run > "$WORKDIR/input/testdata.in" 2>&1 > random.tmp
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/random 中，因此删除挂载点即可。
-umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
+force_umount "$RUNDIR/merged/judge"
 
 # 检查是否运行超时，time-result 可能为空、soft-timelimit、hard-timelimit，空表示没有超时
 if grep '^time-result: .*timelimit' random.meta >/dev/null 2>&1; then
@@ -146,28 +167,23 @@ cat random.tmp >> random.out
 
 #################################
 
-mount -t aufs none -odirs="$WORKDIR/output"=rw:"$STD_PROG"=ro:"$WORKDIR/input"=ro "$RUNDIR/merged/judge"
+$GAINROOT mount -t aufs none -odirs="$WORKDIR/output"=rw:"$STD_PROG"=ro:"$WORKDIR/input"=ro "$RUNDIR/merged/judge"
 
 # 调用 runguard 来执行标准程序
-exitcode=0
-$GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
+runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
         --root "$RUNDIR/merged" \
         --work /judge \
-        --nproc $PROCLIMIT \
         --no-core-dumps \
-        --streamsize $FILELIMIT \
         --user "$RUNUSER" \
         --group "$RUNGROUP" \
-        --memory-limit $MEMLIMIT \
-        --wall-time $TIMELIMIT \
-        --file-limit $FILELIMIT \
-        --out-meta standard.meta \
-        -- /run/run testdata.in testdata.out /judge/run > standard.tmp 2>&1 || \
-        exitcode=$?
+        --wall-time "$TIMELIMIT" \
+        --standard-error-file standard.err \
+        --out-meta standard.meta -- \
+        /run/run testdata.in testdata.out /judge/run 2>runguard.err
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/standard 中，因此删除挂载点即可。
-umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
-umount -f "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
+force_umount "$RUNDIR/merged/judge"
+force_umount "$RUNDIR/merged"
 rm -rf "$RUNDIR"
 
 # 检查是否运行超时，time-result 可能为空、soft-timelimit、hard-timelimit，空表示没有超时

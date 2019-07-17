@@ -40,6 +40,7 @@
                 "--exec-dir=${workspaceFolder}/exec",
                 "--cache-dir=/tmp",
                 "--run-dir=/tmp",
+                "--log-dir=/tmp",
                 "--chroot-dir=/chroot",
                 "--cache-random-data=100",
                 "--run-user=huangyuhui",

@@ -3,7 +3,8 @@
         "port": 25565,
         "exchange": "Submission",
         "hostname": "localhost",
-        "queue": "callback_queue"
+        "queue": "callback_queue",
+        "routing_key": "callback_queue"
     },
     "choiceSubmissionQueue": {
         "port": 25565,
@@ -15,7 +16,8 @@
         "port": 25565,
         "hostname": "localhost",
         "exchange": "Submission",
-        "queue": "ProgrammingSubmission"
+        "queue": "ProgrammingSubmission",
+        "routing_key": "ProgrammingSubmission"
     },
     "systemConfig": {
         "fileApi": "http://127.0.0.1:8999",

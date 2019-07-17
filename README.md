@@ -187,3 +187,13 @@ sudo ./judge-system --enable-sicily=/etc/judge-system/sicily.conf --enable-3=/et
 为了减轻一台服务器 20 个评测队列一起抢 IO 从而导致评测结果不准确，我们使用内存盘来确保 IO 性能：程序的输入输出的 IO 操作全部在内存中完成，内存的速度显然比磁盘 IO 快，就算这导致了内存带宽的不足，也会比多核心抢 IO 要来的好；其次，选手程序是临时文件，并不需要写入磁盘，这样能减少评测系统对磁盘的消耗。
 
 评测系统必要时也可以运行在配置好的 chroot 环境下以避免 boost 的编译。
+
+## 调试
+评测系统需要 root 权限才能运行（因为 chroot），因此调试的时候必须通过 sudo gdb 来完成，我们需要创建一个 `gdb-sudo` 脚本来帮助我们获得 root 权限：
+```bash
+#!/bin/sh
+pkexec gdb $@
+```
+其中 `pkexec` 是可以 GUI 下提示输入密码的程序，因为 sudo 在命令行下输入密码从标准输入读取，此时标准输入已经由 vscode 控制，无法输入密码。以上是本地调试的解决方案。
+
+对于 vscode-remote 的调试方案还未尝试。

@@ -107,7 +107,7 @@ struct compile_check_report {
     /**
      * @brief MOJ 编译任务是否通过
      */
-    bool pass;
+    bool pass = false;
 
     /**
      * @brief 保存编译信息
@@ -263,12 +263,12 @@ struct random_check_report {
     /**
      * @brief MOJ 随机测试得分
      */
-    double grade;
+    int grade;
 
     /**
      * @brief MOJ 随机测试任务的总分
      */
-    double full_grade;
+    int full_grade;
 
     /**
      * @brief 选手程序通过的随机测试数据点数

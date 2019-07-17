@@ -59,11 +59,9 @@ static void process_nolock(concurrent_queue<message::client_task> &testcase_queu
     }
 
     auto &submit = submissions.at(judge_id);
-    if (task_result.status == judge::status::ACCEPTED) {
-        // 记录测试成功信息
-        auto &task_results = judge::server::task_results[judge_id];
-        task_results[task_result.id] = task_result;
-    }
+    // 记录测试信息
+    auto &task_results = judge::server::task_results[judge_id];
+    task_results[task_result.id] = task_result;
 
     DLOG(INFO) << "Testcase [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id
                << ", status: " << (int)task_result.status << ", runtime: " << task_result.run_time

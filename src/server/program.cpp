@@ -148,7 +148,7 @@ void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs:
             case E_COMPILER_ERROR:
                 throw compilation_error("Compilation failed", get_compilation_log(workdir));
             case E_INTERNAL_ERROR:
-                throw internal_error("Compilation failed because of internal errors");
+                throw compilation_error("Compilation failed because of internal errors", get_compilation_log(workdir));
             default:
                 throw runtime_error(fmt::format("Unrecognized compile.sh return code: {}", ret));
         }
