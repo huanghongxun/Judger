@@ -8,6 +8,7 @@
 #include "common/stl_utils.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
+#include "server/moj/choice.hpp"
 #include "server/moj/feedback.hpp"
 
 namespace judge::server::moj {
@@ -359,9 +360,11 @@ bool configuration::fetch_submission(submission &submit) {
         return true;
     }
 
-    if (choice_fetcher->fetch(message, 0)) {
-        // TODO: choice judger
-        return true;
+    // 单独处理选择题，评测系统 4.0 不支持选择题评测
+    while (choice_fetcher->fetch(message, 0)) {
+        choice_exam exam = json::parse(message);
+        json report_json = judge_choice_exam(exam);
+        submission_reporter->report(report_json.dump());
     }
 
     return false;
