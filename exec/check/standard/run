@@ -106,16 +106,15 @@ fi
 GAINROOT="sudo -n"
 PROGRAM="compile/run"
 
-[ $# -ge 4 ] || error "not enough arguments"
+[ $# -ge 7 ] || error "not enough arguments"
 
 DATADIR="$1"; shift
 TIMELIMIT="$1"; shift
 CHROOTDIR="$1"; shift
 WORKDIR="$1"; shift
 RUN_UUID="$1"; shift
-RUN_SCRIPT="$1"
-COMPARE_SCRIPT="$2"
-COMPARE_ARGS="$3"
+RUN_SCRIPT="$1"; shift
+COMPARE_SCRIPT="$1"
 
 TESTIN="$DATADIR/input"
 TESTOUT="$DATADIR/output"
@@ -179,12 +178,11 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
     /run/run testdata.in program.out /judge/run 2>runguard.err
 
 # 比较选手程序输出
-logmsg $LOG_INFO "Comparing output"
+echo "Comparing output" >> system.out
 force_umount "$RUNDIR/merged/judge"
 $GAINROOT mount --bind "$RUNDIR/feedback" "$RUNDIR/merged/feedback"
 $GAINROOT mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro:"$TESTOUT"=ro "$RUNDIR/merged/judge"
 
-exitcode=0
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --root "$RUNDIR/merged" \
     --work /judge \
@@ -194,9 +192,11 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --memory-limit $SCRIPTMEMLIMIT \
     --wall-time $SCRIPTTIMELIMIT \
     --file-limit $SCRIPTFILELIMIT \
+    --standard-output-file compare.out \
+    --standard-error-file compare.err \
     --out-meta compare.meta \
     -VJUDGE_UTILS=/judge_utils -- \
-    "/compare/run" testdata.in program.out testdata.out /feedback > compare.tmp 2>&1
+    "/compare/run" testdata.in program.out testdata.out /feedback 2>>runguard.err
 
 chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
 
@@ -209,25 +209,29 @@ force_umount "$RUNDIR/merged/feedback"
 force_umount "$RUNDIR/merged"
 rm -rf "$RUNDIR/merged"
 rm -rf "$RUNDIR/work"
-# RUNDIR 还剩下 compare.meta, compare.out, program.meta, program.err, system.out, runguard.err 供评测客户端检查
+# RUNDIR 还剩下 compare.meta, compare.out, compare.err program.meta, program.err, system.out, runguard.err 供评测客户端检查
 # RUNDIR 由评测客户端删除
 
-# Append output validator error messages
-# TODO: display extra
-if [ -s feedback/judgeerror.txt ]; then
-	printf "\\n---------- output validator (error) messages ----------\\n" >> feedback/judgemessage.txt
-	cat feedback/judgeerror.txt >> feedback/judgemessage.txt
+# Make sure that all feedback files are owned by the current
+# user/group, so that we can append content.
+$GAINROOT chown -R "$(id -un):" "$RUNDIR/feedback"
+chmod -R go-w feedback
+
+# 记录比较器的标准输出
+if [ -s compare.out ]; then
+	printf "\\n---------- output validator stdout messages ----------\\n" >> system.out
+	cat compare.out >> system.out
 fi
 
-# Append output validator stdin/stderr - display extra?
-if [ -s compare.tmp ]; then
-	printf "\\n---------- output validator stdout/stderr messages ----------\\n" >> feedback/judgemessage.txt
-	cat compare.tmp >> feedback/judgemessage.txt
+# 记录比较器的标准错误流
+if [ -s compare.err ]; then
+	printf "\\n---------- output validator stderr messages ----------\\n" >> system.out
+	cat compare.err >> system.out
 fi
 
-logmsg $LOG_DEBUG "checking compare script exit-status: $exitcode"
+echo "checking compare script exit-status: $exitcode" >> system.out
 if grep '^time-result: .*timelimit' compare.meta >/dev/null 2>&1; then
-    logmsg $LOG_ERR "Comparing aborted after $SCRIPTTIMELIMIT seconds, compare script output: \\n$(cat compare.tmp)"
+    echo "Comparing aborted after $SCRIPTTIMELIMIT seconds" >> system.out
     cleanexit ${E_COMPARE_ERROR:-1}
 fi
 
@@ -235,7 +239,7 @@ if [ ! -r program.meta ]; then
     error "'program.meta' is not readable"
 fi
 
-logmsg $LOG_DEBUG "Checking program run status"
+echo "Checking program run status" >> system.out
 
 timeused=$(grep '^time-used: '    program.meta | sed 's/time-used: //'   )
 cputime=$( grep '^cpu-time: '     program.meta | sed 's/cpu-time: //'    )
@@ -291,7 +295,7 @@ if [ "$progexit" -ne 0 ]; then
 fi
 
 if [ $exitcode -eq $RESULT_PC ] && [ ! -f "$RUNDIR/feedback/score.txt" ]; then
-    logmsg $LOG_ERR "Compare script reports partial correct without score record."
+    echo "Compare script reports partial correct without score record." >> system.out
     cleanexit ${E_COMPARE_ERROR:-1}
 fi
 
@@ -317,7 +321,7 @@ case $exitcode in
         cleanexit ${E_PARTIAL_CORRECT:-1}
         ;;
     *)
-        logmsg $LOG_ERR "Comparing failed with exitcode $exitcode, compare script output:\\n$(cat feedback/judgemessage.txt)"
+        echo "Comparing failed with exitcode $exitcode" >> system.out
         cleanexit ${E_COMPARE_ERROR:-1}
         ;;
 esac

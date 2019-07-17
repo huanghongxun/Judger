@@ -38,7 +38,7 @@
             "check_script": "memory", // valgrind 内存测试
             "run_script": "standard",
             "compare_script": null, // 内存测试不需要比较脚本
-            "score": 20,
+            "score": 10,
             "is_random": false,
             "testcase_id": -1, // 依赖测试点的 testcase_id 不需要填写
             "depends_on": 1, // 依赖第 1 号测试点（这里是标准测试，测试数据将使用 0 号标准测试数据）
@@ -48,10 +48,20 @@
             "check_script": "memory", // valgrind 内存测试
             "run_script": "standard",
             "compare_script": null, // 内存测试不需要比较脚本
-            "score": 20,
+            "score": 10,
             "is_random": true,
             "testcase_id": -1,
             "depends_on": 2, // 依赖第 2 号测试点（这里是随机测试，测试数据将使用随机测试相应的测试数据）
+            "depends_cond": "ACCEPTED"
+        },
+        {
+            "check_script": "static", // oclint 静态测试
+            "run_script": null, // 静态测试不需要运行脚本
+            "compare_script": null, // 静态测试不需要比较脚本
+            "score": 20,
+            "is_random": false,
+            "testcase_id": -1, // 静态测试不需要测试数据
+            "depends_on": -1, // 静态测试不需要依赖编译测试
             "depends_cond": "ACCEPTED"
         }
     ],

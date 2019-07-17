@@ -499,13 +499,44 @@ static void summarize_standard_check(judge_report &report, boost::rational<int> 
  * 采用oclint进行静态检查，用于检测部分代码风格和代码设计问题
  * 
  * 执行条件
- * 1. 配置中开启静态检查（静态检查满分大于0）
+ * 1. 配置中开启静态检查（静态检查满分大于 0）
  * 
  * 评分规则
  * oclint评测违规分3个等级：priority 1、priority 2、priority 3
- * 评测代码每违规一个 priority 1 扣 2 分，每违规一个 priority 2 扣 1 分，违规 priority 3 不扣分。扣分扣至 0 分为止.
+ * 评测代码每违规一个 priority 1 扣 20%，每违规一个 priority 2 扣 10%，违规 priority 3 不扣分。扣分扣至 0 分为止.
  */
-static void summarize_static_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
+static void summarize_static_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &static_check_json) {
+    static_check_report static_check;
+    boost::rational<int> score, full_score;
+    vector<json> oclint_violations;
+    for (size_t i = 0; i < task_results.size(); ++i) {
+        auto &task_result = task_results[i];
+        if (task_result.type == static_check_report::TYPE) {
+            string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
+
+            if (task_result.status == status::ACCEPTED) {
+                score += submit.test_cases[i].score;
+            } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
+                continue;
+            } else if (task_result.status == status::PARTIAL_CORRECT) {
+                score += task_result.score * submit.test_cases[i].score;
+            } else if (task_result.status == status::SYSTEM_ERROR ||
+                       task_result.status == status::RANDOM_GEN_ERROR ||
+                       task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
+                       task_result.status == status::COMPARE_ERROR) {
+                static_check_json = get_error_report(task_result);
+                return;
+            }
+
+            full_score += submit.test_cases[i].score;
+            oclint_violations.push_back(json::parse(report_text));
+        }
+    }
+    static_check.grade = (int)round(boost::rational_cast<double>(score));
+    static_check.full_grade = (int)round(boost::rational_cast<double>(full_score));
+    static_check.report["oclintoutput"] = oclint_violations;
+    static_check_json = static_check;
+    total_score += score;
 }
 
 /**
