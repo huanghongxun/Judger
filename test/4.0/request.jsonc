@@ -1,0 +1,152 @@
+{
+    "category": "exam",
+    "prob_id": 1234,
+    "sub_id": 12345,
+    "last_update": 0, // 最后更新的时间戳
+    "test_cases": [
+        {
+            "check_script": "compile",
+            "run_script": "unused",
+            "compare_script": "unused",
+            "score": 20, // 编译测试占 20 分
+            "is_random": false, // 编译测试不使用随机测试数据
+            "testcase_id": -1, // 编译测试不使用标准测试数据
+            "depends_on": -1, // 没有依赖的测试点
+            "depends_cond": "ACCEPTED"
+        },
+        {
+            "check_script": "standard", // 标准测试模式
+            "run_script": "standard",
+            "compare_script": "", // 空表示使用当前题目自带的比较程序
+            "score": 20,
+            "is_random": false, // 标准测试
+            "testcase_id": 0, // 使用第 0 号标准测试数据
+            "depends_on": 0, // 依赖编译测试
+            "depends_cond": "ACCEPTED" // 仅在编译测试完成之后才能评测该数据点
+        },
+        {
+            "check_script": "standard", // 标准测试模式
+            "run_script": "standard",
+            "compare_script": "diff-ign-space", // 表示使用配置系统中的比较脚本 diff-ign-space
+            "score": 20,
+            "is_random": true, // 随机测试
+            "testcase_id": -1, // 随机测试不使用标准测试数据
+            "depends_on": 0, // 依赖编译测试
+            "depends_cond": "ACCEPTED" // 仅在编译测试完成之后才能评测该数据点
+        },
+        {
+            "check_script": "memory", // valgrind 内存测试
+            "run_script": "standard",
+            "compare_script": null, // 内存测试不需要比较脚本
+            "score": 20,
+            "is_random": false,
+            "testcase_id": -1, // 依赖测试点的 testcase_id 不需要填写
+            "depends_on": 1, // 依赖第 1 号测试点（这里是标准测试，测试数据将使用 0 号标准测试数据）
+            "depends_cond": "ACCEPTED"
+        },
+        {
+            "check_script": "memory", // valgrind 内存测试
+            "run_script": "standard",
+            "compare_script": null, // 内存测试不需要比较脚本
+            "score": 20,
+            "is_random": true,
+            "testcase_id": -1,
+            "depends_on": 2, // 依赖第 2 号测试点（这里是随机测试，测试数据将使用随机测试相应的测试数据）
+            "depends_cond": "ACCEPTED"
+        }
+    ],
+    "test_data": [
+        {
+            "inputs": [
+                {
+                    "type": "text", // text 类型的资源文件
+                    "name": "testdata.in", // 标准输入文件名是 testdata.in
+                    "text": "1\n" // text 为文本文件内容
+                }
+            ],
+            "outputs": [
+                {
+                    "type": "text",
+                    "name": "testdata.out", // 标准输出文件名是 testdata.out
+                    "text": "10\n"
+                }
+            ]
+        },
+        {
+            "inputs": [
+                {
+                    "type": "remote",
+                    "name": "testdata.in", // 标准输入文件名是 testdata.in
+                    "url": "http://filesystem/problem/1234/standard_input/input1"
+                }
+            ],
+            "outputs": [
+                {
+                    "type": "remote",
+                    "name": "testdata.out", // 标准输出文件名是 testdata.out
+                    "url": "http://filesystem/problem/1234/standard_output/output1"
+                }
+            ]
+        }
+    ],
+    "memory_limit": 262144, // 256M
+    "time_limit": 1.0, // 1s
+    "file_limit": 524288, // 512M
+    "proc_limit": -1, // unlimited
+    "submission": {
+        "type": "source_code",
+        "language": "cpp",
+        "entry_point": null,
+        "source_files": [
+            {
+                "type": "text",
+                "name": "main.cpp",
+                "text": "#include <bits/stdc++.h>\nint main() { int a; cin >> a; cout << a * 10 << endl; return 0; }"
+            }
+        ],
+        "assist_files": [
+            {
+                "type": "text",
+                "name": "main.hpp",
+                "text": ""
+            }
+        ],
+        "compile_command": [
+            "-Werror",
+            "-lm",
+            "-g"
+        ]
+    },
+    "standard": {
+        "type": "source_code",
+        "language": "python2",
+        "source_files": [
+            {
+                "type": "remote",
+                "name": "main.py",
+                "url": "http://filesystem/problem/1234/support/main.py"
+            }
+        ]
+    },
+    "random": {
+        "type": "source_code",
+        "language": "python3",
+        "source_files": [
+            {
+                "type": "remote",
+                "name": "main.py",
+                "url": "http://filesystem/problem/1234/random_source/main.py"
+            }
+        ]
+    },
+    "compare": {
+        "type": "executable",
+        "id": "diff-all",
+        "asset": {
+            "type": "remote",
+            "name": "diff-all.zip", // 这个名字无所谓
+            "url": "http://filesystem/executable/diff-all.zip"
+        },
+        "md5sum": "1234567890"
+    }
+}
