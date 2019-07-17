@@ -56,11 +56,6 @@ struct choice_exam {
     int prob_id;
 
     /**
-     * @brief 选择题数量
-     */
-    size_t number;
-
-    /**
      * @brief 选择题类型、评分、标准答案、选手答案集合
      */
     vector<choice_question> questions;

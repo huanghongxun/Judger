@@ -10,7 +10,8 @@
         "port": 25565,
         "hostname": "localhost",
         "exchange": "Submission",
-        "queue": "ChoiceSubmission"
+        "queue": "ChoiceSubmission",
+        "routing_key": "ChoiceSubmission"
     },
     "programmingSubmissionQueue": {
         "port": 25565,

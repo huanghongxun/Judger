@@ -1,6 +1,7 @@
 #include "server/server.hpp"
 #include <glog/logging.h>
 #include <thread>
+#include <boost/stacktrace.hpp>
 #include "common/messages.hpp"
 
 namespace judge::server {
@@ -206,9 +207,13 @@ static bool fetch_submission_nolock(concurrent_queue<message::client_task> &test
     // 尝试从服务器拉取提交，每次都向所有的评测服务器拉取评测任务
     for (auto &[category, server] : judge_servers) {
         judge::server::submission submission;
-        if (server->fetch_submission(submission)) {
-            if (verify_submission(testcase_queue, move(submission)))
-                success = true;
+        try {
+            if (server->fetch_submission(submission)) {
+                if (verify_submission(testcase_queue, move(submission)))
+                    success = true;
+            }
+        } catch (exception &ex) {
+            LOG(WARNING) << "Fetching from " << category << ex.what() << endl << boost::stacktrace::stacktrace();
         }
     }
     return success;

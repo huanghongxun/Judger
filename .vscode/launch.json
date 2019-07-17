@@ -47,7 +47,7 @@
                 "--run-group=huangyuhui"
             ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/file-test",
+            "cwd": "${workspaceFolder}/test/3.0",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",

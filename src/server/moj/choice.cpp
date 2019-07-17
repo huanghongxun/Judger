@@ -55,6 +55,7 @@ void from_json(const json &j, choice_exam &value) {
         qobj.at("type").get_to(q.type);
         qobj.at("answer").get_to(q.standard_answer);
         aobj.get_to(q.student_answer);
+        value.questions.push_back(q);
     }
 }
 
@@ -86,6 +87,7 @@ choice_report judge_choice_exam(const choice_exam &exam) {
         report.full_grade += q.full_grade;
         report.question_grades.push_back(score);
     }
+    return report;
 }
 
 }  // namespace judge::server::moj

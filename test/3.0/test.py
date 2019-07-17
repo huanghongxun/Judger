@@ -1,10 +1,15 @@
 import json
 import pika
+import sys
 
+if len(sys.argv) != 3:
+    sys.stderr.write('{0}: 2 arguments needed, {1} given\n'.format(sys.argv[0], len(sys.argv) - 1))
+    print("Usage: {0} [request.json] [queue_name]".format(sys.argv[0]))
+    sys.exit(2)
 
 host = "127.0.0.1"
 port = 25565
-queue_name = "ProgrammingSubmission"
+queue_name = sys.argv[2]
 exchange = "Submission"
 
 def init_rabbitmq():
@@ -29,7 +34,7 @@ def on_response(ch, method, props, body):
 
 def main():
     channel = init_rabbitmq()
-    req = json.load(open("./request.json"))
+    req = json.load(open(sys.argv[1]))
     result = channel.queue_declare(queue="callback_queue", exclusive=True)
     callback_queue = result.method.queue
     global queue_name, exchange

@@ -112,6 +112,8 @@ if (BUILD_ENTRY)
     SimpleAmqpClient
     mysqlclient
     curl
+    boost_stacktrace_backtrace
+    dl
     ${Boost_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     )
