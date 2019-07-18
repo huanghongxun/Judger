@@ -12,81 +12,12 @@
 # <run-uuid>     运行的 uuid，用于索引运行文件夹位置
 #
 # 必须包含的环境变量：
-# "RUNGUARD"     runguard 的路径
-#
-# 默认的比较脚本都可以放在配置服务中
+#   RUNGUARD        runguard 的路径
+#   RUNUSER         选手程序运行的账户
+#   RUNGROUP        选手程序运行的账户组
 
-set -e
-trap 'cleanup ; error' EXIT
-
-cleanup ()
-{
-    # 删除创建过的文件
-
-    if [ -s runguard.err ]; then
-        echo "************* runguard error *************" >> system.out
-        cat runguard.err >> system.out
-    fi
-}
-
-cleanexit ()
-{
-    set +e
-    trap - EXIT
-
-    cleanup
-
-    exit $1
-}
-
-# 导入 runcheck 函数
-. "$JUDGE_UTILS/utils.sh"
-. "$JUDGE_UTILS/logging.sh"
-. "$JUDGE_UTILS/chroot_setup.sh"
-
-CPUSET=""
-CPUSET_OPT=""
-OPTINT=1
-while getopts "n:" opt; do
-    case $opt in
-        n)
-            OPTSET="$OPTARG"
-            ;;
-        :)
-            >&2 echo "Option -$OPTARG requires an argument."
-            ;;
-    esac
-done
-
-shift $((OPTIND-1))
-[ "$1" == "--" ] && shift
-
-if [ -n "$CPUSET" ]; then
-    CPUSET_OPT="-P $CPUSET"
-fi
-
-LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1).log"
-LOGLEVEL=$LOG_DEBUG
-PROGNAME="$(basename "$0")"
-
-if [ "$DEBUG" ]; then
-    export VERBOSE=$LOG_DEBUG
-else
-    export VERBOSE=$LOG_ERR
-fi
-
-GAINROOT="sudo -n"
-PROGRAM="compile/run"
-
-[ $# -ge 4] || error "not enough arguments"
-
-DATADIR="$1"; shift
-TIMELIMIT="$1"; shift
-MEMLIMIT="$1"; shift
-CHROOTDIR="$1"; shift
-WORKDIR="$1"; shift
-RUN_UUID="$1"; shift
-RUN_SCRIPT="$1"
+# 导入比较脚本，功能是初始化日志、处理命令行参数、并对参数进行初步检查
+. "$JUDGE_UTILS/check_helper.sh"
 
 TESTIN="$DATADIR/input"
 TESTOUT="$DATADIR/output"
@@ -97,69 +28,53 @@ if [ ! -d "$WORKDIR" ] || [ ! -w "$WORKDIR" ] || [ ! -x "$WORKDIR" ]; then
     error "Working directory does not exist: $WORKDIR"
 fi
 
+PROGRAM="compile/run"
 [ -x "$WORKDIR/$PROGRAM" ] || error "Program does not exist"
-[ -x "$COMPARE_SCRIPT" ] || error "Compare script does not exist"
-[ -x "$RUN_SCRIPT" ] || error "Run script does not exist"
-[ -x "$RUNGUARD" ] || error "runguard does not exist"
-
-chmod a+x "$WORKDIR"
-
-# 检查运行脚本
-
-RUNDIR="$WORKDIR/run-$RUN_UUID"
-mkdir -p "$RUNDIR"
-chmod a+rwx "$RUNDIR"
-
-cd "$RUNDIR"
 
 touch judge.out
 touch program.out program.err
 touch program.meta runguard.err
 touch compare.meta compare.err
 
-mkdir -m 0777 -p "$RUNDIR/run" # 运行的临时文件都在这里
-mkdir -m 0777 -p "$RUNDIR/feedback"
-mkdir -m 0777 -p "$RUNDIR/work"
-mkdir -m 0777 -p "$RUNDIR/work/judge"
-mkdir -m 0777 -p "$RUNDIR/merged"
+mkdir -m 0777 -p run # 运行的临时文件都在这里
+mkdir -m 0777 -p feedback
+mkdir -m 0777 -p work
+mkdir -m 0777 -p work/judge
+mkdir -m 0777 -p merged
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
-$GAINROOT mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro "$RUNDIR/work/judge"
-$GAINROOT mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
+$GAINROOT mount -t aufs none -odirs=run=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro work/judge
+$GAINROOT mount -t aufs none -odirs=work=rw:"$CHROOTDIR"=ro merged
 
-chroot_start "$CHROOTDIR" "$RUNDIR/merged"
+chroot_start "$CHROOTDIR" merged
 
 # 我们不检查选手程序的返回值，比如 C 程序的 main 函数没有写 return 会导致返回值非零，这种不是崩溃导致的
-runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
-    --root "$RUNDIR/merged" \
+runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
+    --root merged \
     --work /judge \
-    --nproc $PROCLIMIT \
     --no-core-dumps \
-    --streamsize $FILELIMIT \
     --user "$RUNUSER" \
     --group "$RUNGROUP" \
-    --wall-time $TIMELIMIT \
-    --memory-limit $MEMLIMIT \
-    --file-limit $FILELIMIT \
-    --standard-output-file valgrind.xml \
+    --wall-time "$TIMELIMIT" \
+    --standard-output-file gtest.xml \
     --standard-error-file program.err \
     --out-meta program.meta -- \
     /judge/run  2>runguard.err
 
-chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
+chroot_stop "$CHROOTDIR" merged
 
-force_umount "$RUNDIR/work/judge" >/dev/null 2>&1  || /bin/true
-force_umount "$RUNDIR/work/judge_utils" >/dev/null 2>&1  || /bin/true
-force_umount "$RUNDIR/work/run" >/dev/null 2>&1  || /bin/true
-force_umount "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
-rm -rf "$RUNDIR/run"
-rm -rf "$RUNDIR/merged"
-rm -rf "$RUNDIR/work"
+force_umount work/judge
+force_umount work/judge_utils
+force_umount work/run
+force_umount merged
+rm -rf run
+rm -rf merged
+rm -rf work
 # RUNDIR 还剩下 program.meta, program.err, system.out, runguard.err 供评测客户端检查
 # RUNDIR 由评测客户端删除
 
 # Make sure that all feedback files are owned by the current
 # user/group, so that we can append content.
-$GAINROOT chown -R "$(id -un):" "$RUNDIR/feedback"
+$GAINROOT chown -R "$(id -un):" feedback
 chmod -R go-w feedback
 
 if [ ! -r program.meta ]; then
@@ -167,18 +82,7 @@ if [ ! -r program.meta ]; then
 fi
 
 echo "Checking program run status" >> system.out
-
-timeused=$(grep '^time-used: '    program.meta | sed 's/time-used: //'   )
-cputime=$( grep '^cpu-time: '     program.meta | sed 's/cpu-time: //'    )
-walltime=$(grep '^wall-time: '    program.meta | sed 's/wall-time: //'   )
-progexit=$(grep '^exitcode: '     program.meta | sed 's/exitcode: //'    )
-stdout=$(  grep '^stdout-bytes: ' program.meta | sed 's/stdout-bytes: //')
-stderr=$(  grep '^stderr-bytes: ' program.meta | sed 's/stderr-bytes: //')
-memused=$( grep '^memory-bytes: ' program.meta | sed 's/memory-bytes: //')
-signal=$(  grep '^signal: '       program.meta | sed 's/signal: //'      )
-resource_usage="\
-runtime: ${cputime}s cpu, ${walltime}s wall
-memory used: ${memused} bytes"
+read_metadata program.meta
 
 if grep '^time-result: .*timelimit' program.meta >/dev/null 2>&1; then
     echo "Time Limit Exceeded" >> system.out
@@ -192,7 +96,7 @@ if grep -E '^output-truncated: ([a-z]+,)*stdout(,[a-z]+)*' program.meta >/dev/nu
     cleanexit ${E_OUTPUT_LIMIT:-1}
 fi
 
-runcheck python3 "$PROGNAME/convert.py" gtest.xml $RUNDIR/feedback/report.txt 2>feedback/judgemessage.txt
+runcheck python3 "$PROGNAME/convert.py" gtest.xml feedback/report.txt 2>feedback/judgemessage.txt
 case $exitcode in
     0)
         echo "Accepted" >> system.out
@@ -205,7 +109,7 @@ case $exitcode in
         cleanexit ${E_WRONG_ANSWER:-1}
         ;;
     *)
-        logmsg $LOG_ERR "Comparing failed with exitcode $exitcode, compare script output:\\n$(cat feedback/judgemessage.txt)"
+        echo "Comparing failed with exitcode $exitcode" >> system.out
         cleanexit ${E_COMPARE_ERROR:-1}
         ;;
 esac

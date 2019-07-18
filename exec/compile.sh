@@ -97,8 +97,7 @@ fi
 [ -x "$RUNGUARD" ] || error "runguard not found or not executable: $RUNGUARD"
 
 cd "$WORKDIR"
-mkdir -p "$WORKDIR/compile"
-chmod a+rwx "$WORKDIR/compile"
+mkdir -m 0777 -p "$WORKDIR/compile"
 cd "$WORKDIR/compile"
 touch compile.out compile.meta
 
@@ -113,22 +112,20 @@ if [ ! -z "$ENTRY_POINT" ]; then
 fi
 
 RUNDIR="$WORKDIR/run-compile"
-mkdir -p "$RUNDIR"
-chmod a+rwx "$RUNDIR"
+mkdir -m 0777 -p "$RUNDIR"
 
 chmod -R +x "$COMPILE_SCRIPT"
 
-mkdir -p "$RUNDIR/work"
-mkdir -p "$RUNDIR/work/judge"
-mkdir -p "$RUNDIR/work/compile"
-mkdir -p "$RUNDIR/merged"
+mkdir -m 0777 -p "$RUNDIR/work"
+mkdir -m 0777 -p "$RUNDIR/work/judge"
+mkdir -m 0777 -p "$RUNDIR/work/compile"
+mkdir -m 0777 -p "$RUNDIR/merged"
 $GAINROOT mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
 $GAINROOT mount -t aufs none -odirs="$WORKDIR/compile"=rw "$RUNDIR/merged/judge"
 $GAINROOT mount --bind -o ro "$COMPILE_SCRIPT" "$RUNDIR/merged/compile"
 
 # 调用 runguard 来执行编译命令
-exitcode=0
-$GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
+runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --root "$RUNDIR/merged" \
         --work /judge \
         --user "$RUNUSER" \
@@ -137,8 +134,7 @@ $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --wall-time "$SCRIPTTIMELIMIT" \
         --out-meta compile.meta \
         $ENVIRONMENT_VARS -- \
-        "/compile/run" run "$MEMLIMIT" "$@" > compile.tmp 2>&1 || \
-        exitcode=$?
+        "/compile/run" run "$MEMLIMIT" "$@" > compile.tmp 2>&1
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/compile 中，因此删除挂载点即可。
 $GAINROOT umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true

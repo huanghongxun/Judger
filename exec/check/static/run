@@ -23,110 +23,24 @@
 #   SCRIPTTIMELIMIT 比较脚本执行时间
 #   SCRIPTFILELIMIT 比较脚本输出限制
 
-set -e
-trap 'cleanup ; error' EXIT
-
-cleanup ()
-{
-    # 删除创建过的文件
-
-    if [ -s runguard.err ]; then
-        echo "************* runguard error *************" >> system.out
-        cat runguard.err >> system.out
-    fi
-}
-
-cleanexit ()
-{
-    set +e
-    trap - EXIT
-
-    cleanup
-
-    exit $1
-}
-
-# 导入 runcheck 函数
-. "$JUDGE_UTILS/utils.sh"
-. "$JUDGE_UTILS/logging.sh"
-. "$JUDGE_UTILS/chroot_setup.sh"
-
-CPUSET=""
-CPUSET_OPT=""
-OPTINT=1
-while getopts "n:" opt; do
-    case $opt in
-        n)
-            OPTSET="$OPTARG"
-            ;;
-        :)
-            >&2 echo "Option -$OPTARG requires an argument."
-            ;;
-    esac
-done
-
-shift $((OPTIND-1))
-[ "$1" == "--" ] && shift
-
-if [ -n "$CPUSET" ]; then
-    CPUSET_OPT="-P $CPUSET"
-fi
-
-LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1).log"
-LOGLEVEL=$LOG_DEBUG
-PROGNAME="$(basename "$0")"
-
-if [ "$DEBUG" ]; then
-    export VERBOSE=$LOG_DEBUG
-else
-    export VERBOSE=$LOG_ERR
-fi
-
-GAINROOT="sudo -n"
-
-[ $# -ge 9 ] || error "not enough arguments"
-
-DATADIR="$1"; shift
-TIMELIMIT="$1"; shift
-CHROOTDIR="$1"; shift
-WORKDIR="$1"; shift
-RUN_UUID="$1"; shift
-RUN_SCRIPT="$1"; shift
-COMPARE_SCRIPT="$1"; shift
-SOURCE_FILES="$1"; shift
-ASSIST_FILES="$1"
-
-if [ ! -d "$WORKDIR" ] || [ ! -w "$WORKDIR" ] || [ ! -x "$WORKDIR" ]; then
-    error "Working directory does not exist: $WORKDIR"
-fi
-
-[ -x "$RUNGUARD" ] || error "runguard does not exist"
-
-chmod a+x "$WORKDIR"
-
-# 检查运行脚本
-
-RUNDIR="$WORKDIR/run-$RUN_UUID"
-mkdir -p "$RUNDIR"
-chmod a+rwx "$RUNDIR"
-
-cd "$RUNDIR"
+# 导入比较脚本，功能是初始化日志、处理命令行参数、并对参数进行初步检查，并进入运行文件夹
+. "$JUDGE_UTILS/check_helper.sh"
 
 touch judge.out
 touch program.out program.err
 touch program.meta runguard.err
 touch compare.meta compare.err
 
-mkdir -m 0777 -p "$RUNDIR/run" # 运行的临时文件都在这里
-mkdir -m 0777 -p "$RUNDIR/feedback"
-mkdir -m 0777 -p "$RUNDIR/work"
-mkdir -m 0777 -p "$RUNDIR/work/judge"
-mkdir -m 0777 -p "$RUNDIR/merged"
+mkdir -m 0777 -p run # 运行的临时文件都在这里
+mkdir -m 0777 -p feedback
+mkdir -m 0777 -p work
+mkdir -m 0777 -p work/judge
+mkdir -m 0777 -p merged
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
-mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro "$RUNDIR/work/judge"
-mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
+mount -t aufs none -odirs=run=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro work/judge
+mount -t aufs none -odirs=work=rw:"$CHROOTDIR"=ro merged
 
-chroot_start "$CHROOTDIR" "$RUNDIR/merged"
+chroot_start "$CHROOTDIR" merged
 
 IFS=':' read -ra SRC <<< "$SOURCE_FILES"
 IFS=':' read -ra HDR <<< "$ASSIST_FILES"
@@ -148,34 +62,19 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --out-meta oclint.meta -- \
     oclint "${SRC[@]}" --report-type=json -- -c -std=c++2a "${INC[@]}" > compare.tmp 2>&1
 
-chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
+chroot_stop "$CHROOTDIR" merged
 
-force_umount "$RUNDIR/work/judge"
-force_umount "$RUNDIR/work/run"
-force_umount "$RUNDIR/merged"
-rm -rf "$RUNDIR/run"
-rm -rf "$RUNDIR/merged"
-rm -rf "$RUNDIR/work"
+force_umount work/judge
+force_umount work/run
+force_umount merged
+rm -rf run # 静态测试可以删除 run 文件夹，因为静态测试结果放在 $(pwd) 下面
+rm -rf merged
+rm -rf work
 # RUNDIR 还剩下 program.meta, program.err, system.out, runguard.err 供评测客户端检查
 # RUNDIR 由评测客户端删除
 
-if [ ! -r program.meta ]; then
-    error "'program.meta' is not readable"
-fi
-
 echo "Checking program run status" >> system.out
-
-timeused=$(grep '^time-used: '    program.meta | sed 's/time-used: //'   )
-cputime=$( grep '^cpu-time: '     program.meta | sed 's/cpu-time: //'    )
-walltime=$(grep '^wall-time: '    program.meta | sed 's/wall-time: //'   )
-progexit=$(grep '^exitcode: '     program.meta | sed 's/exitcode: //'    )
-stdout=$(  grep '^stdout-bytes: ' program.meta | sed 's/stdout-bytes: //')
-stderr=$(  grep '^stderr-bytes: ' program.meta | sed 's/stderr-bytes: //')
-memused=$( grep '^memory-bytes: ' program.meta | sed 's/memory-bytes: //')
-signal=$(  grep '^signal: '       program.meta | sed 's/signal: //'      )
-resource_usage="\
-runtime: ${cputime}s cpu, ${walltime}s wall
-memory used: ${memused} bytes"
+read_metadata program.meta
 
 if grep '^time-result: .*timelimit' program.meta >/dev/null 2>&1; then
     echo "Time Limit Exceeded" >> system.out
