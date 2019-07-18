@@ -120,12 +120,12 @@ int main(int argc, char* argv[]) {
         ("clients", po::value<unsigned>(), "set number of single thread judge clients to be kept")
         ("client", po::value<vector<cpuset>>(), "run a judge client which cpuset is given")
         ("auto-clients", po::value<vector<cpuset>>(), "start clients with number of hardware concurrency")
-        ("exec-dir", po::value<string>(), "set the default predefined executables for falling back")
-        ("cache-dir", po::value<string>(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
+        ("exec-dir", po::value<string>()->required(), "set the default predefined executables for falling back")
+        ("cache-dir", po::value<string>()->required(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
         ("data-dir", po::value<string>(), "set the directory to store test data to be judged, for ramdisk to speed up IO performance of user program.")
-        ("run-dir", po::value<string>(), "set the directory to run user programs, store compiled user program")
+        ("run-dir", po::value<string>()->required(), "set the directory to run user programs, store compiled user program")
         ("log-dir", po::value<string>(), "set the directory to store log files")
-        ("chroot-dir", po::value<string>(), "set the chroot directory")
+        ("chroot-dir", po::value<string>()->required(), "set the chroot directory")
         ("script-mem-limit", po::value<unsigned>(), "set memory limit in KB for random data generator, scripts, default to 262144(256MB).")
         ("script-time-limit", po::value<unsigned>(), "set time limit in seconds for random data generator, scripts, default to 10(10 second).")
         ("script-file-limit", po::value<unsigned>(), "set file limit in KB for random data generator, scripts, default to 524288(512MB).")
@@ -169,6 +169,12 @@ int main(int argc, char* argv[]) {
         set_env("JUDGE_UTILS", judge::EXEC_DIR / "utils", true);
         CHECK(filesystem::is_directory(judge::EXEC_DIR))
             << "Executables directory " << judge::EXEC_DIR << " does not exist";
+
+        for (auto& p : filesystem::directory_iterator(judge::EXEC_DIR))
+            if (filesystem::is_regular_file(p))
+                filesystem::permissions(p,
+                                        filesystem::perms::group_exec | filesystem::perms::others_exec | filesystem::perms::owner_exec,
+                                        filesystem::perm_options::add);
     }
 
     if (vm.count("cache-dir")) {

@@ -34,6 +34,7 @@ cleanexit ()
     trap - EXIT
 
     force_umount "$RUNDIR/merged/judge"
+    force_umount "$RUNDIR/merged/run"
     force_umount "$RUNDIR/merged"
     rm -rf "$RUNDIR" || /bin/true
 
@@ -115,6 +116,8 @@ chmod a+rwx "$WORKDIR/input"
 mkdir -p "$WORKDIR/output"
 chmod a+rwx "$WORKDIR/output"
 
+touch random.err
+
 RUNDIR="$WORKDIR/run"
 mkdir -m 0777 -p "$RUNDIR"
 
@@ -130,40 +133,43 @@ $GAINROOT mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/m
 $GAINROOT mount -t aufs none -odirs="$WORKDIR/input"=rw:"$RAN_GEN"=ro "$RUNDIR/merged/judge"
 $GAINROOT mount --bind -o ro "$RUN_SCRIPT" "$RUNDIR/merged/run"
 
+chroot_start "$CHROOTDIR" "$RUNDIR/merged"
+
 # 调用 runguard 来执行随机生成器
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --root "$RUNDIR/merged" \
         --work /judge \
         --user "$RUNUSER" \
         --group "$RUNGROUP" \
-        --memory-limit $SCRIPTMEMLIMIT \
-        --wall-time $SCRIPTTIMELIMIT \
-        --file-limit $SCRIPTFILELIMIT \
+        --memory-limit "$SCRIPTMEMLIMIT" \
+        --wall-time "$SCRIPTTIMELIMIT" \
+        --file-limit "$SCRIPTFILELIMIT" \
         --out-meta random.meta \
-        -- \
-        run > "$WORKDIR/input/testdata.in" 2>&1 > random.tmp
+        --standard-output-file "$WORKDIR/input/testdata.in" \
+        --standard-error-file random.err -- \
+        /judge/run 2>runguard.err
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/random 中，因此删除挂载点即可。
 force_umount "$RUNDIR/merged/judge"
 
 # 检查是否运行超时，time-result 可能为空、soft-timelimit、hard-timelimit，空表示没有超时
 if grep '^time-result: .*timelimit' random.meta >/dev/null 2>&1; then
-    echo "Random data generation aborted after $SCRIPTTIMELIMIT seconds." > random.out
-    cat random.tmp >> random.out
+    echo "Random data generation aborted after $SCRIPTTIMELIMIT seconds." >> system.out
+    cat random.err >> system.out
     cleanexit ${E_RANDOM_GEN_ERROR:--1}
 fi
 
 # 检查是否运行出错/runguard 崩溃
 if [ $exitcode -ne 0 ]; then
-    echo "Random data generation failed with exitcode $exitcode." > random.out
-    cat random.tmp >> random.out
+    echo "Random data generation failed with exitcode $exitcode." >> system.out
+    cat random.err >> system.out
     if [ ! -s random.meta ]; then
-        printf "\n****************runguard crash*****************\n" >> random.out
+        printf "\n****************runguard crash*****************\n" >> system.out
     fi
     cleanexit ${E_RANDOM_GEN_ERROR:--1}
 fi
 
-cat random.tmp >> random.out
+cat random.err >> system.out
 
 #################################
 
@@ -181,28 +187,27 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
         --out-meta standard.meta -- \
         /run/run testdata.in testdata.out /judge/run 2>runguard.err
 
-# 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/standard 中，因此删除挂载点即可。
-force_umount "$RUNDIR/merged/judge"
-force_umount "$RUNDIR/merged"
-rm -rf "$RUNDIR"
+chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
+
+# 删除挂载点在 cleanexit 中完成，因为我们已经确保有用的数据在 $WORKDIR/standard 中，因此删除挂载点即可。
 
 # 检查是否运行超时，time-result 可能为空、soft-timelimit、hard-timelimit，空表示没有超时
 if grep '^time-result: .*timelimit' standard.meta >/dev/null 2>&1; then
-    echo "Random data generation aborted after $TIMELIMIT seconds." > standard.out
-    cat standard.tmp >> standard.out
+    echo "Standard program aborted after $TIMELIMIT seconds." >> system.out
+    cat standard.err >> system.out
     cleanexit ${E_RANDOM_GEN_ERROR:--1}
 fi
 
 # 检查是否运行出错/runguard 崩溃
 if [ $exitcode -ne 0 ]; then
-    echo "Random data generation failed with exitcode $exitcode." > standard.out
-    cat standard.tmp >> standard.out
+    echo "Standard program failed with exitcode $exitcode." >> system.out
+    cat standard.err >> system.out
     if [ ! -s standard.meta ]; then
-        printf "\n****************runguard crash*****************\n" >> standard.out
+        printf "\n****************runguard crash*****************\n" >> system.out
     fi
     cleanexit ${E_RANDOM_GEN_ERROR:--1}
 fi
 
-cat standard.tmp >> standard.out
+cat standard.err >> system.out
 
 cleanexit 0

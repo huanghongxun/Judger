@@ -5,10 +5,10 @@
 #include <fstream>
 #include <mutex>
 #include <stdexcept>
+#include "common/exceptions.hpp"
 #include "common/interprocess.hpp"
 #include "common/io_utils.hpp"
 #include "common/utils.hpp"
-#include "common/exceptions.hpp"
 #include "config.hpp"
 using namespace std;
 
@@ -51,6 +51,9 @@ void executable::fetch(const string &cpuset, const fs::path &, const fs::path &c
             throw executable_compilation_error("executable malformed", "Executable malformed");
         }
     }
+    filesystem::permissions(runpath,
+                            filesystem::perms::group_exec | filesystem::perms::others_exec | filesystem::perms::owner_exec,
+                            filesystem::perm_options::add);
     ofstream to_be_created(deploypath);
 }
 

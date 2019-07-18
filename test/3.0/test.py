@@ -18,7 +18,7 @@ def init_rabbitmq():
     channel = connection.channel()
     channel.exchange_declare(exchange=exchange,
                              exchange_type="direct")
-    channel.queue_declare(queue=queue_name)
+    channel.queue_declare(queue=queue_name, durable=True)
     channel.queue_bind(exchange=exchange, queue=queue_name)
     return channel
 

@@ -7,12 +7,11 @@ namespace judge::server::moj {
 
 struct submission_fetcher {
     submission_fetcher(amqp &amqp);
-    bool fetch(string &message, unsigned int timeout = -1);
-    void ack();
+    bool fetch(AmqpClient::Envelope::ptr_t &envelope, unsigned int timeout = -1);
+    void ack(const AmqpClient::Envelope::ptr_t &envelope);
 
 private:
     AmqpClient::Channel::ptr_t channel;
-    AmqpClient::Envelope::ptr_t envelope;
     string tag;
 };
 

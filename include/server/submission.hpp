@@ -1,5 +1,6 @@
 #pragma once
 
+#include <any>
 #include <boost/rational.hpp>
 #include <map>
 #include <nlohmann/json.hpp>
@@ -53,11 +54,10 @@ struct test_case_data {
  * @brief 表示一个测试点
  */
 struct test_check {
-
     enum class depends_condition {
-        ACCEPTED, // 要求依赖的测试点通过后才能执行本测试
-        PARTIAL_CORRECT, // 要求依赖的测试点不为 0 分时才能执行本测试
-        NON_TIME_LIMIT // 仅在依赖的测试点超出时间限制后才不继续测试
+        ACCEPTED,         // 要求依赖的测试点通过后才能执行本测试
+        PARTIAL_CORRECT,  // 要求依赖的测试点不为 0 分时才能执行本测试
+        NON_TIME_LIMIT    // 仅在依赖的测试点超出时间限制后才不继续测试
     };
 
     /**
@@ -257,7 +257,7 @@ struct submission {
     /**
      * @brief 选手程序的下载地址和编译命令
      */
-    unique_ptr<program> submission;
+    unique_ptr<source_code> submission;
 
     /**
      * @brief 标准程序的下载地址和编译命令
@@ -277,5 +277,10 @@ struct submission {
      * 或者自行提供 source_code 或者 executable 来实现自定义校验
      */
     unique_ptr<program> compare;
+
+    /**
+     * @brief 给 judge_server 保存额外信息的地方
+     */
+    any tag;
 };
 }  // namespace judge::server

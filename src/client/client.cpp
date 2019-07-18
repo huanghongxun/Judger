@@ -1,8 +1,11 @@
 #include "client/client.hpp"
 #include <glog/logging.h>
 #include <unistd.h>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/range/adaptors.hpp>
+#include <boost/range/algorithm.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -40,9 +43,10 @@ thread start_client(const cpu_set_t &set, const string &execcpuset, concurrent_q
  */
 static message::task_result judge(message::client_task &client_task, server::submission &submit, server::test_check &task, const string &execcpuset) {
     namespace ip = boost::interprocess;
+    string uuid = boost::lexical_cast<string>(boost::uuids::random_generator()());
     filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;               // 题目的缓存文件夹
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;  // 本提交的工作文件夹
-    filesystem::path rundir = workdir / ("run-" + to_string(getpid()));                     // 本测试点的运行文件夹
+    filesystem::path rundir = workdir / ("run-" + uuid);                     // 本测试点的运行文件夹
 
     message::task_result result{client_task.judge_id, client_task.id, client_task.type};
     result.run_dir = rundir;
@@ -97,13 +101,13 @@ static message::task_result judge(message::client_task &client_task, server::sub
                     case E_RANDOM_GEN_ERROR: {
                         // 随机数据生成器出错，返回 RANDOM_GEN_ERROR 并携带错误信息
                         result.status = status::RANDOM_GEN_ERROR;
-                        result.error_log = read_file_content(datadir / "random.out", "No information");
+                        result.error_log = read_file_content(datadir / "system.out", "No information");
                         return result;
                     } break;
                     default: {  // INTERNAL_ERROR
                         // 随机数据生成器出错，返回 SYSTEM_ERROR 并携带错误信息
                         result.status = status::SYSTEM_ERROR;
-                        result.error_log = read_file_content(datadir / "random.out", "No information");
+                        result.error_log = read_file_content(datadir / "system.out", "No information");
                         return result;
                     } break;
                 }
@@ -142,7 +146,7 @@ static message::task_result judge(message::client_task &client_task, server::sub
     result.data_dir = datadir;
 
     if (USE_DATA_DIR) {  // 如果要拷贝测试数据，我们随机 UUID 并创建文件夹拷贝数据
-        filesystem::path newdir = DATA_DIR / boost::lexical_cast<string>(boost::uuids::random_generator()());
+        filesystem::path newdir = DATA_DIR / uuid;
         filesystem::copy(datadir, newdir, filesystem::copy_options::recursive);
         datadir = newdir;
     }
@@ -154,10 +158,18 @@ static message::task_result judge(message::client_task &client_task, server::sub
 
     // 调用 check script 来执行真正的评测，这里会调用 run script 运行选手程序，调用 compare script 运行比较器，并返回评测结果
     int ret = call_process_env(env,
-                               check_script->get_run_path() / "run", "-n", execcpuset, datadir, submit.time_limit, CHROOT_DIR, workdir, getpid(), run_script->get_run_path(), compare_script->get_run_path(cachedir / "compare"));
+                               check_script->get_run_path() / "run",
+                               "-n", execcpuset,
+                               datadir, submit.time_limit, CHROOT_DIR, workdir,
+                               uuid,
+                               run_script->get_run_path(),
+                               compare_script->get_run_path(cachedir / "compare"),
+                               boost::algorithm::join(submit.submission->source_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"),
+                               boost::algorithm::join(submit.submission->assist_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"));
     switch (ret) {
         case E_INTERNAL_ERROR:
             result.status = status::SYSTEM_ERROR;
+            result.error_log = read_file_content(rundir / "system.out", "No detailed information");
             break;
         case E_ACCEPTED:
             result.status = status::ACCEPTED;
@@ -205,6 +217,7 @@ static message::task_result judge(message::client_task &client_task, server::sub
             break;
         default:
             result.status = status::SYSTEM_ERROR;
+            result.error_log = read_file_content(rundir / "system.out", "No detailed information");
             break;
     }
 
@@ -271,7 +284,7 @@ static message::task_result compile(message::client_task &client_task, server::s
     // 编译标准程序
     if (submit.standard) {
         filesystem::path standarddir = cachedir / "standard";
-        compile(submit.random.get(), standarddir, execcpuset, result);
+        compile(submit.standard.get(), standarddir, execcpuset, result);
         if (result.status == status::COMPILATION_ERROR)
             result.status = status::EXECUTABLE_COMPILATION_ERROR;
         if (result.status != status::ACCEPTED) return result;

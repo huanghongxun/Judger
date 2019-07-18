@@ -46,6 +46,7 @@ cleanexit ()
 # 导入 runcheck 函数
 . "$JUDGE_UTILS/utils.sh"
 . "$JUDGE_UTILS/logging.sh"
+. "$JUDGE_UTILS/chroot_setup.sh"
 
 CPUSET=""
 CPUSET_OPT=""
@@ -97,7 +98,8 @@ fi
 [ -x "$RUNGUARD" ] || error "runguard not found or not executable: $RUNGUARD"
 
 cd "$WORKDIR"
-mkdir -m 0777 -p "$WORKDIR/compile"
+mkdir -p "$WORKDIR/compile"
+chmod a+rwx "$WORKDIR/compile"
 cd "$WORKDIR/compile"
 touch compile.out compile.meta
 
@@ -112,17 +114,19 @@ if [ ! -z "$ENTRY_POINT" ]; then
 fi
 
 RUNDIR="$WORKDIR/run-compile"
-mkdir -m 0777 -p "$RUNDIR"
+mkdir -p "$RUNDIR"; chmod 777 "$RUNDIR"
 
 chmod -R +x "$COMPILE_SCRIPT"
 
-mkdir -m 0777 -p "$RUNDIR/work"
-mkdir -m 0777 -p "$RUNDIR/work/judge"
-mkdir -m 0777 -p "$RUNDIR/work/compile"
-mkdir -m 0777 -p "$RUNDIR/merged"
+mkdir -p "$RUNDIR/work"; chmod 777 "$RUNDIR/work"
+mkdir -p "$RUNDIR/work/judge"; chmod 777 "$RUNDIR/work/judge"
+mkdir -p "$RUNDIR/work/compile"; chmod 777 "$RUNDIR/work/compile"
+mkdir -p "$RUNDIR/merged"; chmod 777 "$RUNDIR/merged"
 $GAINROOT mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
-$GAINROOT mount -t aufs none -odirs="$WORKDIR/compile"=rw "$RUNDIR/merged/judge"
+$GAINROOT mount --bind "$WORKDIR/compile" "$RUNDIR/merged/judge"
 $GAINROOT mount --bind -o ro "$COMPILE_SCRIPT" "$RUNDIR/merged/compile"
+
+chroot_start "$CHROOTDIR" merged
 
 # 调用 runguard 来执行编译命令
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
@@ -136,10 +140,12 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         $ENVIRONMENT_VARS -- \
         "/compile/run" run "$MEMLIMIT" "$@" > compile.tmp 2>&1
 
+chroot_stop "$CHROOTDIR" merged
+
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/compile 中，因此删除挂载点即可。
-$GAINROOT umount -f "$RUNDIR/merged/judge" >/dev/null 2>&1  || /bin/true
-$GAINROOT umount -f "$RUNDIR/merged/compile" >/dev/null 2>&1  || /bin/true
-$GAINROOT umount -f "$RUNDIR/merged" >/dev/null 2>&1  || /bin/true
+force_umount "$RUNDIR/merged/judge"
+force_umount "$RUNDIR/merged/compile"
+force_umount "$RUNDIR/merged"
 rm -rf "$RUNDIR"
 
 $GAINROOT chown -R "$(id -un):" "$WORKDIR/compile"

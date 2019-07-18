@@ -278,14 +278,14 @@ int runit(struct runguard_options opt) {
         case -1:
             throw system_error(errno, system_category(), "unable to fork");
         case 0: {  // child process, run the command
-            set_restrictions(opt);
-
             if (opt.stdout_filename.size())
                 freopen(opt.stdout_filename.c_str(), "w", stdout);
             if (opt.stderr_filename.size())
                 freopen(opt.stderr_filename.c_str(), "w", stderr);
             if (opt.stdin_filename.size())
                 freopen(opt.stdin_filename.c_str(), "r", stdin);
+                
+            set_restrictions(opt);
 
             auto &cmd = opt.command;
             char **args = new char*[cmd.size() + 1];

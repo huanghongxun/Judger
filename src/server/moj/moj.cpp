@@ -279,6 +279,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
             testcase.depends_on = -1;
             submit.test_cases.push_back(testcase);
         } else if (check.key() == "RandomCheck") {
+            testcase.score /= submit.random_test_times;
             testcase.check_type = random_check_report::TYPE;
             testcase.check_script = "standard";
             testcase.run_script = "standard";
@@ -293,6 +294,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
                 submit.test_cases.push_back(testcase);
             }
         } else if (check.key() == "StandardCheck") {
+            testcase.score /= submit.test_data.size();
             testcase.check_type = standard_check_report::TYPE;
             testcase.check_script = "standard";
             testcase.run_script = "standard";
@@ -325,6 +327,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
             testcase.run_script = "standard";
             testcase.is_random = submit.test_cases.empty();
 
+            size_t test_count;
             if (testcase.is_random) {
                 if (!random_checks.empty()) {  // 如果存在随机测试，则依赖随机测试点的数据
                     for (int &i : random_checks) {
@@ -333,6 +336,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
                         testcase.depends_cond = test_check::depends_condition::ACCEPTED;
                         submit.test_cases.push_back(testcase);
                     }
+                    test_count = random_checks.size();
                 } else {  // 否则只能生成 10 组随机测试数据
                     for (size_t i = 0; i < 10; ++i) {
                         testcase.testcase_id = i;
@@ -340,6 +344,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
                         testcase.depends_cond = test_check::depends_condition::ACCEPTED;
                         submit.test_cases.push_back(testcase);
                     }
+                    test_count = 10;
                 }
             } else {
                 for (int &i : standard_checks) {
@@ -348,23 +353,32 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
                     testcase.depends_cond = test_check::depends_condition::ACCEPTED;
                     submit.test_cases.push_back(testcase);
                 }
+                test_count = standard_checks.size();
             }
+            testcase.score /= test_count;
         }
     }
 }
 
 bool configuration::fetch_submission(submission &submit) {
-    string message;
-    if (programming_fetcher->fetch(message, 0)) {
-        from_json_moj(json::parse(message), *this, submit);
-        return true;
+    AmqpClient::Envelope::ptr_t envelope;
+    if (programming_fetcher->fetch(envelope, 0)) {
+        submit.tag = envelope;
+        try {
+            from_json_moj(json::parse(envelope->Message()->Body()), *this, submit);
+            return true;
+        } catch (exception &ex) {
+            programming_fetcher->ack(envelope);
+            throw ex;
+        }
     }
 
     // 单独处理选择题，评测系统 4.0 不支持选择题评测
-    while (choice_fetcher->fetch(message, 0)) {
-        choice_exam exam = json::parse(message);
+    while (choice_fetcher->fetch(envelope, 0)) {
+        choice_exam exam = json::parse(envelope->Message()->Body());
         json report_json = judge_choice_exam(exam);
         submission_reporter->report(report_json.dump());
+        choice_fetcher->ack(envelope);
     }
 
     return false;
@@ -385,7 +399,7 @@ static json get_error_report(const judge::message::task_result &result) {
  * 1. 配置中开启编译检测（编译检测满分大于0）
  * 2. 已存在提交代码的源文件
  */
-static void summarize_compile_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &compile_check_json) {
+static void summarize_compile_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &compile_check_json) {
     compile_check_report compile_check;
     compile_check.full_grade = (int)round(boost::rational_cast<double>(submit.test_cases[0].score));
     compile_check.report = task_results[0].error_log;
@@ -414,7 +428,7 @@ static void summarize_compile_check(judge_report &report, boost::rational<int> &
  * 评分规则
  * 得分=（通过的测试数）/（总测试数）× 总分。
  */
-static void summarize_random_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &random_check_json) {
+static void summarize_random_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &random_check_json) {
     random_check_report random_check;
     random_check.pass_cases = 0;
     random_check.total_cases = 0;
@@ -454,7 +468,7 @@ static void summarize_random_check(judge_report &report, boost::rational<int> &t
     total_score += score;
 }
 
-static void summarize_standard_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
+static void summarize_standard_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
     standard_check_report standard_check;
     standard_check.pass_cases = 0;
     standard_check.total_cases = 0;
@@ -505,7 +519,7 @@ static void summarize_standard_check(judge_report &report, boost::rational<int> 
  * oclint评测违规分3个等级：priority 1、priority 2、priority 3
  * 评测代码每违规一个 priority 1 扣 20%，每违规一个 priority 2 扣 10%，违规 priority 3 不扣分。扣分扣至 0 分为止.
  */
-static void summarize_static_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &static_check_json) {
+static void summarize_static_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &static_check_json) {
     static_check_report static_check;
     boost::rational<int> score, full_score;
     vector<json> oclint_violations;
@@ -551,7 +565,7 @@ static void summarize_static_check(judge_report &report, boost::rational<int> &t
  * 评分规则
  * 内存检测会多次运行提交代码，未检测出问题则通过，最后总分为通过数/总共运行次数 × 内存检测满分分数
  */
-static void summarize_memory_check(judge_report &report, boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &memory_check_json) {
+static void summarize_memory_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &memory_check_json) {
     memory_check_report memory_check;
     memory_check.pass_cases = 0;
     memory_check.total_cases = 0;
@@ -579,7 +593,10 @@ static void summarize_memory_check(judge_report &report, boost::rational<int> &t
     memory_check.grade = (int)round(boost::rational_cast<double>(score));
     memory_check.full_grade = (int)round(boost::rational_cast<double>(full_score));
     memory_check_json = memory_check;
-    report.grade += memory_check.grade;
+    total_score += score;
+}
+
+static void summarize_gtest_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &gtest_check_json) {
 }
 
 void configuration::summarize(submission &submit, const vector<judge::message::task_result> &task_results) {
@@ -592,19 +609,22 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
     boost::rational<int> total_score;
 
     json compile_check_json;
-    summarize_compile_check(report, total_score, submit, task_results, compile_check_json);
+    summarize_compile_check(total_score, submit, task_results, compile_check_json);
 
     json memory_check_json;
-    summarize_memory_check(report, total_score, submit, task_results, memory_check_json);
+    summarize_memory_check(total_score, submit, task_results, memory_check_json);
 
     json random_check_json;
-    summarize_random_check(report, total_score, submit, task_results, random_check_json);
+    summarize_random_check(total_score, submit, task_results, random_check_json);
 
     json standard_check_json;
-    summarize_standard_check(report, total_score, submit, task_results, standard_check_json);
+    summarize_standard_check(total_score, submit, task_results, standard_check_json);
 
     json static_check_json;
+    summarize_static_check(total_score, submit, task_results, static_check_json);
+
     json gtest_check_json;
+    summarize_gtest_check(total_score, submit, task_results, gtest_check_json);
 
     report.grade = (int)round(boost::rational_cast<double>(total_score));
 
@@ -617,6 +637,7 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
 
     json report_json = report;
     submission_reporter->report(report_json.dump());
+    programming_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.tag));
 
     DLOG(INFO) << "MOJ submission report: " << report_json.dump(4);
 }
