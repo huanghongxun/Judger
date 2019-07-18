@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Python 2 编译器脚本（pypy）
 
@@ -6,8 +6,16 @@ DEST="$1" ; shift
 MEMLIMIT="$1" ; shift
 MAINSOURCE="${ENTRY_POINT:-$1}"
 
-# 导入 expectsuccess 函数
-. "$JUDGE_UTILS/utils.sh"
+# 当未开启 set -e 时，通过使用该函数来保证命令运行正确
+expectsuccess ()
+{
+    set +e
+    exitcode=0
+    "$@"
+    exitcode=$?
+    [ "$exitcode" -ne 0 ] && exit $exitcode
+    set -e
+}
 
 # 检查 python 代码的语法，以便抛出 CE
 expectsuccess python2 -m py_compile "$@"

@@ -48,7 +48,7 @@
                     ]
                 },
                 "random": [
-                    "random.c"
+                    "random_gen.py"
                 ]
             }
         },
@@ -70,13 +70,8 @@
         },
         "random": {
             "c++": {
-                "language": "c",
-                "compile": [
-                    "{INPUT}",
-                    "-w",
-                    "-o",
-                    "{OUTPUT}"
-                ],
+                "language": "python3",
+                "compile": [],
                 "run_times": 2
             }
         }

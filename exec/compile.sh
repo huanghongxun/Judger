@@ -98,22 +98,27 @@ fi
 [ -x "$RUNGUARD" ] || error "runguard not found or not executable: $RUNGUARD"
 
 cd "$WORKDIR"
+RUNDIR="$WORKDIR/run-compile"
+
+[ -d "$RUNDIR/merged/judge" ] && force_umount "$RUNDIR/merged/judge" || /bin/true
+[ -d "$RUNDIR/merged/compile" ] && force_umount "$RUNDIR/merged/compile" || /bin/true
+[ -d "$RUNDIR/merged" ] && chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
+[ -d "$RUNDIR/merged" ] && force_umount "$RUNDIR/merged" || /bin/true
+
 mkdir -p "$WORKDIR/compile"
-chmod a+rwx "$WORKDIR/compile"
+$GAINROOT chmod -R 777 "$WORKDIR/compile"
+$GAINROOT chown -R "$RUNUSER" "$WORKDIR/compile"
 cd "$WORKDIR/compile"
 touch compile.out compile.meta
 
 for src in "$@"; do
     [ -r "$WORKDIR/compile/$src" ] || error "source file not found: $src"
-
-    chmod a+r "$WORKDIR/compile/$src"
 done
 
 if [ ! -z "$ENTRY_POINT" ]; then
     ENVIRONMENT_VARS="-V ENTRY_POINT=$ENTRY_POINT"
 fi
 
-RUNDIR="$WORKDIR/run-compile"
 mkdir -p "$RUNDIR"; chmod 777 "$RUNDIR"
 
 chmod -R +x "$COMPILE_SCRIPT"
@@ -126,7 +131,7 @@ $GAINROOT mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/m
 $GAINROOT mount --bind "$WORKDIR/compile" "$RUNDIR/merged/judge"
 $GAINROOT mount --bind -o ro "$COMPILE_SCRIPT" "$RUNDIR/merged/compile"
 
-chroot_start "$CHROOTDIR" merged
+chroot_start "$CHROOTDIR" "$RUNDIR/merged"
 
 # 调用 runguard 来执行编译命令
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
@@ -140,7 +145,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         $ENVIRONMENT_VARS -- \
         "/compile/run" run "$MEMLIMIT" "$@" > compile.tmp 2>&1
 
-chroot_stop "$CHROOTDIR" merged
+chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/compile 中，因此删除挂载点即可。
 force_umount "$RUNDIR/merged/judge"

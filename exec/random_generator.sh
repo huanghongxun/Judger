@@ -33,7 +33,6 @@ cleanexit ()
 {
     trap - EXIT
 
-    force_umount "$RUNDIR/merged/judge"
     force_umount "$RUNDIR/merged/run"
     force_umount "$RUNDIR/merged"
     rm -rf "$RUNDIR" || /bin/true
@@ -188,6 +187,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
         /run/run testdata.in testdata.out /judge/run 2>runguard.err
 
 chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
+force_umount "$RUNDIR/merged/judge"
 
 # 删除挂载点在 cleanexit 中完成，因为我们已经确保有用的数据在 $WORKDIR/standard 中，因此删除挂载点即可。
 

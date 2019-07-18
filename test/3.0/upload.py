@@ -12,7 +12,7 @@ def upload(file_path, path):
 def main():
     upload("./fake_file/main.cpp", "problem/1234/support/main.cpp")
     upload("./fake_file/header.hpp", "problem/1234/support/header.hpp")
-    upload("./fake_file/random.c", "problem/1234/random_source/random.c")
+    upload("./fake_file/random_gen.py", "problem/1234/random_source/random_gen.py")
     upload("./fake_file/stand_header.h", "problem/1234/support/stand_header.h")
     upload("./fake_file/stand_main.cpp", "problem/1234/support/stand_main.cpp")
     upload("./fake_file/stand_input.in", "problem/1234/standard_input/input0")

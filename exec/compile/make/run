@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Makefile 编译脚本
 # 这允许出题人通过 Makefile 来自定义任何情况下的编译命令
