@@ -1,10 +1,4 @@
-#include "config.hpp"
-#include <boost/assign.hpp>
-#include <fstream>
-#include "common/messages.hpp"
-#include "common/stl_utils.hpp"
-#include "common/utils.hpp"
-#include "server/moj/moj.hpp"
+#include "server/moj/config.hpp"
 
 namespace judge::server::moj {
 using namespace std;
@@ -14,15 +8,6 @@ void from_json(const json &j, system_config &config) {
     j.at("maxReportIOSize").get_to(config.max_report_io_size);
     j.at("timeLimit").get_to(config.time_limit);
     j.at("fileApi").get_to(config.file_api);
-}
-
-void from_json(const json &j, amqp &mq) {
-    j.at("port").get_to(mq.port);
-    j.at("exchange").get_to(mq.exchange);
-    j.at("hostname").get_to(mq.hostname);
-    j.at("queue").get_to(mq.queue);
-    if (j.count("routing_key"))
-        j.at("routing_key").get_to(mq.routing_key);
 }
 
 void from_json(const json &j, time_limit_config &limit) {

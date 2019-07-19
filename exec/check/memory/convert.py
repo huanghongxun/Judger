@@ -25,10 +25,16 @@ try:
     if not isinstance(result, list):
         result = [result]
     for err in result:
-        for item in err["stack"]["frame"]:
-            item.pop("obj", None)
-            item.pop("dir", None)
-    json.dump(result_file, indent=4)
+        if isinstance(err["stack"], list):
+            for stack in err["stack"]:
+                for item in stack["frame"]:
+                    item.pop("obj", None)
+                    item.pop("dir", None)
+        else:
+            for item in err["stack"]["frame"]:
+                item.pop("obj", None)
+                item.pop("dir", None)
+    result_file.write(json.dumps(result, indent=4))
     sys.exit(2)
 except KeyError as e:
     if e.args[0] == 'error':

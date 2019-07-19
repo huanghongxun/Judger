@@ -6,6 +6,7 @@
 #include <tuple>
 #include "common/io_utils.hpp"
 #include "common/status.hpp"
+#include "server/common/config.hpp"
 using namespace boost::assign;
 
 namespace judge::server::sicily {
@@ -57,12 +58,8 @@ void configuration::init(const filesystem::path &config_path) {
     string testdata = config.at("data-dir").get<string>();
     this->testdata = filesystem::path(testdata);
     // 设置数据库连接信息
-    string host = config.at("host").get<string>();
-    string user = config.at("user").get<string>();
-    string password = config.at("password").get<string>();
-    string database = config.at("database").get<string>();
-
-    db.connect(host.c_str(), user.c_str(), password.c_str(), database.c_str());
+    database dbcfg = config;
+    db.connect(dbcfg.host.c_str(), dbcfg.user.c_str(), dbcfg.password.c_str(), dbcfg.database.c_str());
 }
 
 void configuration::summarize_invalid(submission &) {

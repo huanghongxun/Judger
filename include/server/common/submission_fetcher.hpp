@@ -1,9 +1,9 @@
 #pragma once
 
 #include "SimpleAmqpClient/SimpleAmqpClient.h"
-#include "server/moj/config.hpp"
+#include "server/common/config.hpp"
 
-namespace judge::server::moj {
+namespace judge::server {
 
 struct submission_fetcher {
     submission_fetcher(amqp &amqp);
@@ -21,7 +21,7 @@ struct judge_result_reporter {
 
 private:
     AmqpClient::Channel::ptr_t channel;
-    judge::server::moj::amqp queue;
+    judge::server::amqp queue;
 };
 
-}  // namespace judge::server::moj
+}  // namespace judge::server

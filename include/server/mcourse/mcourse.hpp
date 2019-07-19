@@ -4,11 +4,12 @@
 #include <nlohmann/json.hpp>
 #include "server/common/submission_fetcher.hpp"
 #include "server/judge_server.hpp"
-#include "server/moj/config.hpp"
+#include "sql/dbng.hpp"
+#include "sql/mysql.hpp"
 
-namespace judge::server::moj {
+namespace judge::server::mcourse {
 using namespace std;
-using namespace nlohmann;
+using namespace ormpp;
 
 struct configuration : public judge_server {
     local_executable_manager exec_mgr;
@@ -16,35 +17,25 @@ struct configuration : public judge_server {
     /**
      * @brief 一些全局的配置
      */
-    system_config system;
+    dbng<mysql> matrix_db;
 
     /**
-     * @brief 返回评测结果的消息队列
+     * @brief 监控系统数据库
      */
-    amqp submission_report;
+    dbng<mysql> monitor_db;
 
-    unique_ptr<judge_result_reporter> submission_reporter;
+    string file_api;
+    
+    amqp sub_queue;
 
-    /**
-     * @brief 拉取选择题评测的消息队列
-     */
-    amqp choice_submission;
-
-    unique_ptr<submission_fetcher> choice_fetcher;
-
-    /**
-     * @brief 拉取编程题评测的消息队列
-     */
-    amqp programming_submission;
-
-    unique_ptr<submission_fetcher> programming_fetcher;
+    unique_ptr<submission_fetcher> sub_fetcher;
 
     configuration();
 
     string category() const override;
 
     /**
-     * @brief 初始化消息队列
+     * @brief 初始化消息队列和数据库连接
      */
     void init(const filesystem::path &config_path) override;
 
@@ -70,7 +61,7 @@ struct configuration : public judge_server {
 
     /**
      * @brief 处理不合法的提交
-     * 对于 sicily，不可能存在不合法的提交，如果存在则报错并终止程序
+     * 对于 mcourse，提交格式都是生成的，不可能存在不合法的提交，如果存在则报错并终止程序
      * @param submit 不合法的提交
      */
     void summarize_invalid(submission &submit) override;

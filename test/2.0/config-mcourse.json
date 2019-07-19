@@ -1,0 +1,22 @@
+{
+    "matrix_db": {
+        "host": "localhost",
+        "user": "test",
+        "password": "test",
+        "database": "matrix"
+    },
+    "monitor_db": {
+        "host": "localhost",
+        "user": "test",
+        "password": "test",
+        "database": "matrix_monitor"
+    },
+    "submission_queue": {
+        "port": 25565,
+        "exchange": "",
+        "hostname": "localhost",
+        "queue": "matrix",
+        "routing_key": "matrix"
+    },
+    "file_api": "http://localhost:8999"
+}

@@ -1,6 +1,6 @@
-#include "server/moj/submission_fetcher.hpp"
+#include "server/common/submission_fetcher.hpp"
 
-namespace judge::server::moj {
+namespace judge::server {
 
 submission_fetcher::submission_fetcher(amqp &amqp) {
     channel = AmqpClient::Channel::Create(amqp.hostname, amqp.port);
@@ -16,7 +16,7 @@ void submission_fetcher::ack(const AmqpClient::Envelope::ptr_t &envelope) {
     channel->BasicAck(envelope);
 }
 
-judge_result_reporter::judge_result_reporter(judge::server::moj::amqp &queue) : queue(queue) {
+judge_result_reporter::judge_result_reporter(amqp &queue) : queue(queue) {
     channel = AmqpClient::Channel::Create(queue.hostname, queue.port);
 }
 
@@ -25,4 +25,4 @@ void judge_result_reporter::report(const string &message) {
     channel->BasicPublish(queue.exchange, queue.routing_key, msg, true);
 }
 
-}  // namespace judge::server::moj
+}  // namespace judge::server

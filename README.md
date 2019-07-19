@@ -182,8 +182,27 @@ sudo bash $EXEC_DIR/create_cgroups.sh domjudge-run
 ```
 表示我们使用 domjudge-run 这个账号来运行用户程序
 
-3. 启动评测系统，评测系统允许通过命令行参数来对核心使用进行控制：
-可以使用 systemd 部署。
+4. 安装评测系统所需依赖
+请确保你的操作系统至少是 Ubuntu 18.04！！！！！否则配置依赖会很麻烦哦。
+
+然后安装评测系统所需的依赖库，比如 cgroup 用来控制 CPU 和 内存使用；libcurl 用来从远程服务器下载文件；libboost 是 boost 库，注意 boost 的版本至少为 1.65；python3 是评测脚本依赖环境，允许评测脚本使用 python3 编写；python3-pip 方便评测脚本按需下载依赖代码；libmysqlclient-dev 用来连接 MySQL 数据库（Sicily 和 2.0 接口需要数据库访问支持）。其中 gcc 和 g++ 版本至少是 8，并不一定必须安装 8.
+```bash
+sudo apt update
+sudo apt install libcgroup-dev libcurl4-openssl-dev curl make xz-utils python3 python3-pip libboost-all-dev cmake libgtest-dev gcc-8 g++-8 libmysqlclient-dev
+```
+
+5. 构建评测系统
+一般情况下，依赖安装完成之后都可以正常通过编译，但请确保 g++ 版本是 8 以上，因为评测系统使用了 `std::filesystem`，这个 g++-7 尚未提供稳定版本。以下代码中的 `gcc-8`、`g++-8` 可以替换成更高版本的 `gcc` 和 `g++`。
+```bash
+cd Judger # 确保当前目录是源代码的根文件夹
+mkdir build
+mkdir runguard/build
+cd build && CC=gcc-8 CXX=g++-8 cmake -DBUILD_ENTRY=ON .. && make
+cd ../runguard/build && CC=gcc-8 CXX=g++-8 cmake -DBUILD_ENTRY=ON .. && make
+```
+
+6. 启动评测系统，评测系统允许通过命令行参数来对核心使用进行控制：
+请务必使用 systemd 部署。
 ```bash
 sudo ./judge-system --enable-sicily=/etc/judge-system/sicily.conf --enable-3=/etc/judge-system/moj.conf --enable-2=/etc/judge-system/mcourse.conf --enable-2=/etc/judge-system/mexam.conf --client=1 --exec-dir=/opt/judge-system/exec --cache-dir=/tmp/judge-system --run-dir=/tmp/judge-system --data-dir=/ramdisk/rundir --chroot-dir=/chroot --log-dir=/var/log/judge-system --cache-random-data=100 --run-user=domjudge-run --run-group=domjudge-run
 ```
@@ -194,6 +213,15 @@ sudo ./judge-system --enable-sicily=/etc/judge-system/sicily.conf --enable-3=/et
 评测系统必要时也可以运行在配置好的 chroot 环境下以避免 boost 的编译。
 
 ## 调试
+
+### 配置调试环境
+在 `test/3.0` 文件夹中有评测 3.0 API 的测试环境，通过 `prepare.sh` 脚本可以配置测试环境，通过
+```bash
+python test.py request.json ProgrammingSubmission
+```
+命令可以创建 RabbitMQ 消息队列并塞入 `request.json` 文件，这个文件描述了一个测试用的提交信息。
+
+### vscode 调试方法
 评测系统需要 root 权限才能运行（因为 chroot），因此调试的时候必须通过 sudo gdb 来完成，我们需要创建一个 `gdb-sudo` 脚本来帮助我们获得 root 权限：
 ```bash
 #!/bin/sh

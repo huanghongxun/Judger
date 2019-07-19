@@ -9,6 +9,7 @@
 #include "common/utils.hpp"
 #include "config.hpp"
 #include "server/moj/choice.hpp"
+#include "server/moj/config.hpp"
 #include "server/moj/feedback.hpp"
 
 namespace judge::server::moj {

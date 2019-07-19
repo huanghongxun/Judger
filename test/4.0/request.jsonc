@@ -12,7 +12,11 @@
             "is_random": false, // 编译测试不使用随机测试数据
             "testcase_id": -1, // 编译测试不使用标准测试数据
             "depends_on": -1, // 没有依赖的测试点
-            "depends_cond": "ACCEPTED"
+            "depends_cond": "ACCEPTED",
+            "memory_limit": 262144, // 256M
+            "time_limit": 10.0, // 编译限时 10s
+            "file_limit": -1, // unlimited
+            "proc_limit": -1, // unlimited
         },
         {
             "check_script": "standard", // 标准测试模式
@@ -22,7 +26,11 @@
             "is_random": false, // 标准测试
             "testcase_id": 0, // 使用第 0 号标准测试数据
             "depends_on": 0, // 依赖编译测试
-            "depends_cond": "ACCEPTED" // 仅在编译测试完成之后才能评测该数据点
+            "depends_cond": "ACCEPTED", // 仅在编译测试完成之后才能评测该数据点
+            "memory_limit": 262144, // 256M
+            "time_limit": 1.0, // 1s
+            "file_limit": 524288, // 512M
+            "proc_limit": -1, // unlimited
         },
         {
             "check_script": "standard", // 标准测试模式
@@ -32,7 +40,11 @@
             "is_random": true, // 随机测试
             "testcase_id": -1, // 随机测试不使用标准测试数据
             "depends_on": 0, // 依赖编译测试
-            "depends_cond": "ACCEPTED" // 仅在编译测试完成之后才能评测该数据点
+            "depends_cond": "ACCEPTED", // 仅在编译测试完成之后才能评测该数据点
+            "memory_limit": 262144, // 256M
+            "time_limit": 1.0, // 1s
+            "file_limit": 524288, // 512M
+            "proc_limit": -1, // unlimited
         },
         {
             "check_script": "memory", // valgrind 内存测试
@@ -42,7 +54,11 @@
             "is_random": false,
             "testcase_id": -1, // 依赖测试点的 testcase_id 不需要填写
             "depends_on": 1, // 依赖第 1 号测试点（这里是标准测试，测试数据将使用 0 号标准测试数据）
-            "depends_cond": "ACCEPTED"
+            "depends_cond": "ACCEPTED",
+            "memory_limit": 524288, // 512M
+            "time_limit": 20.0, // 20s
+            "file_limit": 524288, // 512M
+            "proc_limit": -1, // unlimited
         },
         {
             "check_script": "memory", // valgrind 内存测试
@@ -52,7 +68,11 @@
             "is_random": true,
             "testcase_id": -1,
             "depends_on": 2, // 依赖第 2 号测试点（这里是随机测试，测试数据将使用随机测试相应的测试数据）
-            "depends_cond": "ACCEPTED"
+            "depends_cond": "ACCEPTED",
+            "memory_limit": 524288, // 512M
+            "time_limit": 20.0, // 20s
+            "file_limit": 524288, // 512M
+            "proc_limit": -1, // unlimited
         },
         {
             "check_script": "static", // oclint 静态测试
@@ -62,7 +82,11 @@
             "is_random": false,
             "testcase_id": -1, // 静态测试不需要测试数据
             "depends_on": -1, // 静态测试不需要依赖编译测试
-            "depends_cond": "ACCEPTED"
+            "depends_cond": "ACCEPTED",
+            "memory_limit": 262144, // 256M
+            "time_limit": 10.0, // 10s
+            "file_limit": 524288, // 512M
+            "proc_limit": -1, // unlimited
         }
     ],
     "test_data": [
@@ -99,10 +123,6 @@
             ]
         }
     ],
-    "memory_limit": 262144, // 256M
-    "time_limit": 1.0, // 1s
-    "file_limit": 524288, // 512M
-    "proc_limit": -1, // unlimited
     "submission": {
         "type": "source_code",
         "language": "cpp",
@@ -129,12 +149,12 @@
     },
     "standard": {
         "type": "source_code",
-        "language": "python2",
+        "language": "c",
         "source_files": [
             {
                 "type": "remote",
-                "name": "main.py",
-                "url": "http://filesystem/problem/1234/support/main.py"
+                "name": "main.c",
+                "url": "http://filesystem/problem/1234/support/main.c"
             }
         ]
     },
@@ -150,13 +170,14 @@
         ]
     },
     "compare": {
-        "type": "executable",
-        "id": "diff-all",
-        "asset": {
-            "type": "remote",
-            "name": "diff-all.zip", // 这个名字无所谓
-            "url": "http://filesystem/executable/diff-all.zip"
-        },
-        "md5sum": "1234567890"
+        "type": "source_code",
+        "language": "python2",
+        "source_files": [
+            {
+                "type": "remote",
+                "name": "compare.py",
+                "url": "http://filesystem/problem/1234/compare/main.py"
+            }
+        ]
     }
 }

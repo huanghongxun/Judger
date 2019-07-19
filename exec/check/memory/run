@@ -68,7 +68,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
     --out-meta program.meta -- \
     valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-fd=1 -- \
     /judge/run 2>>system.out
-read -n1 -r -p "Press any key to continue..." key
+
 chroot_stop "$CHROOTDIR" merged
 
 force_umount merged/judge
