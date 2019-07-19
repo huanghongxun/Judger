@@ -56,14 +56,15 @@ read_metadata()
         error "'$metafile' is not readable"
     fi
     
-    timeused=$(grep '^time-used: '    "$metafile" | sed 's/time-used: //'   )
-    cputime=$( grep '^cpu-time: '     "$metafile" | sed 's/cpu-time: //'    )
-    walltime=$(grep '^wall-time: '    "$metafile" | sed 's/wall-time: //'   )
-    progexit=$(grep '^exitcode: '     "$metafile" | sed 's/exitcode: //'    )
-    stdout=$(  grep '^stdout-bytes: ' "$metafile" | sed 's/stdout-bytes: //')
-    stderr=$(  grep '^stderr-bytes: ' "$metafile" | sed 's/stderr-bytes: //')
-    memused=$( grep '^memory-bytes: ' "$metafile" | sed 's/memory-bytes: //')
-    signal=$(  grep '^signal: '       "$metafile" | sed 's/signal: //'      )
+    timeused=$(grep '^time-used: '      "$metafile" | sed 's/time-used: //'      )
+    cputime=$( grep '^cpu-time: '       "$metafile" | sed 's/cpu-time: //'       )
+    walltime=$(grep '^wall-time: '      "$metafile" | sed 's/wall-time: //'      )
+    progexit=$(grep '^exitcode: '       "$metafile" | sed 's/exitcode: //'       )
+    stdout=$(  grep '^stdout-bytes: '   "$metafile" | sed 's/stdout-bytes: //'   )
+    stderr=$(  grep '^stderr-bytes: '   "$metafile" | sed 's/stderr-bytes: //'   )
+    memused=$( grep '^memory-bytes: '   "$metafile" | sed 's/memory-bytes: //'   )
+    signal=$(  grep '^signal: '         "$metafile" | sed 's/signal: //'         )
+    interr=$(  grep '^internal-error: ' "$metafile" | sed 's/internal-error: //' )
     resource_usage="\
     runtime: ${cputime}s cpu, ${walltime}s wall
     memory used: ${memused} bytes"
@@ -97,7 +98,7 @@ fi
 
 MEMLIMIT_OPT=""
 if [ -n "$MEMLIMIT" ]; then
-    MEMLIMIT_OPT="--memory-limit $MEMLIMIT"
+    MEMLIMIT_OPT="--memory-limit $MEMLIMIT -VMEMLIMIT=$MEMLIMIT"
 fi
 
 FILELIMIT_OPT=""
@@ -113,6 +114,7 @@ fi
 LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1).log"
 LOGLEVEL=$LOG_DEBUG
 PROGNAME="$(basename "$0")"
+PROGDIR="$(dirname "$0")"
 
 if [ "$DEBUG" ]; then
     export VERBOSE=$LOG_DEBUG

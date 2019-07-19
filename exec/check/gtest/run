@@ -96,14 +96,14 @@ if grep -E '^output-truncated: ([a-z]+,)*stdout(,[a-z]+)*' program.meta >/dev/nu
     cleanexit ${E_OUTPUT_LIMIT:-1}
 fi
 
-runcheck python3 "$PROGNAME/convert.py" gtest.xml feedback/report.txt 2>feedback/judgemessage.txt
+runcheck python3 "$PROGDIR/convert.py" gtest.xml feedback/report.txt >>system.out 2>&1
 case $exitcode in
     0)
         echo "Accepted" >> system.out
         echo "$resource_usage" >> system.out
         cleanexit ${E_ACCEPTED:-1}
         ;;
-    1)
+    2)
         echo "Wrong Answer" >> system.out
         echo "$resource_usage" >> system.out
         cleanexit ${E_WRONG_ANSWER:-1}

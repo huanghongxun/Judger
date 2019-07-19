@@ -6,7 +6,7 @@ using namespace std;
 int MAX_RANDOM_DATA_NUM = 100;
 int SCRIPT_MEM_LIMIT = 1 << 18;   // 256M
 int SCRIPT_TIME_LIMIT = 10;       // 10s
-int SCRIPT_FILE_LIMIT = 1 << 16;  // 32M
+int SCRIPT_FILE_LIMIT = 1 << 19;  // 512M
 
 filesystem::path EXEC_DIR;
 filesystem::path CACHE_DIR;

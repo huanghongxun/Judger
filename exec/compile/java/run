@@ -4,12 +4,7 @@
 # 生成一个可执行的脚本来使得运行 java 程序和本地程序一致
 
 DEST="$1"; shift
-MEMLIMIT="$1"; shift
 MAINSOURCE="$1"
-
-MEMSTACK=65536
-MEMJVM=65536
-MEMRESERVED=$((MEMSTACK + MEMJVM))
 
 if [ -z "$ENTRY_POINT" ]; then
     MAINCLASS="Main"
@@ -26,8 +21,6 @@ javap "$MAINCLASS" > /dev/null
 EXITCODE=$?
 [ "$EXITCODE" -ne 0 ] && exit $EXITCODE
 
-MEMLIMITJAVA = $((MEMLIMIT - MEMRESERVED))
-
 cat > "$DEST" <<EOF
 #!/bin/sh
 # 运行路径不一定是编译目录，因此我们需要切换到编译目录下运行，否则会找不到文件
@@ -35,7 +28,16 @@ if [ "\${0%/*}" != "\$0" ]; then
 	cd "\${0%/*}"
 fi
 
-exec java -DONLINE_JUDGE -Dfile.encoding=UTF-8 -XX:+UseSerialGC -Xss${MEMSTACK}k -Xms${MEMLIMITJAVA}k -Xmx${MEMLIMITJAVA}k '$MAINCLASS' "\$@"
+MEMSTACK=65536
+MEMJVM=65536
+MEMRESERVED=$((MEMSTACK + MEMJVM))
+MEMLIMITJAVA = $((MEMLIMIT - MEMRESERVED))
+
+if [ -z "$MEMLIMIT" ]; then
+    exec java -DONLINE_JUDGE -Dfile.encoding=UTF-8 -XX:+UseSerialGC -Xss\${MEMSTACK}k -Xms\${MEMLIMITJAVA}k '$MAINCLASS' "\$@"
+else
+    exec java -DONLINE_JUDGE -Dfile.encoding=UTF-8 -XX:+UseSerialGC -Xss\${MEMSTACK}k -Xms\${MEMLIMITJAVA}k -Xmx\${MEMLIMITJAVA}k '$MAINCLASS' "\$@"
+fi
 EOF
 
 chmod a+x "$DEST"

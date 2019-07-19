@@ -3,7 +3,6 @@
 # Python 2 编译器脚本（pypy）
 
 DEST="$1" ; shift
-MEMLIMIT="$1" ; shift
 MAINSOURCE="${ENTRY_POINT:-$1}"
 
 # 当未开启 set -e 时，通过使用该函数来保证命令运行正确

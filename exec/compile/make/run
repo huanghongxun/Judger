@@ -10,7 +10,6 @@
 # 唯一可执行文件名必须为 $DEST
 
 export DEST="$1"; shift
-MEMLIMIT="$1"; shift
 
 # 编译脚本运行在 /judge/compile 下，详见 compile.sh
 make

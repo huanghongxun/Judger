@@ -93,7 +93,7 @@ static message::task_result judge(message::client_task &client_task, server::sub
                 datadir = random_data_dir / to_string(number);
                 task.testcase_id = number;  // 标记当前测试点使用了哪个随机测试
                 // random_generator.sh <random_gen> <std_program> <timelimit> <chrootdir> <datadir> <run>
-                int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), submit.time_limit, CHROOT_DIR, datadir, run_script->get_run_path());
+                int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), task.time_limit, CHROOT_DIR, datadir, run_script->get_run_path());
                 switch (ret) {
                     case E_SUCCESS: {
                         // 随机数据已经准备好
@@ -152,15 +152,15 @@ static message::task_result judge(message::client_task &client_task, server::sub
     }
 
     map<string, string> env;
-    if (submit.file_limit > 0) env["FILELIMIT"] = to_string(submit.file_limit);
-    if (submit.memory_limit > 0) env["MEMLIMIT"] = to_string(submit.memory_limit);
-    if (submit.proc_limit > 0) env["PROCLIMIT"] = to_string(submit.proc_limit);
+    if (task.file_limit > 0) env["FILELIMIT"] = to_string(task.file_limit);
+    if (task.memory_limit > 0) env["MEMLIMIT"] = to_string(task.memory_limit);
+    if (task.proc_limit > 0) env["PROCLIMIT"] = to_string(task.proc_limit);
 
     // 调用 check script 来执行真正的评测，这里会调用 run script 运行选手程序，调用 compare script 运行比较器，并返回评测结果
     int ret = call_process_env(env,
                                check_script->get_run_path() / "run",
                                "-n", execcpuset,
-                               datadir, submit.time_limit, CHROOT_DIR, workdir,
+                               datadir, task.time_limit, CHROOT_DIR, workdir,
                                uuid,
                                run_script->get_run_path(),
                                compare_script->get_run_path(cachedir / "compare"),
@@ -195,7 +195,7 @@ static message::task_result judge(message::client_task &client_task, server::sub
             break;
         case E_COMPARE_ERROR:
             result.status = status::COMPARE_ERROR;
-            result.error_log = read_file_content(rundir / "feedback" / "judgemessage.txt", "No judge message");
+            result.error_log = read_file_content(rundir / "system.out", "No detailed information");
             break;
         case E_RUNTIME_ERROR:
             result.status = status::RUNTIME_ERROR;

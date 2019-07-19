@@ -7,8 +7,8 @@ import sys
 转换 Google Test 输出的脚本，返回值：
 
 0: 内存测试通过，将返回 Accepted
-1: 内存测试未通过，返回 Wrong Answer
-2: 内部错误，返回 Compare Error
+1: 内部错误，返回 Compare Error
+2: 内存测试未通过，返回 Wrong Answer
 '''
 
 if len(sys.argv) != 3:

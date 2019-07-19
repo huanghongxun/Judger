@@ -3,7 +3,6 @@
 # Bash 脚本的编译脚本
 
 DEST="$1" ; shift
-MEMLIMIT="$1" ; shift
 MAINSOURCE="${ENTRY_POINT:-$1}"
 
 RUNOPTIONS=""

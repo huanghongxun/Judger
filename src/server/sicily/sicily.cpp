@@ -1,11 +1,12 @@
 #include "server/sicily/sicily.hpp"
 #include <fmt/printf.h>
 #include <glog/logging.h>
-#include <boost/assign/list_of.hpp>
+#include <boost/assign.hpp>
 #include <fstream>
 #include <tuple>
 #include "common/io_utils.hpp"
 #include "common/status.hpp"
+using namespace boost::assign;
 
 namespace judge::server::sicily {
 using namespace std;
@@ -100,6 +101,7 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
     unique_ptr<source_code> prog = make_unique<source_code>(sicily.exec_mgr);
     prog->language = submit.language;
     prog->source_files.push_back(make_unique<text_asset>("source.cpp", sourcecode));
+    prog->compile_command += "-fopenmp", "-march=native", "-O2";
 
     {
         // 编译任务
@@ -111,32 +113,6 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
         kase.testcase_id = 0;
         kase.depends_on = -1;  // 编译任务没有依赖，因此可以先执行
         submit.test_cases.push_back(kase);
-    }
-
-    {
-        // test_data
-        filesystem::path case_dir = sicily.testdata / submit.prob_id;
-        ifstream fin(case_dir / ".DIR");
-        string stdin, stdout;
-        for (unsigned i = 0; fin >> stdin >> stdout; ++i) {
-            // 注册标准测试数据
-            test_case_data data;
-            data.inputs.push_back(make_unique<local_asset>("testdata.in", case_dir / stdin));
-            data.outputs.push_back(make_unique<local_asset>("testdata.out", case_dir / stdout));
-            submit.test_data.push_back(move(data));
-
-            // 添加评测任务，sicily 只有标准测试，因此为每个测试数据添加一个标准测试数据组
-            test_check kase;
-            kase.check_script = "standard";
-            kase.run_script = "standard";
-            kase.is_random = false;
-            kase.score = 0;
-            kase.check_type = 1;
-            kase.testcase_id = i;
-            kase.depends_on = i;  // 当前的 kase 是第 i + 1 组测试点，依赖第 i 组测试点，最开始的测试数据将依赖编译
-            kase.depends_cond = test_check::depends_condition::ACCEPTED;
-            submit.test_cases.push_back(kase);
-        }
     }
 
     // Sicily 评测需要处理比赛信息
@@ -164,15 +140,17 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
         submit.prob_id);
     if (!probrows.empty()) {
         int spj, has_framework;
-        tie(submit.time_limit, submit.memory_limit, spj, has_framework) = probrows[0];
-        submit.time_limit /= 1000;
-        submit.proc_limit = -1;
-        submit.file_limit = 32768;  // 32M
+        double time_limit;
+        int memory_limit;
+        tie(time_limit, memory_limit, spj, has_framework) = probrows[0];
+        time_limit /= 1000;
+        int proc_limit = -1;
+        int file_limit = 32768;  // 32M
 
         if (spj) {
             // 由于 Sicily 的 special judge 的比较格式和本评测的不一致，因此我们需要借助 bash 脚本进行转换
             unique_ptr<source_code> spj = make_unique<source_code>(sicily.exec_mgr);
-            spj->language = "bash"; // bash 语言不需要执行编译步骤，实际上 bash 语言允许任何其他编译语言的执行
+            spj->language = "bash";  // bash 语言不需要执行编译步骤，实际上 bash 语言允许任何其他编译语言的执行
             spj->source_files.push_back(make_unique<local_asset>("run", EXEC_DIR / "sicily_spjudge.sh"));
             spj->assist_files.push_back(make_unique<local_asset>("spjudge", get_data_path(sicily.testdata, submit.prob_id, "spjudge")));
             submit.compare = move(spj);
@@ -191,6 +169,36 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
             prog->source_files.push_back(
                 make_unique<local_asset>("framework.cpp", get_data_path(sicily.testdata, submit.prob_id, "framework.cpp")));
         }
+
+        {
+            // test_data
+            filesystem::path case_dir = sicily.testdata / submit.prob_id;
+            ifstream fin(case_dir / ".DIR");
+            string stdin, stdout;
+            for (unsigned i = 0; fin >> stdin >> stdout; ++i) {
+                // 注册标准测试数据
+                test_case_data data;
+                data.inputs.push_back(make_unique<local_asset>("testdata.in", case_dir / stdin));
+                data.outputs.push_back(make_unique<local_asset>("testdata.out", case_dir / stdout));
+                submit.test_data.push_back(move(data));
+
+                // 添加评测任务，sicily 只有标准测试，因此为每个测试数据添加一个标准测试数据组
+                test_check kase;
+                kase.check_script = "standard";
+                kase.run_script = "standard";
+                kase.is_random = false;
+                kase.score = 0;
+                kase.check_type = 1;
+                kase.testcase_id = i;
+                kase.depends_on = i;  // 当前的 kase 是第 i + 1 组测试点，依赖第 i 组测试点，最开始的测试数据将依赖编译
+                kase.depends_cond = test_check::depends_condition::ACCEPTED;
+                kase.time_limit = time_limit;
+                kase.memory_limit = memory_limit;
+                kase.file_limit = file_limit;
+                kase.proc_limit = proc_limit;
+                submit.test_cases.push_back(kase);
+            }
+        }
     }
 
     submit.submission = move(prog);
@@ -204,7 +212,7 @@ static void set_compilelog(configuration &sicily, const string &log, const submi
         log, submit.sub_id);
 }
 
-static void update_user(configuration &sicily, bool solved, const submission &submit) {
+static void update_user(configuration &sicily, bool compilation_error, bool solved, const submission &submit) {
     auto rows = sicily.db.query<std::tuple<>>(
         "SELECT sid FROM status WHERE pid=? AND uid=? AND status.status = 'Accepted' and sid != ?",
         submit.prob_id, submit.user_id, submit.sub_id);
@@ -238,8 +246,8 @@ static void update_user(configuration &sicily, bool solved, const submission &su
             LOG(INFO) << "No submissions";
 
             sicily.db.query<std::tuple<>>(
-                "INSERT INTO ranklist (uid, cid, pid, accepted, submissions, ac_time) VALUES (?, ?, ?, ?, 1, ?)",
-                submit.user_id, submit.contest_id, submit.contest_prob_id, solved, (submit.submit_time - submit.contest_start_time) / 60 + 1);
+                "INSERT INTO ranklist (uid, cid, pid, accepted, submissions, ac_time) VALUES (?, ?, ?, ?, ?, ?)",
+                submit.user_id, submit.contest_id, submit.contest_prob_id, solved, compilation_error ? 0 : 1, (submit.submit_time - submit.contest_start_time) / 60 + 1);
         } else {
             int accepted, ac_time, submissions;
             tie(accepted, ac_time, submissions) = rows[0];
@@ -248,7 +256,7 @@ static void update_user(configuration &sicily, bool solved, const submission &su
 
                 sicily.db.query<std::tuple<>>(
                     "UPDATE ranklist SET accepted=?,ac_time=?,submissions=? WHERE uid=? AND cid=? AND pid=?",
-                    solved, (submit.submit_time - submit.contest_start_time) / 60 + 1, submissions + 1, submit.user_id, submit.contest_id, submit.contest_prob_id);
+                    solved, (submit.submit_time - submit.contest_start_time) / 60 + 1, submissions + (compilation_error ? 0 : 1), submit.user_id, submit.contest_id, submit.contest_prob_id);
             } else if (accepted == 1 && solved && ac_time > (submit.submit_time - submit.contest_start_time) / 60 + 1) {  // rejudge
                 LOG(INFO) << "Rejudge";
 
@@ -257,8 +265,8 @@ static void update_user(configuration &sicily, bool solved, const submission &su
                     submit.user_id, submit.contest_id, submit.contest_prob_id, (submit.submit_time - submit.contest_start_time) / 60 + 1);
 
                 sicily.db.query<std::tuple<>>(
-                    "INSERT INTO ranklist (uid, cid, pid, accepted, submissions, ac_time) VALUES (?, ?, ?, ?, 1, ?)",
-                    submit.user_id, submit.contest_id, submit.contest_prob_id, solved, (submit.submit_time - submit.contest_start_time) / 60 + 1);
+                    "INSERT INTO ranklist (uid, cid, pid, accepted, submissions, ac_time) VALUES (?, ?, ?, ?, ?, ?)",
+                    submit.user_id, submit.contest_id, submit.contest_prob_id, solved, compilation_error ? 0 : 1, (submit.submit_time - submit.contest_start_time) / 60 + 1);
 
                 sicily.db.query<std::tuple<>>(
                     "UPDATE problems SET accepted=accepted+1 WHERE cid=? AND pid=?", submit.contest_id, submit.contest_prob_id);
@@ -287,7 +295,7 @@ static void set_status(configuration &sicily, const judge::message::task_result 
             status_string.at(task_result.status),
             is_multiple_cases ? current_case : -1,
             task_result.run_time,
-            task_result.memory_used >> 10, // Sicily 的内存占用单位是 KB
+            task_result.memory_used >> 10,  // Sicily 的内存占用单位是 KB
             submit.sub_id);
     } else {
         sicily.db.query<std::tuple<>>(
@@ -316,7 +324,7 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
     if (task_results[0].status != judge::status::ACCEPTED) {
         // 先检查是否存在编译错误的情况
         set_status(*this, task_results[0], 0, submit);
-        update_user(*this, false, submit);
+        update_user(*this, /* compilation_error */ true, /* solved */ false, submit);
     } else {
         // 对于选手程序运行结果
         judge::message::task_result final_result;
@@ -330,14 +338,14 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
             // 我们确保了 test_cases 的依赖项一定在前面，因此第一个非 AC 的不可能会存在不满足依赖的情况
             if (task_results[i].status != judge::status::ACCEPTED) {
                 set_status(*this, task_results[i], i - 1, submit);
-                update_user(*this, false, submit);
+                update_user(*this, /* compilation_error */ false, /* solved */ false, submit);
                 return;
             }
         }
 
         // 可能存在没有测试数据的情况，这种情况我们直接返回 Accepted
         set_status(*this, final_result, submit.test_data.size(), submit);
-        update_user(*this, true, submit);
+        update_user(*this, /* compilation_error */ false, /* solved */ true, submit);
     }
 }
 

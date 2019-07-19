@@ -2,23 +2,21 @@
 #
 # 编译脚本
 #
-# 用法：$0 <compile_script> <chrootdir> <workdir> <memlimit> <source file...>
+# 用法：$0 <compile_script> <chrootdir> <workdir> <source file...>
 #
 # <compile_script>  编译的脚本
 # <chrootdir>       chroot directory
 # <workdir>         本次评测的工作文件夹，比如 /tmp/judger0/judging_5322222/
 #                   编译生成的可执行文件在该文件夹中，编译器输出也在该文件夹中
-# <memlimit>        运行时可用的最大内存限制 (KB)
 # <source file...>  需要参与编译的源文件
 #
 # 评测系统通过调用不同的编译脚本来实现多语言支持。
 #
 # 编译脚本的调用参数格式为：
 #
-#   <compile_script> <dest> <memlimit> <source file...>
+#   <compile_script> <dest> <source file...>
 #
 #   <dest>     可执行文件的文件名，如 main, main.jar
-#   <memlimit> 运行时可用的最大内存限制 (KB)
 #   <source file...>
 #
 # 环境变量：
@@ -88,7 +86,6 @@ GAINROOT="sudo -n"
 COMPILE_SCRIPT="$1"; shift
 CHROOTDIR="$1"; shift
 WORKDIR="$1"; shift
-MEMLIMIT="$1"; shift
 
 if [ ! -d "$WORKDIR" ] || [ ! -w "$WORKDIR" ] || [ ! -x "$WORKDIR" ]; then
     error "Work directory is not found or not writable: $WORKDIR"
@@ -143,7 +140,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --wall-time "$SCRIPTTIMELIMIT" \
         --out-meta compile.meta \
         $ENVIRONMENT_VARS -- \
-        "/compile/run" run "$MEMLIMIT" "$@" > compile.tmp 2>&1
+        "/compile/run" run "$@" > compile.tmp 2>&1
 
 chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
 

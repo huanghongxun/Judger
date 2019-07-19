@@ -118,6 +118,30 @@ struct test_check {
      * 
      */
     depends_condition depends_cond;
+
+    /**
+     * @brief 内存限制，限制应用程序实际最多能申请多少内存空间
+     * @note 单位为 KB，小于 0 的数表示不限制内存空间申请
+     */
+    int memory_limit = -1;
+
+    /**
+     * @brief 时间限制，限制应用程序的实际运行时间
+     * @note 单位为秒
+     */
+    double time_limit = -1;
+
+    /**
+     * @brief 文件输出限制，限制应用程序实际最多能写入磁盘多少数据
+     * @note 单位为 KB，小于 0 的数表示不限制内存空间申请
+     */
+    int file_limit = -1;
+
+    /**
+     * @brief 进程数限制，限制应用程序实际最多能打开多少个进程
+     * @note ，小于 0 的数表示不限制进程数
+     */
+    int proc_limit = -1;
 };
 
 /**
@@ -223,36 +247,6 @@ struct submission {
      * @brief 标准测试的测试数据
      */
     vector<test_case_data> test_data;
-
-    /**
-     * @brief 内存限制，限制应用程序实际最多能申请多少内存空间
-     * @note 单位为 KB，小于 0 的数表示不限制内存空间申请
-     */
-    int memory_limit;
-
-    /**
-     * @brief 时间限制，限制应用程序的实际运行时间
-     * @note 单位为秒
-     */
-    double time_limit;
-
-    /**
-     * @brief 文件输出限制，限制应用程序实际最多能写入磁盘多少数据
-     * @note 单位为 KB，小于 0 的数表示不限制内存空间申请
-     */
-    int file_limit;
-
-    /**
-     * @brief 进程数限制，限制应用程序实际最多能打开多少个进程
-     * @note ，小于 0 的数表示不限制进程数
-     */
-    int proc_limit;
-
-    /**
-     * @brief 随机测试组数
-     * @note >0 表示存在随机测试，此时 standard 和 random 项起效
-     */
-    size_t random_test_times = 0;  // 随机测试次数
 
     /**
      * @brief 选手程序的下载地址和编译命令

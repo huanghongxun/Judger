@@ -3,7 +3,6 @@
 # Pascal 编译器脚本
 
 DEST="$1" ; shift
-MEMLIMIT="$1" ; shift
 MAINSOURCE="$1"
 
 if [ -n "$ENTRY_POINT" ]; then

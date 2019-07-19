@@ -46,9 +46,8 @@ PROGRAM="compile/run"
 chmod +x "$RUN_SCRIPT/run"
 chmod +x "$COMPARE_SCRIPT/run"
 
-touch judge.out
-touch program.out program.err
-touch program.meta runguard.err
+touch system.out
+touch program.meta program.err
 touch compare.meta compare.err
 
 mkdir -m 0777 -p run # 运行的临时文件都在这里
@@ -79,7 +78,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
     --wall-time "$TIMELIMIT" \
     --standard-error-file program.err \
     --out-meta program.meta -- \
-    /run/run testdata.in program.out /judge/run 2>runguard.err
+    /run/run testdata.in program.out /judge/run 2>>system.out
 
 # 比较选手程序输出
 echo "Comparing output" >> system.out
@@ -100,7 +99,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --standard-error-file compare.err \
     --out-meta compare.meta \
     -VJUDGE_UTILS=/judge_utils -- \
-    /compare/run testdata.in program.out testdata.out /feedback 2>>runguard.err
+    /compare/run testdata.in program.out testdata.out /feedback 2>>system.out
 
 chroot_stop "$CHROOTDIR" merged
 
@@ -113,7 +112,7 @@ force_umount merged/feedback
 force_umount merged
 rm -rf merged
 rm -rf work
-# RUNDIR 还剩下 compare.meta, compare.out, compare.err program.meta, program.err, system.out, runguard.err 供评测客户端检查
+# RUNDIR 还剩下 compare.meta, compare.out, compare.err, program.meta, program.err, system.out 供评测客户端检查
 # RUNDIR 由评测客户端删除
 
 # Make sure that all feedback files are owned by the current
@@ -139,12 +138,24 @@ if grep '^time-result: .*timelimit' compare.meta >/dev/null 2>&1; then
     cleanexit ${E_COMPARE_ERROR:-1}
 fi
 
+if grep -E '^internal-error: .+$' compare.meta >/dev/null 2>&1; then
+    echo "Internal Error" >> system.out
+    echo "$resource_usage" >> system.out
+    cleanexit ${E_INTERNAL_ERROR:-1}
+fi
+
 if [ ! -r program.meta ]; then
     error "'program.meta' is not readable"
 fi
 
 echo "Checking program run status" >> system.out
 read_metadata program.meta
+
+if grep -E '^internal-error: .+$' program.meta >/dev/null 2>&1; then
+    echo "Internal Error" >> system.out
+    echo "$resource_usage" >> system.out
+    cleanexit ${E_INTERNAL_ERROR:-1}
+fi
 
 if grep '^time-result: .*timelimit' program.meta >/dev/null 2>&1; then
     echo "Time Limit Exceeded" >> system.out

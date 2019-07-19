@@ -7,8 +7,8 @@ import sys
 转换 valgrind 输出的脚本，返回值：
 
 0: 内存测试通过，将返回 Accepted
-1: 内存测试未通过，返回 Wrong Answer
-2: 内部错误，返回 Compare Error
+1: 内部错误，返回 Compare Error，python 脚本出现未捕获异常时也会返回 1
+2: 内存测试未通过，返回 Wrong Answer
 '''
 
 if len(sys.argv) != 3:
@@ -29,10 +29,10 @@ try:
             item.pop("obj", None)
             item.pop("dir", None)
     json.dump(result_file, indent=4)
-    sys.exit(1)
+    sys.exit(2)
 except KeyError as e:
     if e.args[0] == 'error':
         sys.exit(0)
     else:
         sys.stderr.write('Internal error: {0} is not found during parsing memory check result\n'.format(e.args[0]))
-        sys.exit(2)
+        sys.exit(1)

@@ -172,6 +172,8 @@ cat random.err >> system.out
 
 #################################
 
+chmod -R a+rwx "$WORKDIR/input"
+
 $GAINROOT mount -t aufs none -odirs="$WORKDIR/output"=rw:"$STD_PROG"=ro:"$WORKDIR/input"=ro "$RUNDIR/merged/judge"
 
 # 调用 runguard 来执行标准程序

@@ -171,16 +171,21 @@ sudo bash $EXEC_DIR/chroot_make.sh -d /chroot -R disco -M http://mirrors.ustc.ed
 ```
 其中 `-R disco` 表示使用 Ubuntu 的 disco 发行版，版本是 19.04。你可以通过 `-M` 来更改 apt 镜像源。
 
-2. 生成 cgroups，每次计算机启动时都需要执行这个脚本注册 cgroups
+2. 创建评测账户
 ```bash
-sudo bash $EXEC_DIR/create_cgroups.sh matrix4
+sudo useradd -d /nonexistent -U -M -s /bin/false domjudge-run
 ```
-表示宿主机的账号名是 matrix4，并注册相关的 cgroups
+
+3. 生成 cgroups，每次计算机启动时都需要执行这个脚本注册 cgroups
+```bash
+sudo bash $EXEC_DIR/create_cgroups.sh domjudge-run
+```
+表示我们使用 domjudge-run 这个账号来运行用户程序
 
 3. 启动评测系统，评测系统允许通过命令行参数来对核心使用进行控制：
 可以使用 systemd 部署。
 ```bash
-sudo ./judge-system --enable-sicily=/etc/judge-system/sicily.conf --enable-3=/etc/judge-system/moj.conf --enable-2=/etc/judge-system/mcourse.conf --enable-2=/etc/judge-system/mexam.conf --server=0 --client=1-4 --clients=15 --exec-dir=/opt/judge-system/exec --cache-dir=/tmp/judge-system --run-dir=/ramdisk/judge-system --data-dir=/ramdisk/rundir --chroot-dir=/chroot
+sudo ./judge-system --enable-sicily=/etc/judge-system/sicily.conf --enable-3=/etc/judge-system/moj.conf --enable-2=/etc/judge-system/mcourse.conf --enable-2=/etc/judge-system/mexam.conf --client=1 --exec-dir=/opt/judge-system/exec --cache-dir=/tmp/judge-system --run-dir=/tmp/judge-system --data-dir=/ramdisk/rundir --chroot-dir=/chroot --log-dir=/var/log/judge-system --cache-random-data=100 --run-user=domjudge-run --run-group=domjudge-run
 ```
 
 由于评测系统可以直接通过系统服务部署，你同样可以构建 docker 镜像来一键部署评测系统（虽然我不推荐这么做，这样会使得选手程序的运行效率减慢 20%，降低评测速度），docker 的部署参见 docker/Dockerfile.run。

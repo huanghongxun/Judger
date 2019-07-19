@@ -248,18 +248,6 @@ struct source_code : program {
      */
     vector<string> compile_command;
 
-    /**
-     * @brief 源程序运行内存限制
-     * 单位为 KB
-     */
-    int memory_limit;
-
-    /**
-     * @brief 源程序运行时间限制
-     * 单位为秒
-     */
-    double time_limit;
-
     source_code(executable_manager &exec_mgr);
 
     void fetch(const string &cpuset, const filesystem::path &dir, const filesystem::path &chrootdir) override;

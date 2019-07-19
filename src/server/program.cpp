@@ -145,8 +145,8 @@ void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs:
 
     auto exec = exec_mgr.get_compile_script(language);
     exec->fetch(cpuset, chrootdir);
-    // compile.sh <compile script> <chrootdir> <workdir> <memlimit> <files...>
-    if (auto ret = call_process(EXEC_DIR / "compile.sh", "-n", cpuset, /* compile script */ exec->get_run_path(), chrootdir, workdir, memory_limit, /* source files */ paths); ret != 0) {
+    // compile.sh <compile script> <chrootdir> <workdir> <files...>
+    if (auto ret = call_process(EXEC_DIR / "compile.sh", "-n", cpuset, /* compile script */ exec->get_run_path(), chrootdir, workdir, /* source files */ paths); ret != 0) {
         switch (ret) {
             case E_COMPILER_ERROR:
                 throw compilation_error("Compilation failed", get_compilation_log(workdir));

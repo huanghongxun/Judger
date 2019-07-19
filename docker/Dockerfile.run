@@ -1,12 +1,17 @@
 FROM ubuntu:19.04
 
-RUN apt update && apt install curl make golang rustc xz-utils default-jdk-headless pypy python3 clang ruby scala libboost-all-dev cmake libgtest-dev gcc-9 g++-9 gcc-multilib g++-multilib libsqlite3-dev libmysqlclient-dev libpq-dev fp-compiler valgrind locales
+RUN apt update && apt install libcgroup-dev libcurl4-openssl-dev curl make xz-utils python3 libboost-all-dev cmake libgtest-dev gcc-9 g++-9 libmysqlclient-dev locales
+
+WORKDIR /opt/chroot
+COPY exec/chroot_make.sh ./
+RUN bash chroot_make.sh -d /chroot -R disco -M http://mirrors.vmatrix.org.cn/ubuntu
 
 WORKDIR /opt/judge-system
 COPY . ./
+RUN useradd -d /nonexistent -U -M -s /bin/false domjudge-run && bash ./exec/create_cgroups.sh domjudge-run
 WORKDIR /opt/judge-system/build
 RUN CC=gcc-9 CXX=g++-9 cmake -DBUILD_ENTRY=ON .. && make
 WORKDIR /opt/judge-system/runguard/build
-RUN cmake .. && make
+RUN CC=gcc-9 CXX=g++-9 cmake -DBUILD_ENTRY=ON .. && make
 
 ENTRYPOINT ["/opt/judge-system/run.sh"]

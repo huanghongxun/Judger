@@ -36,55 +36,53 @@ TESTOUT="$DATADIR/output"
 PROGRAM="compile/run"
 
 [ -x "$WORKDIR/$PROGRAM" ] || error "Program does not exist"
-[ -x "$COMPARE_SCRIPT" ] || error "Compare script does not exist"
 [ -x "$RUN_SCRIPT" ] || error "Run script does not exist"
 
-touch judge.out
-touch program.out program.err
-touch program.meta runguard.err
-touch compare.meta compare.err
+touch system.out
+touch program.meta program.err
 
-mkdir -m 0777 -p "$RUNDIR/run" # 运行的临时文件都在这里
-mkdir -m 0777 -p "$RUNDIR/feedback"
-mkdir -m 0777 -p "$RUNDIR/work"
-mkdir -m 0777 -p "$RUNDIR/work/judge"
-mkdir -m 0777 -p "$RUNDIR/work/run"
-mkdir -m 0777 -p "$RUNDIR/merged"
+mkdir -m 0777 -p run # 运行的临时文件都在这里
+mkdir -m 0777 -p feedback
+mkdir -m 0777 -p work
+mkdir -m 0777 -p work/judge
+mkdir -m 0777 -p work/run
+mkdir -m 0777 -p merged
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
-$GAINROOT mount -t aufs none -odirs="$RUNDIR/run"=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro "$RUNDIR/work/judge"
-$GAINROOT mount --bind -o ro "$RUN_SCRIPT" "$RUNDIR/work/run"
-$GAINROOT mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
+$GAINROOT mount -t aufs none -odirs=work=rw:"$CHROOTDIR"=ro merged
+$GAINROOT mount -t aufs none -odirs=run=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro merged/judge
+$GAINROOT mount --bind -o ro "$RUN_SCRIPT" merged/run
 
-chroot_start "$CHROOTDIR" "$RUNDIR/merged"
+chroot_start "$CHROOTDIR" merged
 
 # 我们不检查选手程序的返回值，比如 C 程序的 main 函数没有写 return 会导致返回值非零，这种不是崩溃导致的
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
-    --root "$RUNDIR/merged" \
+    --root merged \
     --work /judge \
     --no-core-dumps \
     --user "$RUNUSER" \
     --group "$RUNGROUP" \
     --wall-time "$TIMELIMIT" \
+    --standard-input-file "$TESTIN/testdata.in" \
     --standard-output-file valgrind.xml \
     --standard-error-file program.err \
     --out-meta program.meta -- \
     valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-fd=1 -- \
-    /run/run testdata.in program.out /judge/run 2>runguard.err
+    /judge/run 2>>system.out
+read -n1 -r -p "Press any key to continue..." key
+chroot_stop "$CHROOTDIR" merged
 
-chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
-
-force_umount "$RUNDIR/work/judge"
-force_umount "$RUNDIR/work/run"
-force_umount "$RUNDIR/merged"
-rm -rf "$RUNDIR/run"
-rm -rf "$RUNDIR/merged"
-rm -rf "$RUNDIR/work"
-# RUNDIR 还剩下 program.meta, program.err, system.out, runguard.err 供评测客户端检查
+force_umount merged/judge
+force_umount merged/run
+force_umount merged
+rm -rf run
+rm -rf merged
+rm -rf work
+# RUNDIR 还剩下 program.meta, program.err, system.out 供评测客户端检查
 # RUNDIR 由评测客户端删除
 
 # Make sure that all feedback files are owned by the current
 # user/group, so that we can append content.
-$GAINROOT chown -R "$(id -un):" "$RUNDIR/feedback"
+$GAINROOT chown -R "$(id -un):" feedback
 chmod -R go-w feedback
 
 if [ ! -r program.meta ]; then
@@ -100,20 +98,27 @@ if grep '^time-result: .*timelimit' program.meta >/dev/null 2>&1; then
     cleanexit ${E_TIME_LIMIT:-1}
 fi
 
+if grep -E '^internal-error: .+$' program.meta >/dev/null 2>&1; then
+    echo "Internal Error" >> system.out
+    echo "$resource_usage" >> system.out
+    cleanexit ${E_INTERNAL_ERROR:-1}
+fi
+
 if grep -E '^output-truncated: ([a-z]+,)*stdout(,[a-z]+)*' program.meta >/dev/null 2>&1; then
     echo "Output Limit Exceeded" >> system.out
     echo "$resource_usage" >> system.out
     cleanexit ${E_OUTPUT_LIMIT:-1}
 fi
 
-runcheck python3 "$PROGNAME/convert.py" valgrind.xml "$RUNDIR/feedback/report.txt" 2>feedback/judgemessage.txt
+pip3 install xmltodict
+runcheck python3 "$PROGDIR/convert.py" valgrind.xml "$RUNDIR/feedback/report.txt" >>system.out 2>&1
 case $exitcode in
     0)
         echo "Accepted" >> system.out
         echo "$resource_usage" >> system.out
         cleanexit ${E_ACCEPTED:-1}
         ;;
-    1)
+    2)
         echo "Wrong Answer" >> system.out
         echo "$resource_usage" >> system.out
         cleanexit ${E_WRONG_ANSWER:-1}

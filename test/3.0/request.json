@@ -8,8 +8,9 @@
         "grading": {
             "c++": {
                 "CompileCheck": 20,
-                "StandardCheck": 40,
-                "RandomCheck": 40
+                "StandardCheck": 20,
+                "RandomCheck": 20,
+                "MemoryCheck": 20
             }
         },
         "files": {

@@ -43,8 +43,8 @@
                 "--log-dir=/tmp",
                 "--chroot-dir=/chroot",
                 "--cache-random-data=100",
-                "--run-user=huangyuhui",
-                "--run-group=huangyuhui"
+                "--run-user=domjudge-run",
+                "--run-group=domjudge-run"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/test/3.0",

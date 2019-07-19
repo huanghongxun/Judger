@@ -193,14 +193,16 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
     compile.get_to(submission->compile_command);
     compile.get_to(standard->compile_command);
 
+    int memory_limit;
+    double time_limit;
+    int proc_limit = 10;
+    int file_limit = 32768;  // 32M
+
     const json &limits = config.at("limits").at(language);
-    limits.at("memory").get_to(submit.memory_limit);
-    submit.memory_limit <<= 10;
-    submission->memory_limit = standard->memory_limit = submit.memory_limit;
-    limits.at("time").get_to(submit.time_limit);
-    submit.time_limit /= 1000;
-    submit.proc_limit = -1;
-    submit.file_limit = 32768;  // 32M
+    limits.at("memory").get_to(memory_limit);
+    memory_limit <<= 10;
+    limits.at("time").get_to(time_limit);
+    time_limit /= 1000;
 
     if (files.count("submission")) {
         auto src_url = files.at("submission").at("source_files").get<vector<string>>();
@@ -240,13 +242,14 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         submit.standard = move(standard);
     }
 
+    int random_test_times = 0;
+
     if (config.count("random")) {
         auto random_ptr = make_unique<source_code>(server.exec_mgr);
-        random_ptr->memory_limit = SCRIPT_MEM_LIMIT;
         const json &random = config.at("random").at(language);
         random.at("language").get_to(random_ptr->language);
         random.at("compile").get_to(random_ptr->compile_command);
-        random.at("run_times").get_to(submit.random_test_times);
+        random.at("run_times").get_to(random_test_times);
 
         if (files.count("random")) {
             const json &random_json = files.at("random");
@@ -277,17 +280,26 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
             testcase.check_type = message::client_task::COMPILE_TYPE;
             testcase.testcase_id = -1;
             testcase.depends_on = -1;
+            testcase.time_limit = server.system.time_limit.compile_time_limit;
+            testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
+            testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
+            testcase.proc_limit = proc_limit;
+
             submit.test_cases.push_back(testcase);
         } else if (check.key() == "RandomCheck") {
-            testcase.score /= submit.random_test_times;
+            testcase.score /= max(random_test_times, 1);
             testcase.check_type = random_check_report::TYPE;
             testcase.check_script = "standard";
             testcase.run_script = "standard";
             testcase.is_random = true;
             testcase.depends_on = 0;  // 依赖编译任务
             testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+            testcase.time_limit = time_limit;
+            testcase.memory_limit = memory_limit;
+            testcase.file_limit = file_limit;
+            testcase.proc_limit = proc_limit;
 
-            for (size_t i = 0; i < submit.random_test_times; ++i) {
+            for (int i = 0; i < random_test_times; ++i) {
                 testcase.testcase_id = -1;  // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
                 // 将当前的随机测试点编号记录下来，给内存测试依赖
                 random_checks.push_back(submit.test_cases.size());
@@ -299,6 +311,12 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
             testcase.check_script = "standard";
             testcase.run_script = "standard";
             testcase.is_random = false;
+            testcase.depends_on = 0;  // 依赖编译任务
+            testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+            testcase.time_limit = time_limit;
+            testcase.memory_limit = memory_limit;
+            testcase.file_limit = file_limit;
+            testcase.proc_limit = proc_limit;
 
             for (size_t i = 0; i < submit.test_data.size(); ++i) {
                 testcase.testcase_id = i;
@@ -308,7 +326,16 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
             }
         } else if (check.key() == "StaticCheck") {
             testcase.check_type = static_check_report::TYPE;
-            // TODO: not implemented
+            testcase.check_script = "static";
+            testcase.run_script = "standard";  // unused
+            testcase.is_random = false;
+            testcase.depends_on = -1;
+            testcase.time_limit = server.system.time_limit.oclint;
+            testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
+            testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
+            testcase.proc_limit = proc_limit;
+            testcase.testcase_id = -1;
+            submit.test_cases.push_back(testcase);
         } else if (check.key() == "GTestCheck") {
             testcase.check_type = gtest_check_report::TYPE;
             // TODO: not implemented
@@ -326,6 +353,10 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
             testcase.check_script = "memory";
             testcase.run_script = "standard";
             testcase.is_random = submit.test_cases.empty();
+            testcase.time_limit = server.system.time_limit.valgrind;
+            testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
+            testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
+            testcase.proc_limit = proc_limit;
 
             size_t test_count;
             if (testcase.is_random) {
@@ -526,7 +557,10 @@ static void summarize_static_check(boost::rational<int> &total_score, submission
     for (size_t i = 0; i < task_results.size(); ++i) {
         auto &task_result = task_results[i];
         if (task_result.type == static_check_report::TYPE) {
+            full_score += submit.test_cases[i].score;
+
             string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
+            oclint_violations.push_back(json::parse(report_text));
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.test_cases[i].score;
@@ -541,9 +575,6 @@ static void summarize_static_check(boost::rational<int> &total_score, submission
                 static_check_json = get_error_report(task_result);
                 return;
             }
-
-            full_score += submit.test_cases[i].score;
-            oclint_violations.push_back(json::parse(report_text));
         }
     }
     static_check.grade = (int)round(boost::rational_cast<double>(score));
@@ -573,6 +604,9 @@ static void summarize_memory_check(boost::rational<int> &total_score, submission
     for (size_t i = 0; i < task_results.size(); ++i) {
         auto &task_result = task_results[i];
         if (task_result.type == memory_check_report::TYPE) {
+            full_score += submit.test_cases[i].score;
+            ++memory_check.total_cases;
+
             if (task_result.status == status::ACCEPTED) {
                 score += submit.test_cases[i].score;
                 ++memory_check.pass_cases;
@@ -581,13 +615,12 @@ static void summarize_memory_check(boost::rational<int> &total_score, submission
                 kase.valgrindoutput = read_file_content(task_result.run_dir / "feedback" / "report.txt");
                 kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
                 memory_check.report.push_back(kase);
+            } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
+                continue;
             } else {
                 memory_check_json = get_error_report(task_result);
                 return;
             }
-
-            full_score += submit.test_cases[i].score;
-            ++memory_check.total_cases;
         }
     }
     memory_check.grade = (int)round(boost::rational_cast<double>(score));
