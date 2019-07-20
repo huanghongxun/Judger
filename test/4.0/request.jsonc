@@ -126,7 +126,7 @@
     "submission": {
         "type": "source_code",
         "language": "cpp",
-        "entry_point": null,
+        "entry_point": null, // 对于 Java，entry_point 是主类名，不提供时默认为 Main；对于 Python，entry_point 是主文件名，不提供时默认为第一个文件
         "source_files": [
             {
                 "type": "text",

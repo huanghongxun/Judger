@@ -30,44 +30,28 @@
 
 touch program.meta program.err
 
-mkdir -m 0777 -p run # 运行的临时文件都在这里
 mkdir -m 0777 -p feedback
-mkdir -m 0777 -p work
-mkdir -m 0777 -p work/judge
-mkdir -m 0777 -p merged
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
-mount -t aufs none -odirs=run=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro work/judge
-mount -t aufs none -odirs=work=rw:"$CHROOTDIR"=ro merged
 
-chroot_start "$CHROOTDIR" merged
+IFS=':' read -ra SOURCE_FILES_SPLITTED <<< "$SOURCE_FILES"
+IFS=':' read -ra HEADER_FILES_SPLITTED <<< "$ASSIST_FILES"
 
-IFS=':' read -ra SRC <<< "$SOURCE_FILES"
-IFS=':' read -ra HDR <<< "$ASSIST_FILES"
+# 假如 SOURCE_FILES 为 a.cpp b.cpp，那么 SRC 为 $WORKDIR/compile/a.cpp $WORKDIR/compile/b.cpp
+SRC=()
+for i in "${SOURCE_FILES_SPLITTED[@]}"; do SRC+=("$WORKDIR/compile/$i"); done
 
-# 假如 ASSIST_FILES 为 a.hpp b.hpp，那么 INC 为 -I a.hpp -I b.hpp
+# 假如 ASSIST_FILES 为 a.hpp b.hpp，那么 INC 为 -I $WORKDIR/compile/a.hpp -I $WORKDIR/compile/b.hpp
 INC=()
-for i in "${HDR[@]}"; do INC+=(-I); INC+=($i); done
+for i in "${HEADER_FILES_SPLITTED[@]}"; do INC+=(-I); INC+=("$WORKDIR/compile/$i"); done
 
-runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
-    --root "$RUNDIR/merged" \
-    --work /judge \
-    --no-core-dumps \
-    --user "$RUNUSER" \
-    --group "$RUNGROUP" \
+# oclint 是安全的，不需要挂载也可以完成评测
+runcheck "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
     --wall-time "$TIMELIMIT" \
     --standard-error-file program.err \
     --standard-output-file oclint.json \
     --out-meta program.meta -- \
     oclint "${SRC[@]}" --report-type=json -- -c -std=c++2a "${INC[@]}"
 
-chroot_stop "$CHROOTDIR" merged
-
-force_umount work/judge
-force_umount work/run
-force_umount merged
-rm -rf run # 静态测试可以删除 run 文件夹，因为静态测试结果放在 $(pwd) 下面
-rm -rf merged
-rm -rf work
 # RUNDIR 还剩下 program.meta, program.err, system.out 供评测客户端检查
 # RUNDIR 由评测客户端删除
 
@@ -89,17 +73,17 @@ fi
 # 脚本将读入 oclint.json 并生成 report.txt 和 score.txt
 runcheck python3 "$PROGDIR/process.py" oclint.json feedback/report.txt feedback/score.txt
 case $exitcode in
-    0)
+    $RESULT_AC)
         echo "Accepted"
         echo "$resource_usage"
         cleanexit ${E_ACCEPTED:-1}
         ;;
-    2)
+    $RESULT_WA)
         echo "Wrong Answer"
         echo "$resource_usage"
         cleanexit ${E_WRONG_ANSWER:-1}
         ;;
-    3)
+    $RESULT_PC)
         echo "Partial Correct"
         echo "$resource_usage"
         cleanexit ${E_PARTIAL_CORRECT:-1}

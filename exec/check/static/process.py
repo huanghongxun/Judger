@@ -29,11 +29,11 @@ try:
     report_file.close()
 
     if grade == 10:
-        sys.exit(0) # Accepted
+        sys.exit(42) # Accepted
     elif grade == 0:
-        sys.exit(2) # Wrong Answer
-    else
-        sys.exit(3) # Partial Correct
+        sys.exit(43) # Wrong Answer
+    else:
+        sys.exit(54) # Partial Correct
 except KeyError as e:
     sys.stderr.write('Internal error: {0} is not found during parsing memory check result\n'.format(e.args[0]))
     sys.exit(1) # Internal Error
