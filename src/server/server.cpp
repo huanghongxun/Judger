@@ -1,7 +1,7 @@
 #include "server/server.hpp"
 #include <glog/logging.h>
-#include <thread>
 #include <boost/stacktrace.hpp>
+#include <thread>
 #include "common/messages.hpp"
 
 namespace judge::server {
@@ -39,7 +39,11 @@ static void summarize(unsigned judge_id) {
     submissions.erase(judge_id);
 
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
-    filesystem::remove_all(workdir);
+    try {
+        filesystem::remove_all(workdir);
+    } catch (exception &e) {
+        LOG(ERROR) << "Unable to delete directory " << workdir << ":" << e.what();
+    }
 }
 
 static void report_failure(submission &submit) {
@@ -213,7 +217,8 @@ static bool fetch_submission_nolock(concurrent_queue<message::client_task> &test
                     success = true;
             }
         } catch (exception &ex) {
-            LOG(WARNING) << "Fetching from " << category << ex.what() << endl << boost::stacktrace::stacktrace();
+            LOG(WARNING) << "Fetching from " << category << ex.what() << endl
+                         << boost::stacktrace::stacktrace();
         }
     }
     return success;

@@ -6,7 +6,7 @@ import sys
 import os
 
 '''
-转换 valgrind 输出的脚本，返回值：
+GTest 运行结果解析脚本，返回值：
 
 42: 测试通过，将返回 Accepted
 1: 内部错误，返回 Compare Error，python 脚本出现未捕获异常时也会返回 1
