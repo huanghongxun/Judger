@@ -16,6 +16,8 @@ namespace judge::server::moj {
 using namespace std;
 using namespace nlohmann;
 
+const int GTEST_CHECK_TYPE = 99;
+
 // clang-format off
 const unordered_map<status, const char *> status_string = boost::assign::map_list_of
     (status::PENDING, "")
@@ -262,8 +264,6 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         submit.random = move(random_ptr);
     }
 
-    submit.compare = server.exec_mgr.get_compare_script("diff-ign-space");
-
     const json &grading = config.at("grading").at(language);
     vector<int> standard_checks;  // 标准测试的评测点编号
     vector<int> random_checks;    // 随机测试的评测点编号
@@ -275,30 +275,29 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = test_check::depends_condition::ACCEPTED;
         if (!grade) continue;
+
+        testcase.run_script = "standard";
+        testcase.compare_script = "diff-all";
+        testcase.time_limit = time_limit;
+        testcase.memory_limit = memory_limit;
+        testcase.file_limit = file_limit;
+        testcase.proc_limit = proc_limit;
+
         if (check.key() == "CompileCheck") {
             testcase.is_random = false;
-            // testcase.score = 0;
             testcase.check_type = message::client_task::COMPILE_TYPE;
             testcase.testcase_id = -1;
             testcase.depends_on = -1;
             testcase.time_limit = server.system.time_limit.compile_time_limit;
             testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
             testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
-            testcase.proc_limit = proc_limit;
 
             submit.test_cases.push_back(testcase);
         } else if (check.key() == "RandomCheck") {
             testcase.score /= max(random_test_times, 1);
             testcase.check_type = random_check_report::TYPE;
             testcase.check_script = "standard";
-            testcase.run_script = "standard";
             testcase.is_random = true;
-            testcase.depends_on = 0;  // 依赖编译任务
-            testcase.depends_cond = test_check::depends_condition::ACCEPTED;
-            testcase.time_limit = time_limit;
-            testcase.memory_limit = memory_limit;
-            testcase.file_limit = file_limit;
-            testcase.proc_limit = proc_limit;
 
             for (int i = 0; i < random_test_times; ++i) {
                 testcase.testcase_id = -1;  // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
@@ -310,14 +309,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
             testcase.score /= submit.test_data.size();
             testcase.check_type = standard_check_report::TYPE;
             testcase.check_script = "standard";
-            testcase.run_script = "standard";
             testcase.is_random = false;
-            testcase.depends_on = 0;  // 依赖编译任务
-            testcase.depends_cond = test_check::depends_condition::ACCEPTED;
-            testcase.time_limit = time_limit;
-            testcase.memory_limit = memory_limit;
-            testcase.file_limit = file_limit;
-            testcase.proc_limit = proc_limit;
 
             for (size_t i = 0; i < submit.test_data.size(); ++i) {
                 testcase.testcase_id = i;
@@ -328,18 +320,21 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         } else if (check.key() == "StaticCheck") {
             testcase.check_type = static_check_report::TYPE;
             testcase.check_script = "static";
-            testcase.run_script = "standard";  // unused
             testcase.is_random = false;
-            testcase.depends_on = -1;
+            testcase.depends_on = -1;  // 静态测试不需要通过编译？
             testcase.time_limit = server.system.time_limit.oclint;
             testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
             testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
-            testcase.proc_limit = proc_limit;
             testcase.testcase_id = -1;
             submit.test_cases.push_back(testcase);
         } else if (check.key() == "GTestCheck") {
-            testcase.check_type = gtest_check_report::TYPE;
-            // TODO: not implemented
+            testcase.check_type = GTEST_CHECK_TYPE;
+            testcase.compare_script = "gtest";
+            testcase.is_random = false;
+            testcase.depends_on = 0;
+            testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+            testcase.testcase_id = -1;
+            submit.test_cases.push_back(testcase);
         }
     }
 
@@ -351,8 +346,9 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         if (!grade) continue;
         if (check.key() == "MemoryCheck") {
             testcase.check_type = memory_check_report::TYPE;
-            testcase.check_script = "memory";
-            testcase.run_script = "standard";
+            testcase.check_script = "standard";
+            testcase.run_script = "valgrind";
+            testcase.compare_script = "valgrind";
             testcase.is_random = submit.test_cases.empty();
             testcase.time_limit = server.system.time_limit.valgrind;
             testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
@@ -612,15 +608,23 @@ static void summarize_memory_check(boost::rational<int> &total_score, submission
                 score += submit.test_cases[i].score;
                 ++memory_check.pass_cases;
             } else if (task_result.status == status::WRONG_ANSWER) {
-                memory_check_report_report kase;
-                kase.valgrindoutput = read_file_content(task_result.run_dir / "feedback" / "report.txt");
+                memory_check_error_report kase;
+                kase.valgrindoutput = json::parse(read_file_content(task_result.run_dir / "feedback" / "report.txt"));
+                kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
+                memory_check.report.push_back(kase);
+            } else if (task_result.status == status::TIME_LIMIT_EXCEEDED) {
+                memory_check_error_report kase;
+                kase.message = "Time limit exceeded";
                 kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
                 memory_check.report.push_back(kase);
             } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
-                continue;
+                memory_check_error_report kase;
+                kase.message = "Dependency not satisfied";
+                memory_check.report.push_back(kase);
             } else {
-                memory_check_json = get_error_report(task_result);
-                return;
+                memory_check_error_report kase;
+                kase.message = "Internal Error:\n" + task_result.error_log;
+                memory_check.report.push_back(kase);
             }
         }
     }
@@ -630,7 +634,71 @@ static void summarize_memory_check(boost::rational<int> &total_score, submission
     total_score += score;
 }
 
+/*
+ * @brief GTest 检查报告
+ * 
+ * @code{json}
+ * {
+ *   "grade": 0,
+ *   "full_grade": 0,
+ *   "result": "", // 和 report.crun.result 一致，若 OK，则其他项启用
+ *   "error_cases": 0,
+ *   "disabled_cases": 0,
+ *   "time": 0, // 单位为秒
+ *   "report": {
+ *     "googletest": [
+ *       {
+ *         // InstanceName/TestName/CaseName/ParamValue for TEST_P
+ *         // TestName/CaseName for OTHERS
+ *         "name": "",
+ *         "message": "",
+ *         "param": "", // For TEST_P only
+ *       },
+ *     ],
+ *     "crun": { // 程序的运行结果，这里感觉很冗余。。
+ *         // 评测结果，比如 OK、PR、TL、ML、WA、RE、OL、CE、RF，和 ::result 一致
+ *         "result": "OK",
+ *         // message 对于评测 4.0 没什么用，原来一般是报告程序运行结束或者传参（传给原来的 sandbox crun 用的）有误
+ *         "message": "Program finished running./limit arguments are not int"
+ *     },
+ *   }
+ * }
+ * @endcode
+ */
 static void summarize_gtest_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &gtest_check_json) {
+    boost::rational<int> score, full_score;
+    for (size_t i = 0; i < task_results.size(); ++i) {
+        auto &task_result = task_results[i];
+        if (task_result.type == GTEST_CHECK_TYPE) {
+            full_score += submit.test_cases[i].score;
+
+            // 这里将 report.txt 的 json 格式进行转换，偷懒就直接对 json 操作了
+            // report.txt 的格式参见 exec/compare/gtest/run
+            string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
+            gtest_check_json = json::parse(report_text);
+            gtest_check_json["result"] = status_string.at(task_result.status);
+            json googletest = gtest_check_json.count("report") ? gtest_check_json["report"] : json{};
+            gtest_check_json["report"] = {{"googletest", googletest},
+                                          {"crun",
+                                           {{"result", status_string.at(task_result.status)},
+                                            {"message", "Program finished running."}}}};
+
+            if (task_result.status == status::ACCEPTED) {
+                score += submit.test_cases[i].score;
+            } else if (task_result.status == status::PARTIAL_CORRECT) {
+                score += task_result.score * submit.test_cases[i].score;
+            } else if (task_result.status == status::SYSTEM_ERROR ||
+                       task_result.status == status::RANDOM_GEN_ERROR ||
+                       task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
+                       task_result.status == status::COMPARE_ERROR) {
+                gtest_check_json = get_error_report(task_result);
+                return;
+            }
+        }
+    }
+    gtest_check_json["grade"] = (int)round(boost::rational_cast<double>(score));
+    gtest_check_json["full_grade"] = (int)round(boost::rational_cast<double>(full_score));
+    total_score += score;
 }
 
 void configuration::summarize(submission &submit, const vector<judge::message::task_result> &task_results) {

@@ -2,7 +2,7 @@
 #
 # 测试脚本帮助文件，帮助处理命令行参数，避免重复代码
 #
-# 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <run> <compare> <source files> <assist files>
+# 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <run> <compare> <source files> <assist files> <run args>
 #
 # <datadir>      包含数据文件的文件夹的绝对路径
 # <timelimit>    运行时间限制，格式为 %d:%d，如 1:3 表示测试点时间限制
@@ -15,6 +15,7 @@
 # <compare>      比较程序/脚本文件夹的文件夹
 # <source-files> 源文件集，使用 : 隔开，如 a.cpp:b.cpp
 # <assist-files> 头文件集，使用 : 隔开，如 a.hpp:b.hpp
+# <run-args>     提供给选手程序的参数
 #
 # 必须包含的环境变量：
 #   RUNGUARD        runguard 的路径
@@ -148,3 +149,6 @@ RUNDIR="$WORKDIR/run-$RUN_UUID"
 mkdir -m 0777 -p "$RUNDIR"
 
 cd "$RUNDIR"
+
+exec >>system.out
+exec 2>&1

@@ -46,22 +46,24 @@ PROGRAM="compile/run"
 chmod +x "$RUN_SCRIPT/run"
 chmod +x "$COMPARE_SCRIPT/run"
 
-touch system.out
 touch program.meta program.err
 touch compare.meta compare.err
 
 mkdir -m 0777 -p run # 运行的临时文件都在这里
 mkdir -m 0777 -p feedback
-mkdir -m 0777 -p work
+mkdir -m 0755 -p work
 mkdir -m 0777 -p work/judge
-mkdir -m 0777 -p work/judge_utils
-mkdir -m 0777 -p work/compare
+mkdir -m 0755 -p work/judge_utils
+mkdir -m 0755 -p work/compare
+mkdir -m 0755 -p work/testin
+mkdir -m 0755 -p work/testout
 mkdir -m 0777 -p work/run
 mkdir -m 0777 -p work/feedback
-mkdir -m 0777 -p merged
+mkdir -m 0755 -p merged
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
 $GAINROOT mount -t aufs none -odirs=work=rw:"$CHROOTDIR"=ro merged
 $GAINROOT mount -t aufs none -odirs=run=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro merged/judge
+$GAINROOT mount --bind -o ro "$TESTIN" merged/testin
 $GAINROOT mount --bind -o ro "$JUDGE_UTILS" merged/judge_utils
 $GAINROOT mount --bind -o ro "$COMPARE_SCRIPT" merged/compare
 $GAINROOT mount --bind -o ro "$RUN_SCRIPT" merged/run
@@ -78,13 +80,12 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
     --wall-time "$TIMELIMIT" \
     --standard-error-file program.err \
     --out-meta program.meta -- \
-    /run/run testdata.in program.out /judge/run 2>>system.out
+    /run/run testdata.in program.out /judge/run "$@"
 
 # 比较选手程序输出
-echo "Comparing output" >> system.out
-force_umount merged/judge
+echo "Comparing output"
 $GAINROOT mount --bind feedback merged/feedback
-$GAINROOT mount -t aufs none -odirs=run=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro:"$TESTOUT"=ro merged/judge
+$GAINROOT mount --bind -o ro "$TESTOUT" merged/testout
 
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --root merged \
@@ -99,7 +100,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --standard-error-file compare.err \
     --out-meta compare.meta \
     -VJUDGE_UTILS=/judge_utils -- \
-    /compare/run testdata.in program.out testdata.out /feedback 2>>system.out
+    /compare/run /testin/testdata.in program.out /testout/testdata.out /feedback
 
 chroot_stop "$CHROOTDIR" merged
 
@@ -107,6 +108,8 @@ chroot_stop "$CHROOTDIR" merged
 force_umount merged/judge
 force_umount merged/judge_utils
 force_umount merged/compare
+force_umount merged/testin
+force_umount merged/testout
 force_umount merged/run
 force_umount merged/feedback
 force_umount merged
@@ -122,25 +125,25 @@ chmod -R go-w feedback
 
 # 记录比较器的标准输出
 if [ -s compare.out ]; then
-	printf "\\n---------- output validator stdout messages ----------\\n" >> system.out
-	cat compare.out >> system.out
+	printf "\\n---------- output validator stdout messages ----------\\n"
+	cat compare.out
 fi
 
 # 记录比较器的标准错误流
 if [ -s compare.err ]; then
-	printf "\\n---------- output validator stderr messages ----------\\n" >> system.out
-	cat compare.err >> system.out
+	printf "\\n---------- output validator stderr messages ----------\\n"
+	cat compare.err
 fi
 
-echo "checking compare script exit-status: $exitcode" >> system.out
+echo "checking compare script exit-status: $exitcode"
 if grep '^time-result: .*timelimit' compare.meta >/dev/null 2>&1; then
-    echo "Comparing aborted after $SCRIPTTIMELIMIT seconds" >> system.out
+    echo "Comparing aborted after $SCRIPTTIMELIMIT seconds"
     cleanexit ${E_COMPARE_ERROR:-1}
 fi
 
 if grep -E '^internal-error: .+$' compare.meta >/dev/null 2>&1; then
-    echo "Internal Error" >> system.out
-    echo "$resource_usage" >> system.out
+    echo "Internal Error"
+    echo "$resource_usage"
     cleanexit ${E_INTERNAL_ERROR:-1}
 fi
 
@@ -148,42 +151,46 @@ if [ ! -r program.meta ]; then
     error "'program.meta' is not readable"
 fi
 
-echo "Checking program run status" >> system.out
+echo "Checking program run status"
+if [ ! -s program.meta ]; then
+    printf "\n****************runguard crash*****************\n"
+    cleanexit ${E_INTERNAL_ERROR:--1}
+fi
 read_metadata program.meta
 
 if grep -E '^internal-error: .+$' program.meta >/dev/null 2>&1; then
-    echo "Internal Error" >> system.out
-    echo "$resource_usage" >> system.out
+    echo "Internal Error"
+    echo "$resource_usage"
     cleanexit ${E_INTERNAL_ERROR:-1}
 fi
 
 if grep '^time-result: .*timelimit' program.meta >/dev/null 2>&1; then
-    echo "Time Limit Exceeded" >> system.out
-    echo "$resource_usage" >> system.out
+    echo "Time Limit Exceeded"
+    echo "$resource_usage"
     cleanexit ${E_TIME_LIMIT:-1}
 fi
 
 if grep -E '^output-truncated: ([a-z]+,)*stdout(,[a-z]+)*' program.meta >/dev/null 2>&1; then
-    echo "Output Limit Exceeded" >> system.out
-    echo "$resource_usage" >> system.out
+    echo "Output Limit Exceeded"
+    echo "$resource_usage"
     cleanexit ${E_OUTPUT_LIMIT:-1}
 fi
 
 if [ ! -z $signal ]; then
     case $signal in
         11) # SIGSEGV
-            echo "Segmentation Fault" >> system.out
-            echo "$resource_usage" >> system.out
+            echo "Segmentation Fault"
+            echo "$resource_usage"
             cleanexit ${E_SEG_FAULT:-1}
             ;;
         8) # SIGFPE
-            echo "Floating Point Exception" >> system.out
-            echo "$resource_usage" >> system.out
+            echo "Floating Point Exception"
+            echo "$resource_usage"
             cleanexit ${E_FLOATING_POINT:-1}
             ;;
         *)
-            echo "Runtime Error" >> system.out
-            echo "$resource_usage" >> system.out
+            echo "Runtime Error"
+            echo "$resource_usage"
             cleanexit ${E_RUNTIME_ERROR:-1}
             ;;
     esac
@@ -193,39 +200,39 @@ fi
 # 返回值而误判为 Runtime Error
 # 经过测试，现在 gcc/g++ 会自动解决 main 函数没有 return 0 的问题，暂时不需要解决
 if [ "$progexit" -ne 0 ]; then
-    echo "Non-zero exitcode $progexit" >> system.out
-    echo "$resource_usage" >> system.out
+    echo "Non-zero exitcode $progexit"
+    echo "$resource_usage"
     cleanexit ${E_RUNTIME_ERROR:-1}
 fi
 
 if [ $exitcode -eq $RESULT_PC ] && [ ! -f "$RUNDIR/feedback/score.txt" ]; then
-    echo "Compare script reports partial correct without score record." >> system.out
+    echo "Compare script reports partial correct without score record."
     cleanexit ${E_COMPARE_ERROR:-1}
 fi
 
 case $exitcode in
     $RESULT_AC)
-        echo "Accepted" >> system.out
-        echo "$resource_usage" >> system.out
+        echo "Accepted"
+        echo "$resource_usage"
         cleanexit ${E_ACCEPTED:-1}
         ;;
     $RESULT_WA)
-        echo "Wrong Answer" >> system.out
-        echo "$resource_usage" >> system.out
+        echo "Wrong Answer"
+        echo "$resource_usage"
         cleanexit ${E_WRONG_ANSWER:-1}
         ;;
     $RESULT_PE)
-        echo "Presentation Error" >> system.out
-        echo "$resource_usage" >> system.out
+        echo "Presentation Error"
+        echo "$resource_usage"
         cleanexit ${E_PRESENTATION_ERROR:-1}
         ;;
     $RESULT_PC)
-        echo "Partial Correct" >> system.out
-        echo "$resouce_usage" >> system.out
+        echo "Partial Correct"
+        echo "$resouce_usage"
         cleanexit ${E_PARTIAL_CORRECT:-1}
         ;;
     *)
-        echo "Comparing failed with exitcode $exitcode" >> system.out
+        echo "Comparing failed with exitcode $exitcode"
         cleanexit ${E_COMPARE_ERROR:-1}
         ;;
 esac

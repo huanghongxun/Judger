@@ -54,9 +54,14 @@ void to_json(json &j, const standard_check_report &report) {
          {"report", report.report}};
 }
 
-void to_json(json &j, const memory_check_report_report &report) {
-    j = {{"valgrindoutput", report.valgrindoutput},
-         {"stdin", report.stdin}};
+void to_json(json &j, const memory_check_error_report &report) {
+    if (report.message.empty())
+        j = {{"valgrindoutput", report.valgrindoutput},
+             {"stdin", report.stdin}};
+    else {
+        j = {{"message", report.message},
+             {"stdin", report.stdin}};
+    }
 }
 
 void to_json(json &j, const memory_check_report &report) {
@@ -65,10 +70,6 @@ void to_json(json &j, const memory_check_report &report) {
          {"pass_cases", report.pass_cases},
          {"total_cases", report.total_cases},
          {"report", report.report}};
-}
-
-void to_json(json & /* j */, const gtest_check_report & /* report */) {
-    // TODO: not implemented
 }
 
 }  // namespace judge::server::moj

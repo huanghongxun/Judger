@@ -46,6 +46,29 @@ cleanexit ()
 . "$JUDGE_UTILS/logging.sh"
 . "$JUDGE_UTILS/chroot_setup.sh"
 
+read_metadata()
+{
+    local metafile
+    metafile="$1"
+
+    if [ ! -r $metafile ]; then
+        error "'$metafile' is not readable"
+    fi
+    
+    timeused=$(grep '^time-used: '      "$metafile" | sed 's/time-used: //'      )
+    cputime=$( grep '^cpu-time: '       "$metafile" | sed 's/cpu-time: //'       )
+    walltime=$(grep '^wall-time: '      "$metafile" | sed 's/wall-time: //'      )
+    progexit=$(grep '^exitcode: '       "$metafile" | sed 's/exitcode: //'       )
+    stdout=$(  grep '^stdout-bytes: '   "$metafile" | sed 's/stdout-bytes: //'   )
+    stderr=$(  grep '^stderr-bytes: '   "$metafile" | sed 's/stderr-bytes: //'   )
+    memused=$( grep '^memory-bytes: '   "$metafile" | sed 's/memory-bytes: //'   )
+    signal=$(  grep '^signal: '         "$metafile" | sed 's/signal: //'         )
+    interr=$(  grep '^internal-error: ' "$metafile" | sed 's/internal-error: //' )
+    resource_usage="\
+    runtime: ${cputime}s cpu, ${walltime}s wall
+    memory used: ${memused} bytes"
+}
+
 CPUSET=""
 CPUSET_OPT=""
 OPTIND=1
@@ -110,6 +133,10 @@ fi
 [ -x "$RUNGUARD" ] || error "runguard not found or not executable: $RUNGUARD"
 
 cd "$WORKDIR"
+
+exec >>system.out
+exec 2>&1
+
 mkdir -p "$WORKDIR/input"
 chmod a+rwx "$WORKDIR/input"
 mkdir -p "$WORKDIR/output"
@@ -124,10 +151,10 @@ chmod -R +x "$RUN_SCRIPT/run"
 chmod -R +x "$RAN_GEN/run"
 chmod -R +x "$STD_PROG/run"
 
-mkdir -m 0777 -p "$RUNDIR/work"
-mkdir -m 0777 -p "$RUNDIR/work/judge"
-mkdir -m 0777 -p "$RUNDIR/work/run"
-mkdir -m 0777 -p "$RUNDIR/merged"
+mkdir -m 0555 -p "$RUNDIR/work"
+mkdir -m 0755 -p "$RUNDIR/work/judge"
+mkdir -m 0755 -p "$RUNDIR/work/run"
+mkdir -m 0755 -p "$RUNDIR/merged"
 $GAINROOT mount -t aufs none -odirs="$RUNDIR/work"=rw:"$CHROOTDIR"=ro "$RUNDIR/merged"
 $GAINROOT mount -t aufs none -odirs="$WORKDIR/input"=rw:"$RAN_GEN"=ro "$RUNDIR/merged/judge"
 $GAINROOT mount --bind -o ro "$RUN_SCRIPT" "$RUNDIR/merged/run"
@@ -146,29 +173,33 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --out-meta random.meta \
         --standard-output-file "$WORKDIR/input/testdata.in" \
         --standard-error-file random.err -- \
-        /judge/run 2>runguard.err
+        /judge/run
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/random 中，因此删除挂载点即可。
 force_umount "$RUNDIR/merged/judge"
 
+echo "Checking random generator run status"
+if [ ! -s random.meta ]; then
+    printf "\n****************runguard crash*****************\n"
+    cleanexit ${E_RANDOM_GEN_ERROR:--1}
+fi
+read_metadata random.meta
+
 # 检查是否运行超时，time-result 可能为空、soft-timelimit、hard-timelimit，空表示没有超时
 if grep '^time-result: .*timelimit' random.meta >/dev/null 2>&1; then
-    echo "Random data generation aborted after $SCRIPTTIMELIMIT seconds." >> system.out
-    cat random.err >> system.out
+    echo "Random data generation aborted after $SCRIPTTIMELIMIT seconds."
+    cat random.err
     cleanexit ${E_RANDOM_GEN_ERROR:--1}
 fi
 
 # 检查是否运行出错/runguard 崩溃
-if [ $exitcode -ne 0 ]; then
-    echo "Random data generation failed with exitcode $exitcode." >> system.out
-    cat random.err >> system.out
-    if [ ! -s random.meta ]; then
-        printf "\n****************runguard crash*****************\n" >> system.out
-    fi
+if [ $progexit -ne 0 ]; then
+    echo "Random data generation failed with exitcode $progexit."
+    cat random.err
     cleanexit ${E_RANDOM_GEN_ERROR:--1}
 fi
 
-cat random.err >> system.out
+cat random.err
 
 #################################
 
@@ -186,30 +217,34 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
         --wall-time "$TIMELIMIT" \
         --standard-error-file standard.err \
         --out-meta standard.meta -- \
-        /run/run testdata.in testdata.out /judge/run 2>runguard.err
+        /run/run testdata.in testdata.out /judge/run
 
 chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
 force_umount "$RUNDIR/merged/judge"
 
 # 删除挂载点在 cleanexit 中完成，因为我们已经确保有用的数据在 $WORKDIR/standard 中，因此删除挂载点即可。
 
+echo "Checking standard program run status"
+if [ ! -s standard.meta ]; then
+    printf "\n****************runguard crash*****************\n"
+    cleanexit ${E_RANDOM_GEN_ERROR:--1}
+fi
+read_metadata standard.meta
+
 # 检查是否运行超时，time-result 可能为空、soft-timelimit、hard-timelimit，空表示没有超时
 if grep '^time-result: .*timelimit' standard.meta >/dev/null 2>&1; then
-    echo "Standard program aborted after $TIMELIMIT seconds." >> system.out
-    cat standard.err >> system.out
+    echo "Standard program aborted after $TIMELIMIT seconds."
+    cat standard.err
     cleanexit ${E_RANDOM_GEN_ERROR:--1}
 fi
 
 # 检查是否运行出错/runguard 崩溃
-if [ $exitcode -ne 0 ]; then
-    echo "Standard program failed with exitcode $exitcode." >> system.out
-    cat standard.err >> system.out
-    if [ ! -s standard.meta ]; then
-        printf "\n****************runguard crash*****************\n" >> system.out
-    fi
+if [ $progexit -ne 0 ]; then
+    echo "Standard program failed with exitcode $progexit."
+    cat standard.err
     cleanexit ${E_RANDOM_GEN_ERROR:--1}
 fi
 
-cat standard.err >> system.out
+cat standard.err
 
 cleanexit 0

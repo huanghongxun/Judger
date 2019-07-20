@@ -46,7 +46,7 @@ static message::task_result judge(message::client_task &client_task, server::sub
     string uuid = boost::lexical_cast<string>(boost::uuids::random_generator()());
     filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;               // 题目的缓存文件夹
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;  // 本提交的工作文件夹
-    filesystem::path rundir = workdir / ("run-" + uuid);                     // 本测试点的运行文件夹
+    filesystem::path rundir = workdir / ("run-" + uuid);                                    // 本测试点的运行文件夹
 
     message::task_result result{client_task.judge_id, client_task.id, client_task.type};
     result.run_dir = rundir;
@@ -61,7 +61,14 @@ static message::task_result judge(message::client_task &client_task, server::sub
     auto run_script = exec_mgr.get_run_script(task.run_script);
     run_script->fetch(execcpuset, CHROOT_DIR);
 
-    auto &compare_script = submit.compare;
+    unique_ptr<judge::server::program> exec_compare_script = task.compare_script.empty() ? nullptr : exec_mgr.get_compare_script(task.compare_script);
+    auto &compare_script = task.compare_script.empty() ? submit.compare : exec_compare_script;
+    if (!compare_script) { // 没有 submit.compare，但却存在需求 submit.compare 的 task 时报错
+        result.status = status::SYSTEM_ERROR;
+        result.error_log = "no compare script";
+        return result;
+    }
+
     compare_script->fetch(execcpuset, cachedir / "compare", CHROOT_DIR);
 
     filesystem::path datadir;
@@ -166,10 +173,10 @@ static message::task_result judge(message::client_task &client_task, server::sub
                                compare_script->get_run_path(cachedir / "compare"),
                                boost::algorithm::join(submit.submission->source_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"),
                                boost::algorithm::join(submit.submission->assist_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"));
+    result.error_log = read_file_content(rundir / "system.out", "No detailed information");
     switch (ret) {
         case E_INTERNAL_ERROR:
             result.status = status::SYSTEM_ERROR;
-            result.error_log = read_file_content(rundir / "system.out", "No detailed information");
             break;
         case E_ACCEPTED:
             result.status = status::ACCEPTED;
@@ -195,7 +202,6 @@ static message::task_result judge(message::client_task &client_task, server::sub
             break;
         case E_COMPARE_ERROR:
             result.status = status::COMPARE_ERROR;
-            result.error_log = read_file_content(rundir / "system.out", "No detailed information");
             break;
         case E_RUNTIME_ERROR:
             result.status = status::RUNTIME_ERROR;
@@ -217,7 +223,6 @@ static message::task_result judge(message::client_task &client_task, server::sub
             break;
         default:
             result.status = status::SYSTEM_ERROR;
-            result.error_log = read_file_content(rundir / "system.out", "No detailed information");
             break;
     }
 
@@ -285,6 +290,15 @@ static message::task_result compile(message::client_task &client_task, server::s
     if (submit.standard) {
         filesystem::path standarddir = cachedir / "standard";
         compile(submit.standard.get(), standarddir, execcpuset, result);
+        if (result.status == status::COMPILATION_ERROR)
+            result.status = status::EXECUTABLE_COMPILATION_ERROR;
+        if (result.status != status::ACCEPTED) return result;
+    }
+
+    // 编译比较器
+    if (submit.compare) {
+        filesystem::path comparedir = cachedir / "compare";
+        compile(submit.compare.get(), comparedir, execcpuset, result);
         if (result.status == status::COMPILATION_ERROR)
             result.status = status::EXECUTABLE_COMPILATION_ERROR;
         if (result.status != status::ACCEPTED) return result;

@@ -10,17 +10,19 @@
             "request": "launch",
             "program": "${workspaceFolder}/runguard/bin/runguard",
             "args": [
-                "--user",
-                "judge",
-                "--group",
-                "judge"
+                "--user=domjudge-run",
+                "--group=domjudge-run",
+                "--wall-time=1",
+                "--out-meta test.meta",
+                "--",
+                "/tmp/test"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerPath": "/usr/bin/gdb-sudo",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb and add better child debugging",

@@ -5,6 +5,6 @@
 # 用法：$0 <testin> <progout> <commands...>
 
 TESTIN="$1"; shift
-PROGOUT="$1"
+PROGOUT="$1"; shift
 
-exec valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-fs=1 "$@" < "$TESTIN" > "$PROGOUT"
+exec valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-fd=1 -- "$@" < "$TESTIN" > "$PROGOUT"

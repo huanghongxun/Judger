@@ -158,7 +158,7 @@ void summarize_cgroup(const runguard_options& opt, int exitcode,
         LOG(WARNING) << "Time Limit Exceeded (soft cpu time)";
     }
 
-    append_meta("time-result", output_timelimit_str[cpulimit]);
+    append_meta("time-result", output_timelimit_str[walllimit | cpulimit]);
 
     if (opt.stream_size >= 0) {
         using namespace boost::assign;
@@ -221,7 +221,7 @@ static void child_handler(int /* signal */) {
     received_SIGCHLD = true;
 }
 
-void pump_pipes(struct runguard_options& opt, fd_set* readfds, bool use_splice, int child_pipefd[3][2], int child_redirfd[3], size_t data_read[], size_t data_passed[]) {
+static void pump_pipes(struct runguard_options& opt, fd_set* readfds, bool &use_splice, int child_pipefd[3][2], int child_redirfd[3], size_t data_read[], size_t data_passed[]) {
     char buf[BUF_SIZE];
     ssize_t nread, nwritten;
     size_t to_read, to_write;
@@ -248,7 +248,7 @@ void pump_pipes(struct runguard_options& opt, fd_set* readfds, bool use_splice, 
                                    to_read, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
 
                     if (nread == -1 && errno == EINVAL) {
-                        use_splice = 0;
+                        use_splice = false;
                         LOG(ERROR) << "splice failed, switching to read/write";
                         /* Setting errno here to repeat the copy. */
                         errno = EAGAIN;
@@ -509,7 +509,7 @@ int runit(struct runguard_options opt) {
             // I/O file descriptors. If that fails (not all I/O
             // source - dest combinations support it), then we revert to
             // using read()/write().
-            int use_splice = 1;
+            bool use_splice = true;
             while (1) {
                 FD_ZERO(&readfds);
                 int nfds = -1;

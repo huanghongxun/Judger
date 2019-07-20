@@ -297,7 +297,10 @@ chroot "$CHROOTDIR" /bin/sh -c "apt-get autoremove --purge"
 chroot "$CHROOTDIR" /bin/sh -c "apt-get clean"
 
 # Install required python packages
-#chroot "$CHROOTDIR" /bin/sh -c "pip3 install xmltodict"
+chroot "$CHROOTDIR" /bin/sh -c "pip3 install xmltodict"
+
+# Install GTest
+chroot "$CHROOTDIR" /bin/sh -c "cd /usr/src/gtest && cmake . && make && cp *.a /usr/lib"
 
 # Install D-lang compiler suite
 #chroot "$CHROOTDIR" /bin/sh -c "curl -fsS https://dlang.org/install.sh | bash -s dmd"

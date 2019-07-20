@@ -75,7 +75,6 @@ struct test_check {
     /**
      * @brief 本测试点使用的 check script
      * 不同的测试点可能有不同的 check script
-     * 对于 MemoryCheck，check script 需要选择 memory
      * 对于 StaticCheck，check script 需要选择 static
      */
     string check_script;
@@ -83,8 +82,18 @@ struct test_check {
     /**
      * @brief 本测试点使用的 run script
      * 不同的测试点可能有不同的 run script
+     * 对于 MemoryCheck，需要选择 valgrind
+     * 对于 GTestCheck，需要选择 gtest
      */
     string run_script;
+
+    /**
+     * @brief 本测试点使用的比较脚本
+     * 为空时表示使用提交自带的脚本，也就是 submission.compare
+     * 对于 MemoryCheck，需要选择 valgrind
+     * 对于 GTestCheck，需要选择 gtest
+     */
+    string compare_script;
 
     /**
      * @brief 本测试点总分

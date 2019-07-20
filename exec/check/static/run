@@ -2,7 +2,7 @@
 #
 # 静态测试脚本
 #
-# 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <run> <compare> <source files> <assist files>
+# 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <run> <compare> <program args> <source files> <assist files>
 #
 # <datadir>      此程序不使用数据
 # <timelimit>    此程序受 SCRIPTTIMELIMIT 时限限制
@@ -28,7 +28,6 @@
 # 导入比较脚本，功能是初始化日志、处理命令行参数、并对参数进行初步检查，并进入运行文件夹
 . "$JUDGE_UTILS/check_helper.sh"
 
-touch system.out
 touch program.meta program.err
 
 mkdir -m 0777 -p run # 运行的临时文件都在这里
@@ -59,7 +58,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
     --standard-error-file program.err \
     --standard-output-file oclint.json \
     --out-meta program.meta -- \
-    oclint "${SRC[@]}" --report-type=json -- -c -std=c++2a "${INC[@]}" 2>>system.out
+    oclint "${SRC[@]}" --report-type=json -- -c -std=c++2a "${INC[@]}"
 
 chroot_stop "$CHROOTDIR" merged
 
@@ -72,41 +71,41 @@ rm -rf work
 # RUNDIR 还剩下 program.meta, program.err, system.out 供评测客户端检查
 # RUNDIR 由评测客户端删除
 
-echo "Checking program run status" >> system.out
+echo "Checking program run status"
 read_metadata program.meta
 
 if grep '^time-result: .*timelimit' program.meta >/dev/null 2>&1; then
-    echo "Time Limit Exceeded" >> system.out
-    echo "$resource_usage" >> system.out
+    echo "Time Limit Exceeded"
+    echo "$resource_usage"
     cleanexit ${E_TIME_LIMIT:-1}
 fi
 
 if grep -E '^output-truncated: ([a-z]+,)*stdout(,[a-z]+)*' program.meta >/dev/null 2>&1; then
-    echo "Output Limit Exceeded" >> system.out
-    echo "$resource_usage" >> system.out
+    echo "Output Limit Exceeded"
+    echo "$resource_usage"
     cleanexit ${E_OUTPUT_LIMIT:-1}
 fi
 
 # 脚本将读入 oclint.json 并生成 report.txt 和 score.txt
-runcheck python3 "$PROGDIR/process.py" oclint.json feedback/report.txt feedback/score.txt >>system.out 2>&1
+runcheck python3 "$PROGDIR/process.py" oclint.json feedback/report.txt feedback/score.txt
 case $exitcode in
     0)
-        echo "Accepted" >> system.out
-        echo "$resource_usage" >> system.out
+        echo "Accepted"
+        echo "$resource_usage"
         cleanexit ${E_ACCEPTED:-1}
         ;;
     2)
-        echo "Wrong Answer" >> system.out
-        echo "$resource_usage" >> system.out
+        echo "Wrong Answer"
+        echo "$resource_usage"
         cleanexit ${E_WRONG_ANSWER:-1}
         ;;
     3)
-        echo "Partial Correct" >> system.out
-        echo "$resource_usage" >> system.out
+        echo "Partial Correct"
+        echo "$resource_usage"
         cleanexit ${E_PARTIAL_CORRECT:-1}
         ;;
     *)
-        echo "Comparing failed with exitcode $exitcode" >> system.out
+        echo "Comparing failed with exitcode $exitcode"
         cleanexit ${E_INTERNAL_ERROR:-1}
         ;;
 esac

@@ -319,12 +319,13 @@ struct standard_check_report {
 
 void to_json(json &j, const standard_check_report &report);
 
-struct memory_check_report_report {
+struct memory_check_error_report {
     json valgrindoutput;
+    string message;
     string stdin;
 };
 
-void to_json(json &j, const memory_check_report_report &report);
+void to_json(json &j, const memory_check_error_report &report);
 
 /**
  * @brief 内存检查报告
@@ -431,37 +432,9 @@ struct memory_check_report {
     /**
      * @brief Valgrind 测试的输出
      */
-    vector<memory_check_report_report> report;
+    vector<memory_check_error_report> report;
 };
 
 void to_json(json &j, const memory_check_report &report);
-
-struct gtest_check_report {
-    static constexpr int TYPE = 5;
-
-    string result;
-
-    /**
-     * @brief 
-     * 
-     */
-    int error_cases;
-
-    /**
-     * @brief GTest 中被禁用的测试组
-     * 
-     */
-    int disabled_cases;
-
-    /**
-     * @brief 评测用时
-     * 单位为妙
-     */
-    double time;
-
-    json report;
-};
-
-void to_json(json &j, const gtest_check_report &report);
 
 }  // namespace judge::server::moj

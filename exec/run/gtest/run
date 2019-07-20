@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# 内存检查脚本
+#
+# 用法：$0 <testin> <progout> <commands...>
+
+TESTIN="$1"; shift
+PROGOUT="$1"; shift
+
+exec "$@" --gtest_output=xml < "$TESTIN" > "$PROGOUT"

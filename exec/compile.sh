@@ -106,7 +106,11 @@ mkdir -p "$WORKDIR/compile"
 $GAINROOT chmod -R 777 "$WORKDIR/compile"
 $GAINROOT chown -R "$RUNUSER" "$WORKDIR/compile"
 cd "$WORKDIR/compile"
-touch compile.out compile.meta
+touch compile.meta
+
+exec >>compile.out
+exec 2>&1
+
 
 for src in "$@"; do
     [ -r "$WORKDIR/compile/$src" ] || error "source file not found: $src"
@@ -155,27 +159,27 @@ chmod -R go-w+x "$WORKDIR/compile"
 
 # 检查是否编译超时，time-result 可能为空、soft-timelimit、hard-timelimit，空表示没有超时
 if grep '^time-result: .*timelimit' compile.meta >/dev/null 2>&1; then
-    echo "Compilation aborted after $SCRIPTTIMELIMIT seconds." > compile.out
-    cat compile.tmp >> compile.out
+    echo "Compilation aborted after $SCRIPTTIMELIMIT seconds."
+    cat compile.tmp
     cleanexit ${E_COMPILER_ERROR:--1}
 fi
 
 # 检查是否编译器出错/runguard 崩溃
 if [ $exitcode -ne 0 ]; then
-    echo "Compilation failed with exitcode $exitcode." > compile.out
-    cat compile.tmp >> compile.out
+    echo "Compilation failed with exitcode $exitcode."
+    cat compile.tmp
     if [ ! -s compile.meta ]; then
-        printf "\n****************runguard crash*****************\n" >> compile.out
+        printf "\n****************runguard crash*****************\n"
     fi
     cleanexit ${E_INTERNAL_ERROR:--1}
 fi
 
 # 检查是否成功编译出程序
 if [ ! -f run ] || [ ! -x run ]; then
-    echo "Compilation failed: executable is not created." > compile.out
-    cat compile.tmp >> compile.out
+    echo "Compilation failed: executable is not created."
+    cat compile.tmp
     cleanexit ${E_COMPILER_ERROR:--1}
 fi
 
-cat compile.tmp >> compile.out
+cat compile.tmp
 cleanexit 0

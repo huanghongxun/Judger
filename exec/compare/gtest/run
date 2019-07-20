@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+import xmltodict
+import textwrap
+import json
+import sys
+import os
+
+'''
+转换 valgrind 输出的脚本，返回值：
+
+42: 测试通过，将返回 Accepted
+1: 内部错误，返回 Compare Error，python 脚本出现未捕获异常时也会返回 1
+43: 所有测试都未通过
+54: 通过了部分测试
+
+report.txt 格式：
+{
+    "total_cases": 0,
+    "pass_cases": 0,
+    "error_cases": 0,
+    "disabled_cases": 0,
+    "report": [
+        {
+            "name": "InstanceName/TestName/CaseName/ParamValue for TEST_P, TestName/CaseName for OTHERS",
+            "message": "failure message",
+            "param": "for TEST_P only"
+        }
+    ]
+}
+'''
+
+if len(sys.argv) != 5:
+    sys.stderr.write('{0}: 4 arguments needed, {1} given\n'.format(sys.argv[0], len(sys.argv) - 1))
+    print("Usage: {0} [stdin] [userout] [stdout] [feedback]".format(sys.argv[0]))
+    sys.exit(2)
+
+xml_file = open('test_details.xml', 'r')
+result_file = open(os.path.join(sys.argv[4], 'report.txt'), 'w')
+score_file = open(os.path.join(sys.argv[4], 'score.txt'), 'w')
+
+xml_result = xmltodict.parse(xml_file.read())
+
+pass_cases = 0
+disabled_cases = 0
+reports = []
+
+try:
+    error_cases = xml_result['testsuites']['@failures']
+    disabled_cases = xml_result['testsuites']['@disabled']
+    time = xml_result['testsuites']['@time']
+    testsuites = xml_result['testsuites']['testsuite']
+    if not isinstance(testsuites, list):
+        testsuites = [testsuites]
+    for testsuite in testsuites:
+        testcases = testsuite['testcase']
+        if not isinstance(testcase, list):
+            testcases = [testcase]
+        for testcase in testcases:
+            name = testsuite['@name'] + '/' + testcase['@name']
+            if testcase.get('status', 'run') == 'notrun':
+                disabled_cases += 1
+                continue
+            if 'failure' not in testcase or not testcase['failure']:
+                pass_cases += 1
+                continue
+            failure = testcase['failure']
+            if isinstance(failure, list):
+                failure = failure[0]
+            message = textwrap.shorten(failure.get('@message', ''), width = 1000)
+            param = textwrap.shorten(testcase.get('@value_param', ''), width = 1000)
+            if len(reports) < 10:
+                reports += [{ 'name': name, 'message': message, 'param': param }]
+    total_cases = pass_cases + error_cases
+    result_file.write(json.dumps({
+        'total_cases': total_cases,
+        'pass_cases': pass_cases,
+        'error_cases': error_cases,
+        'disabled_cases': disabled_cases,
+        'time': time,
+        'report': reports
+    }, indent=4))
+    if error_cases == 0:
+        sys.exit(42)
+    elif pass_cases == 0:
+        sys.exit(43)
+    else:
+        score_file.write('{0} {1}'.format(pass_cases, total_cases))
+        sys.exit(54)
+except KeyError as e:
+    sys.stderr.write('Internal error: {0} is not found during parsing memory check result\n'.format(e.args[0]))
+    sys.exit(1)
