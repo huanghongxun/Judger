@@ -2,7 +2,7 @@
 #
 # 提供给 Docker 的运行脚本
 
-DIR="$(dirname "$0")"
+DIR="$(realpath "$(dirname "$0")")"
 
 MOJ_OPT=""
 if [ -n "$MOJ_CONF" ]; then

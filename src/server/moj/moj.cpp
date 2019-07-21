@@ -22,7 +22,7 @@ const int GTEST_CHECK_TYPE = 99;
 const unordered_map<status, const char *> status_string = boost::assign::map_list_of
     (status::PENDING, "")
     (status::RUNNING, "")
-    (status::ACCEPTED, "OK")
+    (status::ACCEPTED, "AC")
     (status::COMPILATION_ERROR, "CE")
     (status::WRONG_ANSWER, "WA")
     (status::RUNTIME_ERROR, "RE")

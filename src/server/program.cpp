@@ -143,6 +143,11 @@ void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs:
         file->fetch(compilepath);
     }
 
+    if (paths.empty()) {
+        // skip program that has no source files
+        return;
+    }
+
     auto exec = exec_mgr.get_compile_script(language);
     exec->fetch(cpuset, chrootdir);
     // compile.sh <compile script> <chrootdir> <workdir> <files...>
@@ -153,7 +158,7 @@ void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs:
             case E_INTERNAL_ERROR:
                 throw compilation_error("Compilation failed because of internal errors", get_compilation_log(workdir));
             default:
-                throw runtime_error(fmt::format("Unrecognized compile.sh return code: {}", ret));
+                throw compilation_error(fmt::format("Unrecognized compile.sh exitcode: {}", ret), get_compilation_log(workdir));
         }
     }
 }

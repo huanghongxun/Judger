@@ -244,10 +244,10 @@ static void compile(server::program *program, const filesystem::path &workdir, c
         task_result.status = status::ACCEPTED;
     } catch (server::executable_compilation_error &ex) {
         task_result.status = status::EXECUTABLE_COMPILATION_ERROR;
-        task_result.error_log = program->get_compilation_log(workdir);
+        task_result.error_log = string(ex.what()) + "\n" + program->get_compilation_log(workdir);
     } catch (server::compilation_error &ex) {
         task_result.status = status::COMPILATION_ERROR;
-        task_result.error_log = program->get_compilation_log(workdir);
+        task_result.error_log = string(ex.what()) + "\n" + program->get_compilation_log(workdir);
     } catch (exception &ex) {
         task_result.status = status::SYSTEM_ERROR;
         task_result.error_log = ex.what();
