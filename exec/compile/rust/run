@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# Rust 编译器脚本
+#
+# 用法：$0 <dest> <source files...> <extra compile flags...>
+#
+# <dest> 编译生成的可执行文件路径
+# <source files...> 参与编译的源代码
+# <extra compile flags...> 提供给编译器的参数
+
+DEST="$1"; shift
+
+rustc -o "$DEST" "$@"
+exit $?
