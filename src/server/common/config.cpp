@@ -12,7 +12,7 @@ void from_json(const json &j, amqp &mq) {
     if (j.count("routing_key"))
         j.at("routing_key").get_to(mq.routing_key);
     else
-        mq.routing_key = mq.queue;
+        mq.routing_key = "";
 }
 
 void from_json(const json &j, database &db) {

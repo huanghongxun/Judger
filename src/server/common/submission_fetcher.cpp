@@ -1,10 +1,13 @@
 #include "server/common/submission_fetcher.hpp"
+#include <glog/logging.h>
 
 namespace judge::server {
 
 submission_fetcher::submission_fetcher(amqp &amqp) {
     channel = AmqpClient::Channel::Create(amqp.hostname, amqp.port);
     channel->DeclareQueue(amqp.queue, /* passive */ false, /* durable */ true, /* exclusive */ false, /* auto_delete */ false);
+    channel->DeclareExchange(amqp.exchange, AmqpClient::Channel::EXCHANGE_TYPE_TOPIC, /* passive */ false, /* durable */ true);
+    channel->BindQueue(amqp.queue, amqp.exchange, amqp.routing_key);
     channel->BasicConsume(amqp.queue, /* consumer tag */ "", /* no_local */ true, /* no_ack */ false, /* exclusive */ false);
 }
 
@@ -16,13 +19,18 @@ void submission_fetcher::ack(const AmqpClient::Envelope::ptr_t &envelope) {
     channel->BasicAck(envelope);
 }
 
-judge_result_reporter::judge_result_reporter(amqp &queue) : queue(queue) {
-    channel = AmqpClient::Channel::Create(queue.hostname, queue.port);
+judge_result_reporter::judge_result_reporter(amqp &amqp) : queue(amqp) {
+    channel = AmqpClient::Channel::Create(amqp.hostname, amqp.port);
+    channel->DeclareQueue(amqp.queue, /* passive */ false, /* durable */ true, /* exclusive */ false, /* auto_delete */ false);
+    channel->DeclareExchange(amqp.exchange, AmqpClient::Channel::EXCHANGE_TYPE_TOPIC, /* passive */ false, /* durable */ true);
+    channel->BindQueue(amqp.queue, amqp.exchange, amqp.routing_key);
 }
 
 void judge_result_reporter::report(const string &message) {
     AmqpClient::BasicMessage::ptr_t msg = AmqpClient::BasicMessage::Create(message);
+    DLOG(INFO) << "Sending message to exchange:" << queue.exchange << ", routing_key=" << queue.routing_key << std::endl << message;
     channel->BasicPublish(queue.exchange, queue.routing_key, msg, true);
+    DLOG(INFO) << "Sending message succeeded";
 }
 
 }  // namespace judge::server

@@ -274,7 +274,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
         testcase.score = grade;
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = test_check::depends_condition::ACCEPTED;
-        if (!grade) continue;
+        if (check.key() != "CompileCheck" && !grade) continue;
 
         testcase.run_script = "standard";
         testcase.compare_script = "diff-all";
