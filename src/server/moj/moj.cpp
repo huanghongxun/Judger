@@ -183,7 +183,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
     unique_ptr<source_code> standard = make_unique<source_code>(server.exec_mgr);
 
     string language = j.at("language").get<string>();
-    standard->language = "cpp"; // 评测 3.0 没有分开处理选手和标答的编译参数，只能把参数传给标答，并强制标答是 cpp。
+    standard->language = "cpp";  // 评测 3.0 没有分开处理选手和标答的编译参数，只能把参数传给标答，并强制标答是 cpp。
     // 硬编码将 c++ 改成 cpp
     if (language == "c++")
         submission->language = "cpp";
@@ -396,7 +396,7 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
     }
 }
 
-static void report_to_server(configuration &server, bool is_complete, const json &report) {
+static bool report_to_server(configuration &server, bool is_complete, const json &report) {
     try {
         long sub_id;
         size_t grade;
@@ -411,7 +411,9 @@ static void report_to_server(configuration &server, bool is_complete, const json
         server.redis_server.execute([=, &reply](cpp_redis::client &redis) {
             reply = redis.set(to_string(sub_id), report_string);
         });
-        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << sub_id << " into redis, reply " << reply.get();
+        cpp_redis::reply msg = reply.get();
+        if (!msg.ok()) return false;
+        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << sub_id << " into redis, reply " << msg;
 
         if (is_complete) {
             LOG(INFO) << "MOJ Submission Reporter: updating database record of submission " << sub_id;
@@ -419,9 +421,11 @@ static void report_to_server(configuration &server, bool is_complete, const json
             server.db.query<tuple<>>("UPDATE submission SET grade=? WHERE sub_id=?",
                                      grade, sub_id);
         }
+        return true;
     } catch (std::exception &ex) {
         LOG(ERROR) << "MOJ Submission Reporter: unable to report to server: " << ex.what() << ", report: " << endl
                    << report;
+        return false;
     }
 }
 
@@ -448,8 +452,8 @@ bool configuration::fetch_submission(submission &submit) {
         report.is_complete = true;
         report.sub_id = exam.sub_id;
         report.prob_id = exam.prob_id;
-        report_to_server(*this, true, report);
-        choice_fetcher->ack(envelope);
+        if (report_to_server(*this, true, report))
+            choice_fetcher->ack(envelope);
     }
 
     return false;
@@ -785,8 +789,8 @@ void configuration::summarize(submission &submit, size_t completed, const vector
                      {"GTestCheck", gtest_check_json}};
 
     json report_json = report;
-    report_to_server(*this, report.is_complete, report_json);
-    programming_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.tag));
+    if (report_to_server(*this, report.is_complete, report_json))
+        programming_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.tag));
 
     // DLOG(INFO) << "MOJ submission report: " << report_json.dump(4);
 }

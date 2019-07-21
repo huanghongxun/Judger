@@ -34,7 +34,7 @@ void redis_conn::init(const redis &redis_config) {
 }
 
 void redis_conn::execute(function<void(cpp_redis::client &)> callback) {
-    if (!redis_client.is_connected()) connect_to_server(redis_client, redis_config);
+    while (!redis_client.is_connected()) connect_to_server(redis_client, redis_config);
     callback(redis_client);
     redis_client.sync_commit();
 }
