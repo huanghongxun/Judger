@@ -166,7 +166,7 @@ json 示例
 }
 */
 static void from_json_moj(const json &j, configuration &server, judge::server::submission &submit) {
-    DLOG(INFO) << "Receive moj submission: " << j.dump(4);
+    // DLOG(INFO) << "Receive moj submission: " << j.dump(4);
 
     submit.category = server.category();
 
@@ -788,7 +788,7 @@ void configuration::summarize(submission &submit, size_t completed, const vector
     report_to_server(*this, report.is_complete, report_json);
     programming_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.tag));
 
-    DLOG(INFO) << "MOJ submission report: " << report_json.dump(4);
+    // DLOG(INFO) << "MOJ submission report: " << report_json.dump(4);
 }
 
 }  // namespace judge::server::moj
