@@ -183,11 +183,12 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
     unique_ptr<source_code> standard = make_unique<source_code>(server.exec_mgr);
 
     string language = j.at("language").get<string>();
+    standard->language = "cpp"; // 评测 3.0 没有分开处理选手和标答的编译参数，只能把参数传给标答，并强制标答是 cpp。
     // 硬编码将 c++ 改成 cpp
     if (language == "c++")
-        submission->language = standard->language = "cpp";
+        submission->language = "cpp";
     else
-        submission->language = standard->language = language;
+        submission->language = language;
 
     const json &files = config.at("files").at(language);
     if (files.count("support")) {
@@ -201,7 +202,6 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
     }
 
     const json &compile = config.at("compile").at(language);
-    compile.get_to(submission->compile_command);
     compile.get_to(standard->compile_command);
 
     int memory_limit;
