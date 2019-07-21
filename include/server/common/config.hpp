@@ -27,6 +27,11 @@ struct amqp {
     string exchange;
 
     /**
+     * @brief Exchange 类型，可选 direct, topic, fanout
+     */
+    string exchange_type;
+
+    /**
      * @brief AMQP 消息队列的队列名
      */
     string queue;
@@ -64,6 +69,14 @@ struct database {
     string database;
 };
 
-void from_json(const json &j, database &mq);
+void from_json(const json &j, database &db);
+
+struct redis {
+    string host;
+    int port;
+    string password;
+};
+
+void from_json(const json &j, redis &redis_config);
 
 }  // namespace judge::server

@@ -81,7 +81,7 @@ void configuration::summarize_invalid(submission &) {
     throw runtime_error("Invalid submission");
 }
 
-void configuration::summarize(submission &submit, const vector<judge::message::task_result> &task_results) {
+void configuration::summarize(submission &submit, size_t completed, const vector<judge::message::task_result> &task_results) {
 }
 
 }  // namespace judge::server::mcourse

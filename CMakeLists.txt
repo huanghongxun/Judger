@@ -27,6 +27,8 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/json/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/SimpleAmqpClient/src")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/cpp_redis/includes")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/cpp_redis/tacopie/includes")
 ################################################################################
 
 # source files
@@ -44,6 +46,7 @@ find_package(Boost 1.65 REQUIRED COMPONENTS program_options)
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/glog")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/SimpleAmqpClient")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/cpp_redis")
 
 if (BUILD_UNIT_TEST OR BUILD_GTEST_MODULE_TEST)
   if (NOT TARGET gtest)
@@ -112,6 +115,7 @@ if (BUILD_ENTRY)
     SimpleAmqpClient
     mysqlclient
     curl
+    cpp_redis
     boost_stacktrace_backtrace
     dl
     ${Boost_LIBRARIES}

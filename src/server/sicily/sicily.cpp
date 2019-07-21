@@ -199,6 +199,7 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
     }
 
     submit.submission = move(prog);
+    submit.tag = judge::message::task_result(0, 0, 0);
 
     return true;
 }
@@ -244,7 +245,7 @@ static void update_user(configuration &sicily, bool compilation_error, bool solv
 
             sicily.db.query<std::tuple<>>(
                 "INSERT INTO ranklist (uid, cid, pid, accepted, submissions, ac_time) VALUES (?, ?, ?, ?, ?, ?)",
-                submit.user_id, submit.contest_id, submit.contest_prob_id, solved, compilation_error ? 0 : 1, (submit.submit_time - submit.contest_start_time) / 60 + 1);
+                submit.user_id, submit.contest_id, submit.contest_prob_id, (int)solved, compilation_error ? 0 : 1, (submit.submit_time - submit.contest_start_time) / 60 + 1);
         } else {
             int accepted, ac_time, submissions;
             tie(accepted, ac_time, submissions) = rows[0];
@@ -253,7 +254,7 @@ static void update_user(configuration &sicily, bool compilation_error, bool solv
 
                 sicily.db.query<std::tuple<>>(
                     "UPDATE ranklist SET accepted=?,ac_time=?,submissions=? WHERE uid=? AND cid=? AND pid=?",
-                    solved, (submit.submit_time - submit.contest_start_time) / 60 + 1, submissions + (compilation_error ? 0 : 1), submit.user_id, submit.contest_id, submit.contest_prob_id);
+                    (int)solved, (submit.submit_time - submit.contest_start_time) / 60 + 1, submissions + (compilation_error ? 0 : 1), submit.user_id, submit.contest_id, submit.contest_prob_id);
             } else if (accepted == 1 && solved && ac_time > (submit.submit_time - submit.contest_start_time) / 60 + 1) {  // rejudge
                 LOG(INFO) << "Rejudge";
 
@@ -263,7 +264,7 @@ static void update_user(configuration &sicily, bool compilation_error, bool solv
 
                 sicily.db.query<std::tuple<>>(
                     "INSERT INTO ranklist (uid, cid, pid, accepted, submissions, ac_time) VALUES (?, ?, ?, ?, ?, ?)",
-                    submit.user_id, submit.contest_id, submit.contest_prob_id, solved, compilation_error ? 0 : 1, (submit.submit_time - submit.contest_start_time) / 60 + 1);
+                    submit.user_id, submit.contest_id, submit.contest_prob_id, (int)solved, compilation_error ? 0 : 1, (submit.submit_time - submit.contest_start_time) / 60 + 1);
 
                 sicily.db.query<std::tuple<>>(
                     "UPDATE problems SET accepted=accepted+1 WHERE cid=? AND pid=?", submit.contest_id, submit.contest_prob_id);
@@ -314,33 +315,43 @@ bool configuration::fetch_submission(submission &submit) {
     return fetch_queue(*this, submit);
 }
 
-void configuration::summarize(submission &submit, const vector<judge::message::task_result> &task_results) {
-    popup_queue(*this, submit);
+void configuration::summarize(submission &submit, size_t completed, const vector<judge::message::task_result> &task_results) {
+    if (completed < 1 || completed > task_results.size()) return;
+
+    if (completed == task_results.size())
+        popup_queue(*this, submit);
     set_compilelog(*this, task_results[0].error_log, submit);
 
-    if (task_results[0].status != judge::status::ACCEPTED) {
-        // 先检查是否存在编译错误的情况
-        set_status(*this, task_results[0], 0, submit);
-        update_user(*this, /* compilation_error */ true, /* solved */ false, submit);
-    } else {
-        // 对于选手程序运行结果
-        judge::message::task_result final_result;
-        final_result.status = judge::status::ACCEPTED;
-        final_result.run_time = 0;     // Sicily 需要计算总的运行时间
-        final_result.memory_used = 0;  // 所有测试点的最大运行内存使用量
-        for (size_t i = 1; i < task_results.size(); ++i) {
-            final_result.run_time += task_results[i].run_time;
-            final_result.memory_used = max(final_result.memory_used, task_results[i].memory_used);
-            // 对于评测，第一个非 AC 的点一定不是 DEPENDENCY_NOT_SATISFIED，因此可以直接将这个认为是本次提交的评测结果
-            // 我们确保了 test_cases 的依赖项一定在前面，因此第一个非 AC 的不可能会存在不满足依赖的情况
-            if (task_results[i].status != judge::status::ACCEPTED) {
-                set_status(*this, task_results[i], i - 1, submit);
-                update_user(*this, /* compilation_error */ false, /* solved */ false, submit);
-                return;
-            }
-        }
+    judge::message::task_result current = task_results[completed - 1];
+    auto final_result = any_cast<judge::message::task_result>(submit.tag);
 
-        // 可能存在没有测试数据的情况，这种情况我们直接返回 Accepted
+    if (completed == 1) {
+        if (current.status != judge::status::ACCEPTED) {
+            // 先检查是否存在编译错误的情况
+            set_status(*this, task_results[0], 0, submit);
+            update_user(*this, /* compilation_error */ true, /* solved */ false, submit);
+            return;
+        }
+    } else {
+        final_result.run_time += current.run_time;
+        final_result.memory_used = max(final_result.memory_used, current.memory_used);
+    }
+
+    submit.tag = final_result;
+
+    // 如果选手程序在当前测试点失败，则直接返回提交结果。
+    // 根据我们构造的 submission，之后一定不会再调用 summarize 函数
+    if (current.status != judge::status::ACCEPTED) {
+        // completed 同时包含 1 组编译测试和一些标准测试
+        // set_status 要求传标准测试的标号，那么就是 completed - 1(一组编译测试) - 1(标准测试点编号从 0 开始)
+        set_status(*this, current, completed - 2, submit);
+        update_user(*this, /* compilation error */ false, /* solved */ false, submit);
+        return;
+    }
+
+    // 所有测试数据都通过了测试，此时我们返回 Accepted
+    // 对于可能没有标准测试数据的题目，completed == 1 满足之后会到这里返回 Accepted
+    if (completed == task_results.size()) {
         set_status(*this, final_result, submit.test_data.size(), submit);
         update_user(*this, /* compilation_error */ false, /* solved */ true, submit);
     }

@@ -1,15 +1,9 @@
 {
-    "submissionReportQueue": {
-        "port": 25565,
-        "exchange": "Submission",
-        "hostname": "localhost",
-        "queue": "callback_queue",
-        "routing_key": "callback_queue"
-    },
     "choiceSubmissionQueue": {
         "port": 25565,
         "hostname": "localhost",
         "exchange": "Submission",
+        "exchange_type": "direct",
         "queue": "ChoiceSubmission",
         "routing_key": "ChoiceSubmission"
     },
@@ -17,8 +11,20 @@
         "port": 25565,
         "hostname": "localhost",
         "exchange": "Submission",
+        "exchange_type": "direct",
         "queue": "ProgrammingSubmission",
         "routing_key": "ProgrammingSubmission"
+    },
+    "database": {
+        "host": "localhost",
+        "user": "test",
+        "password": "test",
+        "database": "matrix"
+    },
+    "redis": {
+        "host": "127.0.0.1",
+        "port": 6379,
+        "password": ""
     },
     "systemConfig": {
         "fileApi": "http://127.0.0.1:8999",

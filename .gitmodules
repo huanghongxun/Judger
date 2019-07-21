@@ -13,3 +13,6 @@
 [submodule "ext/json"]
 	path = ext/json
 	url = https://github.com/nlohmann/json
+[submodule "ext/cpp_redis"]
+	path = ext/cpp_redis
+	url = https://github.com/cpp-redis/cpp_redis

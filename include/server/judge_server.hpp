@@ -44,9 +44,10 @@ struct judge_server {
      * 该函数是阻塞的。评测系统不需要通过多线程来并发写服务器，因为 server 并不会因为
      * 评测过程而阻塞，获取提交和返回评测结果都能很快完成，因此 server 是单线程的。
      * @param submit 该提交的信息
+     * @param completed 该提交完成了多少组评测
      * @param task_results 评测结果
      */
-    virtual void summarize(submission &submit, const vector<judge::message::task_result> &task_results) = 0;
+    virtual void summarize(submission &submit, size_t completed, const vector<judge::message::task_result> &task_results) = 0;
 
     /**
      * @brief 处理不合法的提交

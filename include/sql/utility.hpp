@@ -82,30 +82,6 @@ inline void get_sql_conditions(std::string& sql, const std::string& arg, Args&&.
 }
 
 template <typename T>
-inline constexpr auto to_str(T&& t) {
-    if constexpr (std::is_arithmetic_v<std::decay_t<T>>) {
-        return std::to_string(std::forward<T>(t));
-    } else {
-        return std::string("'") + t + std::string("'");
-    }
-}
-
-inline void get_str(std::string& sql, const std::string& s) {
-    auto pos = sql.find_first_of('?');
-    sql.replace(pos, 1, " ");
-    sql.insert(pos, s);
-}
-
-template <typename... Args>
-inline std::string get_sql(const std::string& o, Args&&... args) {
-    auto sql = o;
-    std::string s = "";
-    (get_str(sql, to_str(args)), ...);
-
-    return sql;
-}
-
-template <typename T>
 struct field_attribute;
 
 template <typename T, typename U>

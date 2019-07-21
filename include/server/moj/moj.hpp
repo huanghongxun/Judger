@@ -2,13 +2,17 @@
 
 #include <map>
 #include <nlohmann/json.hpp>
+#include "server/common/redis.hpp"
 #include "server/common/submission_fetcher.hpp"
 #include "server/judge_server.hpp"
 #include "server/moj/config.hpp"
+#include "sql/dbng.hpp"
+#include "sql/mysql.hpp"
 
 namespace judge::server::moj {
 using namespace std;
 using namespace nlohmann;
+using namespace ormpp;
 
 struct configuration : public judge_server {
     local_executable_manager exec_mgr;
@@ -19,11 +23,18 @@ struct configuration : public judge_server {
     system_config system;
 
     /**
-     * @brief 返回评测结果的消息队列
+     * @brief redis 用来存储评测结果
      */
-    amqp submission_report;
+    redis redis_config;
 
-    unique_ptr<judge_result_reporter> submission_reporter;
+    redis_conn redis_server;
+
+    database dbcfg;
+    
+    /**
+     * @brief 修改数据库中有关提交的状态
+     */
+    dbng<mysql> db;
 
     /**
      * @brief 拉取选择题评测的消息队列
@@ -66,7 +77,7 @@ struct configuration : public judge_server {
      * @param submit 该提交的信息
      * @param task_results 评测结果
      */
-    void summarize(submission &submit, const vector<judge::message::task_result> &task_results) override;
+    void summarize(submission &submit, size_t completed, const vector<judge::message::task_result> &task_results) override;
 
     /**
      * @brief 处理不合法的提交

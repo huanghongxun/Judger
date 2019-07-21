@@ -57,7 +57,7 @@ struct configuration : public judge_server {
      * @param submit 该提交的信息
      * @param task_results 评测结果
      */
-    void summarize(submission &submit, const vector<judge::message::task_result> &task_results) override;
+    void summarize(submission &submit, size_t completed, const vector<judge::message::task_result> &task_results) override;
 
     /**
      * @brief 处理不合法的提交

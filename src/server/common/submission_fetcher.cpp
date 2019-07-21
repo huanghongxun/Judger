@@ -6,7 +6,7 @@ namespace judge::server {
 submission_fetcher::submission_fetcher(amqp &amqp) {
     channel = AmqpClient::Channel::Create(amqp.hostname, amqp.port);
     channel->DeclareQueue(amqp.queue, /* passive */ false, /* durable */ true, /* exclusive */ false, /* auto_delete */ false);
-    channel->DeclareExchange(amqp.exchange, AmqpClient::Channel::EXCHANGE_TYPE_TOPIC, /* passive */ false, /* durable */ true);
+    channel->DeclareExchange(amqp.exchange, amqp.exchange_type, /* passive */ false, /* durable */ true);
     channel->BindQueue(amqp.queue, amqp.exchange, amqp.routing_key);
     channel->BasicConsume(amqp.queue, /* consumer tag */ "", /* no_local */ true, /* no_ack */ false, /* exclusive */ false);
 }
@@ -22,7 +22,7 @@ void submission_fetcher::ack(const AmqpClient::Envelope::ptr_t &envelope) {
 judge_result_reporter::judge_result_reporter(amqp &amqp) : queue(amqp) {
     channel = AmqpClient::Channel::Create(amqp.hostname, amqp.port);
     channel->DeclareQueue(amqp.queue, /* passive */ false, /* durable */ true, /* exclusive */ false, /* auto_delete */ false);
-    channel->DeclareExchange(amqp.exchange, AmqpClient::Channel::EXCHANGE_TYPE_TOPIC, /* passive */ false, /* durable */ true);
+    channel->DeclareExchange(amqp.exchange, amqp.exchange_type, /* passive */ false, /* durable */ true);
     channel->BindQueue(amqp.queue, amqp.exchange, amqp.routing_key);
 }
 

@@ -40,18 +40,26 @@ const unordered_map<status, const char *> status_string = boost::assign::map_lis
 configuration::configuration()
     : exec_mgr(CACHE_DIR, EXEC_DIR) {}
 
+static void connect_database(dbng<mysql> &db, const database &dbcfg) {
+    db.connect(dbcfg.host.c_str(), dbcfg.user.c_str(), dbcfg.password.c_str(), dbcfg.database.c_str());
+}
+
 void configuration::init(const filesystem::path &config_path) {
     if (!filesystem::exists(config_path))
         throw runtime_error("Unable to find configuration file");
     ifstream fin(config_path);
     json config;
     fin >> config;
-    config.at("submissionReportQueue").get_to(submission_report);
+    config.at("redis").get_to(redis_config);
+    redis_server.init(redis_config);
+
+    config.at("database").get_to(dbcfg);
+    connect_database(db, dbcfg);
+
     config.at("choiceSubmissionQueue").get_to(choice_submission);
     config.at("programmingSubmissionQueue").get_to(programming_submission);
     config.at("systemConfig").get_to(system);
 
-    submission_reporter = make_unique<judge_result_reporter>(submission_report);
     programming_fetcher = make_unique<submission_fetcher>(programming_submission);
     choice_fetcher = make_unique<submission_fetcher>(choice_submission);
 }
@@ -388,6 +396,35 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
     }
 }
 
+static void report_to_server(configuration &server, bool is_complete, const json &report) {
+    try {
+        long sub_id;
+        size_t grade;
+        string report_string = report.dump();
+        json real_report = report.at("report");
+
+        report.at("sub_id").get_to(sub_id);
+        report.at("grade").get_to(grade);
+
+        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << sub_id << " into redis";
+        std::future<cpp_redis::reply> reply;
+        server.redis_server.execute([=, &reply](cpp_redis::client &redis) {
+            reply = redis.set(to_string(sub_id), report_string);
+        });
+        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << sub_id << " into redis, reply " << reply.get();
+
+        if (is_complete) {
+            LOG(INFO) << "MOJ Submission Reporter: updating database record of submission " << sub_id;
+            if (!server.db.ping()) connect_database(server.db, server.dbcfg);
+            server.db.query<tuple<>>("UPDATE submission SET grade=? WHERE sub_id=?",
+                                     grade, sub_id);
+        }
+    } catch (std::exception &ex) {
+        LOG(ERROR) << "MOJ Submission Reporter: unable to report to server: " << ex.what() << ", report: " << endl
+                   << report;
+    }
+}
+
 bool configuration::fetch_submission(submission &submit) {
     AmqpClient::Envelope::ptr_t envelope;
     if (programming_fetcher->fetch(envelope, 0)) {
@@ -404,8 +441,14 @@ bool configuration::fetch_submission(submission &submit) {
     // 单独处理选择题，评测系统 4.0 不支持选择题评测
     while (choice_fetcher->fetch(envelope, 0)) {
         choice_exam exam = json::parse(envelope->Message()->Body());
-        json report_json = judge_choice_exam(exam);
-        submission_reporter->report(report_json.dump());
+        choice_report subreport = judge_choice_exam(exam);
+        judge_report report;
+        report.report = subreport;
+        report.grade = subreport.grade;
+        report.is_complete = true;
+        report.sub_id = exam.sub_id;
+        report.prob_id = exam.prob_id;
+        report_to_server(*this, true, report);
         choice_fetcher->ack(envelope);
     }
 
@@ -466,6 +509,7 @@ static void summarize_random_check(boost::rational<int> &total_score, submission
         if (task_result.type == random_check_report::TYPE) {
             full_score += submit.test_cases[i].score;
             ++random_check.total_cases;
+            if (task_result.status == status::PENDING) continue;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.test_cases[i].score;
@@ -506,6 +550,7 @@ static void summarize_standard_check(boost::rational<int> &total_score, submissi
         if (task_result.type == standard_check_report::TYPE) {
             full_score += submit.test_cases[i].score;
             ++standard_check.total_cases;
+            if (task_result.status == status::PENDING) continue;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.test_cases[i].score;
@@ -555,6 +600,7 @@ static void summarize_static_check(boost::rational<int> &total_score, submission
         auto &task_result = task_results[i];
         if (task_result.type == static_check_report::TYPE) {
             full_score += submit.test_cases[i].score;
+            if (task_result.status == status::PENDING) continue;
 
             string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
             oclint_violations.push_back(json::parse(report_text));
@@ -603,6 +649,7 @@ static void summarize_memory_check(boost::rational<int> &total_score, submission
         if (task_result.type == memory_check_report::TYPE) {
             full_score += submit.test_cases[i].score;
             ++memory_check.total_cases;
+            if (task_result.status == status::PENDING) continue;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.test_cases[i].score;
@@ -671,6 +718,7 @@ static void summarize_gtest_check(boost::rational<int> &total_score, submission 
         auto &task_result = task_results[i];
         if (task_result.type == GTEST_CHECK_TYPE) {
             full_score += submit.test_cases[i].score;
+            if (task_result.status == status::PENDING) continue;
 
             // 这里将 report.txt 的 json 格式进行转换，偷懒就直接对 json 操作了
             // report.txt 的格式参见 exec/compare/gtest/run
@@ -701,12 +749,11 @@ static void summarize_gtest_check(boost::rational<int> &total_score, submission 
     total_score += score;
 }
 
-void configuration::summarize(submission &submit, const vector<judge::message::task_result> &task_results) {
+void configuration::summarize(submission &submit, size_t completed, const vector<judge::message::task_result> &task_results) {
     judge_report report;
-    report.grade = 0;
     report.sub_id = boost::lexical_cast<unsigned>(submit.sub_id);
     report.prob_id = boost::lexical_cast<unsigned>(submit.prob_id);
-    report.is_complete = true;
+    report.is_complete = completed == submit.test_cases.size();
 
     boost::rational<int> total_score;
 
@@ -738,7 +785,7 @@ void configuration::summarize(submission &submit, const vector<judge::message::t
                      {"GTestCheck", gtest_check_json}};
 
     json report_json = report;
-    submission_reporter->report(report_json.dump());
+    report_to_server(*this, report.is_complete, report_json);
     programming_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.tag));
 
     DLOG(INFO) << "MOJ submission report: " << report_json.dump(4);

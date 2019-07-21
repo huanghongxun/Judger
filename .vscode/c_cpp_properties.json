@@ -3,6 +3,8 @@
         {
             "name": "Linux",
             "includePath": [
+                "${workspaceFolder}/ext/cpp_redis/includes",
+                "${workspaceFolder}/ext/cpp_redis/tacopie/includes",
                 "${workspaceFolder}/ext/fmt/include",
                 "${workspaceFolder}/ext/json/include",
                 "${workspaceFolder}/ext/glog/src",

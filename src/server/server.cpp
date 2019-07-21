@@ -33,7 +33,12 @@ submission &get_submission_by_judge_id(unsigned judge_id) {
 static void summarize(unsigned judge_id) {
     auto &submit = submissions.at(judge_id);
     auto &judge_server = judge_servers.at(submit.category);
-    judge_server->summarize(submit, task_results[judge_id]);
+    int completed = 0;
+    for (auto &task_reuslt : task_results[judge_id]) {
+        if (task_reuslt.status != status::PENDING)
+            ++completed;
+    }
+    judge_server->summarize(submit, completed, task_results[judge_id]);
     task_results.erase(judge_id);
     finished_task_cases.erase(judge_id);
     submissions.erase(judge_id);
@@ -124,6 +129,8 @@ static void process_nolock(concurrent_queue<message::client_task> &testcase_queu
     } else if (finished > submit.test_cases.size()) {
         LOG(ERROR) << "Test case exceeded [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "]";
         return;  // 跳过本次评测过程
+    } else {
+        // TODO: 发送 incomplete 的评测报告
     }
 }
 
