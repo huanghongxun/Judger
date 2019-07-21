@@ -8,7 +8,7 @@ MAINSOURCE="$1"
 # GHC 编译器需要一个 HOME 环境变量，但不需要这目录必须存在
 export HOME=/what/the/fuck
 
-ghc -x hs -Wall -Wwarn -O -static -optl-static -optl-pthread -o "$DEST" "$@"
+ghc -x hs -Wall -Wwarn -O -optl-pthread -o "$DEST" "$@"
 exitcode=$?
 
 # 清理生成的多余文件
