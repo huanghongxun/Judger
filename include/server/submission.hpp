@@ -282,8 +282,13 @@ struct submission {
     unique_ptr<program> compare;
 
     /**
-     * @brief 给 judge_server 保存额外信息的地方
+     * @brief 给 judge_server 保存消息队列信封的地方
      */
-    any tag;
+    any envelope;
+
+    /**
+     * @brief 给 judge_server 保存题目配置的地方
+     */
+    any config;
 };
 }  // namespace judge::server

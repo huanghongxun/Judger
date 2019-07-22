@@ -14,7 +14,7 @@ using namespace std;
  */
 struct client_task {
     static constexpr long ID = 0;
-    static constexpr uint8_t COMPILE_TYPE = 0;
+    static constexpr string COMPILE_TYPE = "compile";
 
     /**
      * @brief 评测 id

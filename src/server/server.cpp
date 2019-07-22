@@ -153,7 +153,7 @@ static bool verify_submission(concurrent_queue<message::client_task> &testcase_q
             return false;
         }
 
-        if (test_case.check_type == message::client_task::COMPILE_TYPE) {
+        if (test_case.check_script == message::client_task::COMPILE_TYPE) {
             if (!has_compile_case) {
                 has_compile_case = true;
             } else {

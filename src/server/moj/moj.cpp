@@ -8,15 +8,20 @@
 #include "common/stl_utils.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
+#include "server/common/config.hpp"
 #include "server/moj/choice.hpp"
-#include "server/moj/config.hpp"
 #include "server/moj/feedback.hpp"
 
 namespace judge::server::moj {
 using namespace std;
 using namespace nlohmann;
 
-const int GTEST_CHECK_TYPE = 99;
+const int COMPILE_CHECK_TYPE = 0;
+const int STANDARD_CHECK_TYPE = 1;
+const int RANDOM_CHECK_TYPE = 2;
+const int STATIC_CHECK_TYPE = 3;
+const int MEMORY_CHECK_TYPE = 4;
+const int GTEST_CHECK_TYPE = 5;
 
 // clang-format off
 const unordered_map<status, const char *> status_string = boost::assign::map_list_of
@@ -276,153 +281,175 @@ static void from_json_moj(const json &j, configuration &server, judge::server::s
     vector<int> standard_checks;  // 标准测试的评测点编号
     vector<int> random_checks;    // 随机测试的评测点编号
 
-    for (auto &check : grading.items()) {
+    // 下面构造测试的顺序很重要，编译测试必须第一个处理，内存测试必须最后处理
+
+    {  // 编译测试
         test_check testcase;
-        int grade = check.value().get<int>();
-        testcase.score = grade;
+        testcase.score = grading.count("CompileCheck") ? grading.at("CompileCheck").get<int>() : 0;
+        testcase.depends_on = -1;
+        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+        testcase.check_type = COMPILE_CHECK_TYPE;
+        testcase.check_script = "compile";
+        testcase.is_random = false;
+        testcase.time_limit = server.system.time_limit.compile_time_limit;
+        testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
+        testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
+        testcase.proc_limit = proc_limit;
+        testcase.testcase_id = -1;
+        submit.test_cases.push_back(testcase);
+    }
+
+    {  // 随机测试
+        test_check testcase;
+        testcase.score = grading.count("RandomCheck") ? grading.at("RandomCheck").get<int>() : 0;
+        testcase.score /= max(random_test_times, 1);
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = test_check::depends_condition::ACCEPTED;
-        if (check.key() != "CompileCheck" && !grade) continue;
-
+        testcase.check_type = RANDOM_CHECK_TYPE;
+        testcase.check_script = "standard";
         testcase.run_script = "standard";
         testcase.compare_script = "diff-all";
+        testcase.is_random = true;
         testcase.time_limit = time_limit;
         testcase.memory_limit = memory_limit;
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
 
-        if (check.key() == "CompileCheck") {
-            testcase.is_random = false;
-            testcase.check_type = message::client_task::COMPILE_TYPE;
-            testcase.testcase_id = -1;
-            testcase.depends_on = -1;
-            testcase.time_limit = server.system.time_limit.compile_time_limit;
-            testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
-            testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
-
-            submit.test_cases.push_back(testcase);
-        } else if (check.key() == "RandomCheck") {
-            testcase.score /= max(random_test_times, 1);
-            testcase.check_type = random_check_report::TYPE;
-            testcase.check_script = "standard";
-            testcase.is_random = true;
-
-            for (int i = 0; i < random_test_times; ++i) {
-                testcase.testcase_id = -1;  // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
-                // 将当前的随机测试点编号记录下来，给内存测试依赖
-                random_checks.push_back(submit.test_cases.size());
-                submit.test_cases.push_back(testcase);
-            }
-        } else if (check.key() == "StandardCheck") {
-            testcase.score /= submit.test_data.size();
-            testcase.check_type = standard_check_report::TYPE;
-            testcase.check_script = "standard";
-            testcase.is_random = false;
-
-            for (size_t i = 0; i < submit.test_data.size(); ++i) {
-                testcase.testcase_id = i;
-                // 将当前的标准测试点编号记录下来，给内存测试依赖
-                standard_checks.push_back(submit.test_cases.size());
-                submit.test_cases.push_back(testcase);
-            }
-        } else if (check.key() == "StaticCheck") {
-            testcase.check_type = static_check_report::TYPE;
-            testcase.check_script = "static";
-            testcase.is_random = false;
-            testcase.depends_on = -1;  // 静态测试不需要通过编译？
-            testcase.time_limit = server.system.time_limit.oclint;
-            testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
-            testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
-            testcase.testcase_id = -1;
-            submit.test_cases.push_back(testcase);
-        } else if (check.key() == "GTestCheck") {
-            testcase.check_type = GTEST_CHECK_TYPE;
-            testcase.compare_script = "gtest";
-            testcase.is_random = false;
-            testcase.depends_on = 0;
-            testcase.depends_cond = test_check::depends_condition::ACCEPTED;
-            testcase.testcase_id = -1;
+        for (int i = 0; i < random_test_times && testcase.score > 0; ++i) {
+            testcase.testcase_id = -1;  // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
+            // 将当前的随机测试点编号记录下来，给内存测试依赖
+            random_checks.push_back(submit.test_cases.size());
             submit.test_cases.push_back(testcase);
         }
     }
 
-    // 内存测试需要依赖标准测试或随机测试以便可以在标准或随机测试没有 AC 的情况下终止内存测试以加速评测速度
-    for (auto &check : grading.items()) {
+    {  // 标准测试
         test_check testcase;
-        int grade = check.value().get<int>();
-        testcase.score = grade;
-        if (!grade) continue;
-        if (check.key() == "MemoryCheck") {
-            testcase.check_type = memory_check_report::TYPE;
-            testcase.check_script = "standard";
-            testcase.run_script = "valgrind";
-            testcase.compare_script = "valgrind";
-            testcase.is_random = submit.test_cases.empty();
-            testcase.time_limit = server.system.time_limit.valgrind;
-            testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
-            testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
-            testcase.proc_limit = proc_limit;
+        testcase.score = grading.count("StandardCheck") ? grading.at("StandardCheck").get<int>() : 0;
+        testcase.score /= submit.test_data.size();
+        testcase.depends_on = 0;  // 依赖编译任务
+        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+        testcase.check_type = STANDARD_CHECK_TYPE;
+        testcase.check_script = "standard";
+        testcase.run_script = "standard";
+        testcase.compare_script = "diff-all";
+        testcase.is_random = false;
+        testcase.time_limit = time_limit;
+        testcase.memory_limit = memory_limit;
+        testcase.file_limit = file_limit;
+        testcase.proc_limit = proc_limit;
 
-            size_t test_count;
-            if (testcase.is_random) {
-                if (!random_checks.empty()) {  // 如果存在随机测试，则依赖随机测试点的数据
-                    for (int &i : random_checks) {
-                        testcase.testcase_id = submit.test_cases[i].testcase_id;
-                        testcase.depends_on = i;
-                        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
-                        submit.test_cases.push_back(testcase);
-                    }
-                    test_count = random_checks.size();
-                } else {  // 否则只能生成 10 组随机测试数据
-                    for (size_t i = 0; i < 10; ++i) {
-                        testcase.testcase_id = i;
-                        testcase.depends_on = 0;  // 依赖编译任务
-                        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
-                        submit.test_cases.push_back(testcase);
-                    }
-                    test_count = 10;
-                }
-            } else {
-                for (int &i : standard_checks) {
+        for (size_t i = 0; i < submit.test_data.size() && testcase.score > 0; ++i) {
+            testcase.testcase_id = i;
+            // 将当前的标准测试点编号记录下来，给内存测试依赖
+            standard_checks.push_back(submit.test_cases.size());
+            submit.test_cases.push_back(testcase);
+        }
+    }
+
+    {  // 静态测试
+        test_check testcase;
+        testcase.score = grading.count("StaticCheck") ? grading.at("StaticCheck").get<int>() : 0;
+        testcase.depends_on = -1;  // 静态测试不需要通过编译？
+        testcase.check_type = STATIC_CHECK_TYPE;
+        testcase.check_script = "static";
+        testcase.run_script = "standard";
+        testcase.compare_script = "diff-all";
+        testcase.is_random = false;
+        testcase.time_limit = server.system.time_limit.oclint;
+        testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
+        testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
+        testcase.proc_limit = proc_limit;
+        testcase.testcase_id = -1;
+        if (testcase.score > 0)
+            submit.test_cases.push_back(testcase);
+    }
+
+    {  // GTest 测试
+        test_check testcase;
+        testcase.score = grading.count("GTestCheck") ? grading.at("GTestCheck").get<int>() : 0;
+        testcase.depends_on = 0;  // 依赖编译任务
+        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+        testcase.check_type = GTEST_CHECK_TYPE;
+        testcase.check_script = "standard";
+        testcase.run_script = "gtest";
+        testcase.compare_script = "gtest";
+        testcase.is_random = false;
+        testcase.time_limit = time_limit;
+        testcase.memory_limit = memory_limit;
+        testcase.file_limit = file_limit;
+        testcase.proc_limit = proc_limit;
+        testcase.testcase_id = -1;
+        if (testcase.score > 0)
+            submit.test_cases.push_back(testcase);
+    }
+
+    {  // 内存测试需要依赖标准测试或随机测试以便可以在标准或随机测试没有 AC 的情况下终止内存测试以加速评测速度
+        test_check testcase;
+        testcase.score = grading.count("MemoryCheck") ? grading.at("MemoryCheck").get<int>() : 0;
+        testcase.check_type = MEMORY_CHECK_TYPE;
+        testcase.check_script = "standard";
+        testcase.run_script = "valgrind";
+        testcase.compare_script = "valgrind";
+        testcase.is_random = submit.test_cases.empty();
+        testcase.time_limit = server.system.time_limit.valgrind;
+        testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
+        testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
+        testcase.proc_limit = proc_limit;
+
+        size_t test_count;
+        if (testcase.is_random) {
+            if (!random_checks.empty()) {  // 如果存在随机测试，则依赖随机测试点的数据
+                for (int &i : random_checks) {
                     testcase.testcase_id = submit.test_cases[i].testcase_id;
                     testcase.depends_on = i;
                     testcase.depends_cond = test_check::depends_condition::ACCEPTED;
                     submit.test_cases.push_back(testcase);
                 }
-                test_count = standard_checks.size();
+                test_count = random_checks.size();
+            } else {  // 否则只能生成 10 组随机测试数据
+                for (size_t i = 0; i < 10; ++i) {
+                    testcase.testcase_id = i;
+                    testcase.depends_on = 0;  // 依赖编译任务
+                    testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+                    submit.test_cases.push_back(testcase);
+                }
+                test_count = 10;
             }
-            testcase.score /= test_count;
+        } else {
+            for (int &i : standard_checks) {
+                testcase.testcase_id = submit.test_cases[i].testcase_id;
+                testcase.depends_on = i;
+                testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+                submit.test_cases.push_back(testcase);
+            }
+            test_count = standard_checks.size();
         }
+        testcase.score /= test_count;
     }
 }
 
-static bool report_to_server(configuration &server, bool is_complete, const json &report) {
+static bool report_to_server(configuration &server, bool is_complete, const judge_report &report) {
     try {
-        long sub_id;
-        size_t grade;
-        string report_string = report.dump();
-        json real_report = report.at("report");
+        string report_string = json(report).dump();
 
-        report.at("sub_id").get_to(sub_id);
-        report.at("grade").get_to(grade);
-
-        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << sub_id << " into redis";
+        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << report.sub_id << " into redis";
         std::future<cpp_redis::reply> reply;
         server.redis_server.execute([=, &server, &reply](cpp_redis::client &redis) {
             if (server.redis_config.channel.empty())
-                reply = redis.set(to_string(sub_id), report_string);
+                reply = redis.set(to_string(report.sub_id), report_string);
             else
                 reply = redis.publish(server.redis_config.channel, report_string);
         });
         cpp_redis::reply msg = reply.get();
         if (!msg.ok()) return false;
-        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << sub_id << " into redis, reply " << msg;
+        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << report.sub_id << " into redis, reply " << msg;
 
         if (is_complete) {
-            LOG(INFO) << "MOJ Submission Reporter: updating database record of submission " << sub_id;
+            LOG(INFO) << "MOJ Submission Reporter: updating database record of submission " << report.sub_id;
             if (!server.db.ping()) connect_database(server.db, server.dbcfg);
-            server.db.query<tuple<>>("UPDATE submission SET grade=? WHERE sub_id=?",
-                                     grade, sub_id);
+            server.db.execute("UPDATE submission, submission_detail SET submission.grade=?, submission_detail.report=? WHERE submission.sub_id=? AND submission_detail.sub_id=?",
+                              report.grade, report.report.dump(), report.sub_id, report.sub_id);
         }
         return true;
     } catch (std::exception &ex) {
@@ -435,7 +462,7 @@ static bool report_to_server(configuration &server, bool is_complete, const json
 bool configuration::fetch_submission(submission &submit) {
     AmqpClient::Envelope::ptr_t envelope;
     if (programming_fetcher->fetch(envelope, 0)) {
-        submit.tag = envelope;
+        submit.envelope = envelope;
         try {
             from_json_moj(json::parse(envelope->Message()->Body()), *this, submit);
             return true;
@@ -610,7 +637,9 @@ static void summarize_static_check(boost::rational<int> &total_score, submission
             if (task_result.status == status::PENDING) continue;
 
             string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
-            oclint_violations.push_back(json::parse(report_text));
+            json report = json::parse(report_text);
+            if (report.count("violation"))
+                oclint_violations.push_back(report.at("violation"));
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.test_cases[i].score;
@@ -664,6 +693,7 @@ static void summarize_memory_check(boost::rational<int> &total_score, submission
             } else if (task_result.status == status::WRONG_ANSWER) {
                 memory_check_error_report kase;
                 kase.valgrindoutput = json::parse(read_file_content(task_result.run_dir / "feedback" / "report.txt"));
+                kase.valgrindoutput = kase.valgrindoutput.at("error");
                 kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
                 memory_check.report.push_back(kase);
             } else if (task_result.status == status::TIME_LIMIT_EXCEEDED) {
@@ -793,7 +823,7 @@ void configuration::summarize(submission &submit, size_t completed, const vector
 
     json report_json = report;
     if (report_to_server(*this, report.is_complete, report_json))
-        programming_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.tag));
+        programming_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.envelope));
 
     // DLOG(INFO) << "MOJ submission report: " << report_json.dump(4);
 }

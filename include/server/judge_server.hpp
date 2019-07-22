@@ -9,6 +9,13 @@
 namespace judge::server {
 using namespace std;
 
+enum class client_state {
+    START,
+    IDLE,
+    CRASHED,
+    STOPPED
+};
+
 /**
  * @brief 表示一个远程服务器
  * 比如可以表示 MOJ 的评测类型，运行时可以注册多个远程服务器拉取提交

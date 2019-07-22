@@ -22,10 +22,12 @@ result_file = open(os.path.join(sys.argv[4], 'report.txt'), 'w')
 
 xml_result = xmltodict.parse(xml_file.read())
 try:
-    result = xml_result["valgrindoutput"]["error"]
-    if not isinstance(result, list):
-        result = [result]
-    for err in result:
+    xml_result = xml_result["valgrindoutput"]
+    if not xml_result["error"]:
+        xml_result["error"] = []
+    if not isinstance(xml_result["error"], list):
+        xml_result["error"] = [xml_result["error"]]
+    for err in xml_result["error"]:
         if isinstance(err["stack"], list):
             for stack in err["stack"]:
                 for item in stack["frame"]:
@@ -35,7 +37,7 @@ try:
             for item in err["stack"]["frame"]:
                 item.pop("obj", None)
                 item.pop("dir", None)
-    result_file.write(json.dumps(result, indent=4))
+    result_file.write(json.dumps(xml_result, indent=4))
     sys.exit(43)
 except KeyError as e:
     if e.args[0] == 'error':

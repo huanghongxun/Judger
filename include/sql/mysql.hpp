@@ -1,10 +1,10 @@
 #pragma once
 
 #include <climits>
+#include <cstring>
 #include <iostream>
 #include <list>
 #include <map>
-#include <cstring>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -79,13 +79,12 @@ public:
     }
 
     //for tuple and string with args...
-    template <typename T, typename Arg, typename... Args>
-    constexpr std::vector<T> query(const Arg& s, Args&&... args) {
+    template <typename T, typename... Args>
+    constexpr int query(std::vector<T>& result, const char* sql, Args&&... args) {
         static_assert(iguana::is_tuple<T>::value);
 
-        std::string sql = s;
         constexpr auto args_sz = sizeof...(Args);
-        if (args_sz != std::count(sql.begin(), sql.end(), '?')) {
+        if (args_sz != std::count(sql, sql + strlen(sql), '?')) {
             // or we can do compile-time checking
             throw std::runtime_error("argument number not matched");
         }
@@ -94,7 +93,7 @@ public:
             throw std::runtime_error(mysql_error(con_));
         }
 
-        if (mysql_stmt_prepare(stmt_, sql.c_str(), (int)sql.size())) {
+        if (mysql_stmt_prepare(stmt_, sql, strlen(sql))) {
             throw std::runtime_error(mysql_error(con_));
         }
 
@@ -117,14 +116,17 @@ public:
                     params[index].buffer_type = MYSQL_TYPE_STRING;
                     params[index].buffer = (void*)item.data();
                     params[index].buffer_length = item.length();
-                } else if constexpr (std::is_same_v<const char *, U> || std::is_same_v<char *, U>) {
+                } else if constexpr (std::is_same_v<const char*, U> || std::is_same_v<char*, U>) {
                     params[index].buffer_type = MYSQL_TYPE_VAR_STRING;
                     params[index].buffer = (void*)item;
                     params[index].buffer_length = strlen(item);
                 } else {
                     std::cout << typeid(U).name() << std::endl;
-                    throw std::runtime_error("Unrecognized type, only artihmetic types and string are supported");
+                    static_assert(std::is_arithmetic_v<U> || std::is_same_v<std::string, U> || std::is_same_v<const char*, U> || std::is_same_v<char*, U>,
+                                  "Unrecognized type, only arithmetic types and string are allowed");
                 }
+
+                static_assert(!std::is_arithmetic_v<U> || sizeof(U) >= 4, "bool, char, short are not supported");
                 ++index;
             });
 
@@ -158,7 +160,8 @@ public:
                     results[index].buffer_length = 65536;
                 } else {
                     std::cout << typeid(U).name() << std::endl;
-                    throw std::runtime_error("Unrecognized type, only artihmetic types and string are supported");
+                    static_assert(std::is_arithmetic_v<U> || std::is_same_v<std::string, U>,
+                                  "Unrecognized type, only arithmetic types and string are allowed");
                 }
                 ++index;
             });
@@ -172,7 +175,8 @@ public:
             throw std::runtime_error(mysql_error(con_));
         }
 
-        std::vector<T> v;
+        int ret = mysql_stmt_affected_rows(stmt_);
+
         while (mysql_stmt_fetch(stmt_) == 0) {
             if constexpr (result_size<T>::value > 0) {
                 auto it = mp.begin();
@@ -184,26 +188,17 @@ public:
                     }
                 });
 
-                v.push_back(std::move(result_tp));
+                result.push_back(std::move(result_tp));
             } else {
-                v.emplace_back();
+                result.emplace_back();
             }
         }
 
-        return v;
+        return ret;
     }
 
     bool has_error() {
         return has_error_;
-    }
-
-    //just support execute string sql without placeholders
-    bool execute(const std::string& sql) {
-        if (mysql_query(con_, sql.data()) != 0) {
-            throw std::runtime_error(mysql_error(con_));
-        }
-
-        return true;
     }
 
     //transaction

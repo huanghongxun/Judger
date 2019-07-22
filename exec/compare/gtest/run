@@ -21,6 +21,8 @@ report.txt 格式：
     "disabled_cases": 0,
     "report": [
         {
+            "suite": "InstanceName/TestName for TEST_P, TestName for OTHERS",
+            "case": "CaseName/ParamValue for TEST_P, CaseName for OTHERS",
             "name": "InstanceName/TestName/CaseName/ParamValue for TEST_P, TestName/CaseName for OTHERS",
             "message": "failure message",
             "param": "for TEST_P only"
@@ -56,7 +58,8 @@ try:
         if not isinstance(testcase, list):
             testcases = [testcase]
         for testcase in testcases:
-            name = testsuite['@name'] + '/' + testcase['@name']
+            suite = testsuite['@name']
+            case = testcase['@name']
             if testcase.get('status', 'run') == 'notrun':
                 disabled_cases += 1
                 continue
@@ -69,7 +72,7 @@ try:
             message = textwrap.shorten(failure.get('@message', ''), width = 1000)
             param = textwrap.shorten(testcase.get('@value_param', ''), width = 1000)
             if len(reports) < 10:
-                reports += [{ 'name': name, 'message': message, 'param': param }]
+                reports += [{ 'suite': suite, 'case': case, 'name': suite + '/' + case, 'message': message, 'param': param }]
     total_cases = pass_cases + error_cases
     result_file.write(json.dumps({
         'total_cases': total_cases,

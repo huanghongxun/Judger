@@ -17,16 +17,25 @@ struct configuration : public judge_server {
     /**
      * @brief 一些全局的配置
      */
+    system_config system;
+
+    database matrix_dbcfg;
+
+    /**
+     * @brief Matrix 数据库
+     */
     dbng<mysql> matrix_db;
+    
+    database monitor_dbcfg;
 
     /**
      * @brief 监控系统数据库
      */
     dbng<mysql> monitor_db;
-
-    string file_api;
     
     amqp sub_queue;
+
+    string host;
 
     unique_ptr<submission_fetcher> sub_fetcher;
 
@@ -65,6 +74,8 @@ struct configuration : public judge_server {
      * @param submit 不合法的提交
      */
     void summarize_invalid(submission &submit) override;
+
+    void report_client_state(int client_id, client_state state);
 };
 
 }  // namespace judge::server::moj

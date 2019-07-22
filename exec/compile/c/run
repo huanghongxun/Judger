@@ -1,8 +1,14 @@
 #!/bin/bash
 
 # C 编译器脚本
+#
+# 用法：$0 <dest> <source files...> <extra compile flags...>
+#
+# <dest> 编译生成的可执行文件路径
+# <source files...> 参与编译的源代码
+# <extra compile flags...> 提供给编译器的参数
 
 DEST="$1"; shift
 
-gcc-9 -x c -DONLINE_JUDGE -fopenmp -march=native -std=c11 -Wall -Wextra -O2 -o "$DEST" "$@" -lm -lpthread
+gcc-9 -x c -DONLINE_JUDGE -fopenmp -march=native -std=c17 -Wall -Wextra -O2 -o "$DEST" "$@" -lm -lpthread
 exit $?

@@ -27,20 +27,16 @@ public:
 
     //restriction, all the args are string, the first is the where condition, rest are append conditions
     template <typename T, typename... Args>
-    std::vector<T> query(Args&&... args) {
-        return db_.template query<T>(std::forward<Args>(args)...);
+    std::vector<T> query(const char *sql, Args&&... args) {
+        std::vector<T> result;
+        db_.template query<T>(result, sql, std::forward<Args>(args)...);
     }
 
-    //support member variable, such as: query(FID(simple::id), "<", 5)
-    template <typename Pair, typename U>
-    auto query(Pair pair, std::string_view oper, U&& val) {
-        auto sql = build_condition(pair, oper, std::forward<U>(val));
-        using T = typename ormpp::field_attribute<decltype(pair.second)>::type;
-        return query<T>(sql);
-    }
-
-    bool execute(const std::string& sql) {
-        return db_.execute(sql);
+    //restriction, all the args are string, the first is the where condition, rest are append conditions
+    template <typename... Args>
+    int execute(const char *sql, Args&&... args) {
+        std::vector<tuple<>> result;
+        return db_.template query<tuple<>>(result, sql, std::forward<Args>(args)...);
     }
 
     //transaction

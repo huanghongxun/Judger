@@ -258,7 +258,6 @@ void to_json(json &j, const check_case_report &report);
  * @endcode
  */
 struct random_check_report {
-    static constexpr int TYPE = 2;
 
     /**
      * @brief MOJ 随机测试得分
@@ -289,7 +288,6 @@ struct random_check_report {
 void to_json(json &j, const random_check_report &report);
 
 struct standard_check_report {
-    static constexpr int TYPE = 3;
 
     /**
      * @brief MOJ 标准测试得分
@@ -407,7 +405,6 @@ void to_json(json &j, const memory_check_error_report &report);
  * @endcode
  */
 struct memory_check_report {
-    static constexpr int TYPE = 1;
 
     /**
      * @brief MOJ 内存测试得分

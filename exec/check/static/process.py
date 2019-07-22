@@ -21,8 +21,7 @@ try:
     for violation in result["summary"]["numberOfViolationsWithPriority"]:
         grade -= (3 - violation['priority']) * violation['number']
     grade = 0 if grade < 0 else grade
-    if result["violation"]:
-        json.dump(result["violation"], report_file)
+    json.dump(result, report_file)
 
     score_file.write('{0} {1}'.format(grade, 10))
     score_file.close()

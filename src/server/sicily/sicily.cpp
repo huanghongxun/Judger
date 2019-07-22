@@ -98,15 +98,13 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
     unique_ptr<source_code> prog = make_unique<source_code>(sicily.exec_mgr);
     prog->language = submit.language;
     prog->source_files.push_back(make_unique<text_asset>("source.cpp", sourcecode));
-    prog->compile_command += "-fopenmp", "-march=native", "-O2";
 
     {
         // 编译任务
         test_check kase;
-        kase.check_script = "compile";
         kase.is_random = false;
         kase.score = 0;
-        kase.check_type = message::client_task::COMPILE_TYPE;
+        kase.check_script = message::client_task::COMPILE_TYPE;
         kase.testcase_id = 0;
         kase.depends_on = -1;  // 编译任务没有依赖，因此可以先执行
         submit.test_cases.push_back(kase);
@@ -205,13 +203,12 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
 }
 
 static void set_compilelog(configuration &sicily, const string &log, const submission &submit) {
-    sicily.db.query<std::tuple<>>(
-        "UPDATE status set compilelog=? where sid=?",
-        log, submit.sub_id);
+    sicily.db.execute("UPDATE status set compilelog=? where sid=?",
+                      log, submit.sub_id);
 }
 
 static void update_user(configuration &sicily, bool compilation_error, bool solved, const submission &submit) {
-    auto rows = sicily.db.query<std::tuple<>>(
+    auto rows = sicily.db.query<tuple<int>>(
         "SELECT sid FROM status WHERE pid=? AND uid=? AND status.status = 'Accepted' and sid != ?",
         submit.prob_id, submit.user_id, submit.sub_id);
     LOG(INFO) << "update status pid=" << submit.prob_id << " uid=" << submit.user_id << " sid=" << submit.sub_id << " solved=" << solved;
@@ -228,9 +225,8 @@ static void update_user(configuration &sicily, bool compilation_error, bool solv
     }
 
     if (solved) {
-        sicily.db.query<std::tuple<>>(
-            "UPDATE problems SET accepted = accepted + 1 WHERE pid=?",
-            submit.prob_id);
+        sicily.db.execute("UPDATE problems SET accepted = accepted + 1 WHERE pid=?",
+                          submit.prob_id);
     }
 
     if (!submit.contest_id.empty()) {
@@ -243,7 +239,7 @@ static void update_user(configuration &sicily, bool compilation_error, bool solv
         if (rows.empty()) {
             LOG(INFO) << "No submissions";
 
-            sicily.db.query<std::tuple<>>(
+            sicily.db.execute(
                 "INSERT INTO ranklist (uid, cid, pid, accepted, submissions, ac_time) VALUES (?, ?, ?, ?, ?, ?)",
                 submit.user_id, submit.contest_id, submit.contest_prob_id, (int)solved, compilation_error ? 0 : 1, (submit.submit_time - submit.contest_start_time) / 60 + 1);
         } else {
@@ -252,22 +248,23 @@ static void update_user(configuration &sicily, bool compilation_error, bool solv
             if (accepted == 0) {
                 LOG(INFO) << "Update Non-ac Submissions";
 
-                sicily.db.query<std::tuple<>>(
-                    "UPDATE ranklist SET accepted=?,ac_time=?,submissions=? WHERE uid=? AND cid=? AND pid=?",
+                sicily.db.execute(
+                    "UPDATE ranklist SET accepted=?, ac_time=?,submissions=? WHERE uid=? AND cid=? AND pid=?",
                     (int)solved, (submit.submit_time - submit.contest_start_time) / 60 + 1, submissions + (compilation_error ? 0 : 1), submit.user_id, submit.contest_id, submit.contest_prob_id);
             } else if (accepted == 1 && solved && ac_time > (submit.submit_time - submit.contest_start_time) / 60 + 1) {  // rejudge
                 LOG(INFO) << "Rejudge";
 
-                sicily.db.query<std::tuple<>>(
+                sicily.db.execute(
                     "DELETE FROM ranklist WHERE uid=? AND cid=? AND pid=? AND ac_time>?",
                     submit.user_id, submit.contest_id, submit.contest_prob_id, (submit.submit_time - submit.contest_start_time) / 60 + 1);
 
-                sicily.db.query<std::tuple<>>(
+                sicily.db.execute(
                     "INSERT INTO ranklist (uid, cid, pid, accepted, submissions, ac_time) VALUES (?, ?, ?, ?, ?, ?)",
                     submit.user_id, submit.contest_id, submit.contest_prob_id, (int)solved, compilation_error ? 0 : 1, (submit.submit_time - submit.contest_start_time) / 60 + 1);
 
-                sicily.db.query<std::tuple<>>(
-                    "UPDATE problems SET accepted=accepted+1 WHERE cid=? AND pid=?", submit.contest_id, submit.contest_prob_id);
+                sicily.db.execute(
+                    "UPDATE problems SET accepted=accepted+1 WHERE cid=? AND pid=?",
+                    submit.contest_id, submit.contest_prob_id);
             }
         }
     }
@@ -288,7 +285,7 @@ static void set_status(configuration &sicily, const judge::message::task_result 
 
     bool is_multiple_cases = submit.test_data.size() > 1;
     if (final_status.count(task_result.status)) {
-        sicily.db.query<std::tuple<>>(
+        sicily.db.execute(
             "UPDATE status SET status=?, failcase=?, run_time=?, run_memory=? WHERE sid=?",
             status_string.at(task_result.status),
             is_multiple_cases ? current_case : -1,
@@ -296,7 +293,7 @@ static void set_status(configuration &sicily, const judge::message::task_result 
             task_result.memory_used >> 10,  // Sicily 的内存占用单位是 KB
             submit.sub_id);
     } else {
-        sicily.db.query<std::tuple<>>(
+        sicily.db.execute(
             "UPDATE status SET status=?, failcase=? WHERE sid=?",
             status_string.at(task_result.status),
             is_multiple_cases ? current_case : -1,
@@ -306,9 +303,8 @@ static void set_status(configuration &sicily, const judge::message::task_result 
 }
 
 static void popup_queue(configuration &sicily, submission &submit) {
-    sicily.db.query<std::tuple<>>(
-        "DELETE FROM queue WHERE qid=?",
-        submit.queue_id);
+    sicily.db.execute("DELETE FROM queue WHERE qid=?",
+                      submit.queue_id);
 }
 
 bool configuration::fetch_submission(submission &submit) {
