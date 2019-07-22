@@ -34,7 +34,12 @@ void redis_conn::init(const redis &redis_config) {
 }
 
 void redis_conn::execute(function<void(cpp_redis::client &)> callback) {
-    while (!redis_client.is_connected()) connect_to_server(redis_client, redis_config);
+    int fail = 0;
+    for (; !redis_client.is_connected() && fail < 5; ++fail)
+        connect_to_server(redis_client, redis_config);
+    if (fail == 5) {
+        throw std::runtime_error("unable to connect to redis server");
+    }
     callback(redis_client);
     redis_client.sync_commit();
 }

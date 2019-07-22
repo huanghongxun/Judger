@@ -33,6 +33,10 @@ void from_json(const json &j, redis &redis_config) {
         j.at("password").get_to(redis_config.password);
     else
         redis_config.password = "";
+    if (j.count("channel"))
+        j.at("channel").get_to(redis_config.channel);
+    else
+        redis_config.channel = "";
 }
 
-}  // namespace judge::server::moj
+}  // namespace judge::server

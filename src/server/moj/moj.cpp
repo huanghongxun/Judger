@@ -408,8 +408,11 @@ static bool report_to_server(configuration &server, bool is_complete, const json
 
         LOG(INFO) << "MOJ Submission Reporter: inserting submission " << sub_id << " into redis";
         std::future<cpp_redis::reply> reply;
-        server.redis_server.execute([=, &reply](cpp_redis::client &redis) {
-            reply = redis.set(to_string(sub_id), report_string);
+        server.redis_server.execute([=, &server, &reply](cpp_redis::client &redis) {
+            if (server.redis_config.channel.empty())
+                reply = redis.set(to_string(sub_id), report_string);
+            else
+                reply = redis.publish(server.redis_config.channel, report_string);
         });
         cpp_redis::reply msg = reply.get();
         if (!msg.ok()) return false;

@@ -71,10 +71,23 @@ struct database {
 
 void from_json(const json &j, database &db);
 
+/**
+ * redis 的登录情况
+ */
 struct redis {
     string host;
     int port;
+
+    /**
+     * @brief 密码，若不为空，则使用该密码登录
+     */
     string password;
+
+    /**
+     * @brief 发布的通道名，允许服务端通过 subscribe 来监听 redis 的更改
+     * 如果为空，那么 publish 操作都改成 set 操作
+     */
+    string channel;
 };
 
 void from_json(const json &j, redis &redis_config);
