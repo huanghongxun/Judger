@@ -8,19 +8,19 @@
 #include <regex>
 #include <set>
 #include <thread>
-#include "client/client.hpp"
 #include "common/concurrent_queue.hpp"
 #include "common/messages.hpp"
 #include "common/system.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
+#include "server/mcourse/mcourse.hpp"
 #include "server/moj/moj.hpp"
-#include "server/server.hpp"
 #include "server/sicily/sicily.hpp"
+#include "worker.hpp"
 using namespace std;
 
 judge::concurrent_queue<judge::message::client_task> testcase_queue;
-set<int> client_pid;
+set<int> worker_pid;
 
 struct cpuset {
     string literal;
@@ -117,9 +117,9 @@ int main(int argc, char* argv[]) {
         ("enable-3", po::value<vector<string>>(), "run Matrix Judge System 3.0 submission fetcher, with configuration file path.")
         ("enable-2", po::value<vector<string>>(), "run Matrix Judge System 2.0 submission fetcher, with configuration file path.")
         ("monitor-port", po::value<unsigned>(), "set the port the monitor server listens to, default to 80")
-        ("clients", po::value<unsigned>(), "set number of single thread judge clients to be kept")
-        ("client", po::value<vector<cpuset>>(), "run a judge client which cpuset is given")
-        ("auto-clients", po::value<vector<cpuset>>(), "start clients with number of hardware concurrency")
+        ("workers", po::value<unsigned>(), "set number of single thread judge workers to be kept")
+        ("worker", po::value<vector<cpuset>>(), "run a judge worker which cpuset is given")
+        ("auto-workers", po::value<vector<cpuset>>(), "start workers with number of hardware concurrency")
         ("exec-dir", po::value<string>()->required(), "set the default predefined executables for falling back")
         ("cache-dir", po::value<string>()->required(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
         ("data-dir", po::value<string>(), "set the directory to store test data to be judged, for ramdisk to speed up IO performance of user program.")
@@ -250,7 +250,7 @@ int main(int argc, char* argv[]) {
 
             auto sicily_judger = make_unique<judge::server::sicily::configuration>();
             sicily_judger->init(sicily_server);
-            judge::server::register_judge_server(move(sicily_judger));
+            judge::register_judge_server(move(sicily_judger));
         }
     }
 
@@ -266,24 +266,33 @@ int main(int argc, char* argv[]) {
 
             auto third_judger = make_unique<judge::server::moj::configuration>();
             third_judger->init(third_server);
-            judge::server::register_judge_server(move(third_judger));
+            judge::register_judge_server(move(third_judger));
         }
     }
 
     if (vm.count("enable-2")) {
-        // TODO: not implemented
+        auto second_servers = vm.at("enable-2").as<vector<string>>();
+        for (auto& second_server : second_servers) {
+            CHECK(filesystem::is_regular_file(second_server))
+                << "Configuration file " << second_server << " does not exist";
+
+            auto second_judger = make_unique<judge::server::mcourse::configuration>();
+            second_judger->init(second_server);
+            judge::register_judge_server(move(second_judger));
+        }
     }
 
     set<unsigned> cores;
-    vector<thread> client_threads;
+    vector<thread> worker_threads;
+    size_t worker_id = 0;
 
-    if (vm.count("auto-clients")) {
-        // 对于自动设置客户端的情况，我们为每个 CPU 都生成一个 client
+    if (vm.count("auto-workers")) {
+        // 对于自动设置客户端的情况，我们为每个 CPU 都生成一个 worker
         cpu_set_t cpuset;
         for (unsigned i = 0; i < cpus; ++i) {
             CPU_ZERO(&cpuset);
             CPU_SET(i, &cpuset);
-            client_threads.push_back(move(judge::client::start_client(cpuset, to_string(i), testcase_queue)));
+            worker_threads.push_back(move(judge::start_worker(worker_id++, cpuset, to_string(i), testcase_queue)));
         }
     } else {
         // 对于手动设置客户端的情况，我们记录可以使用的核心
@@ -292,13 +301,13 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (vm.count("client")) {
-        auto clients = vm.at("client").as<vector<cpuset>>();
-        for (auto& client : clients) {
+    if (vm.count("worker")) {
+        auto workers = vm.at("worker").as<vector<cpuset>>();
+        for (auto& worker : workers) {
             cpu_set_t cpuset;
             CPU_ZERO(&cpuset);
 
-            for (unsigned id : client.ids) {
+            for (unsigned id : worker.ids) {
                 auto it = cores.find(id);
                 if (it == cores.end()) {
                     cerr << "Cpuset must be disjoint" << endl;
@@ -309,29 +318,29 @@ int main(int argc, char* argv[]) {
                 CPU_SET(id, &cpuset);
             }
 
-            client_threads.push_back(move(judge::client::start_client(cpuset, client.literal, testcase_queue)));
+            worker_threads.push_back(move(judge::start_worker(worker_id++, cpuset, worker.literal, testcase_queue)));
         }
     }
 
-    if (vm.count("clients")) {
-        auto clients = vm.at("clients").as<unsigned>();
-        if (cores.size() < clients) {
+    if (vm.count("workers")) {
+        auto workers = vm.at("workers").as<unsigned>();
+        if (cores.size() < workers) {
             cerr << "Not enough cores" << endl;
             return EXIT_FAILURE;
         }
         unsigned i = 0;
         auto it = cores.begin();
-        for (; i < clients; ++i, ++it) {
+        for (; i < workers; ++i, ++it) {
             int cpuid = *it;
             cpu_set_t cpuset;
             CPU_ZERO(&cpuset);
             CPU_SET(cpuid, &cpuset);
-            client_threads.push_back(move(judge::client::start_client(cpuset, to_string(cpuid), testcase_queue)));
+            worker_threads.push_back(move(judge::start_worker(worker_id++, cpuset, to_string(cpuid), testcase_queue)));
         }
     }
 
     // TODO: termination recovery
-    for (auto& th : client_threads)
+    for (auto& th : worker_threads)
         th.join();
     return 0;
 }

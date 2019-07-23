@@ -1,7 +1,7 @@
 #pragma once
 
 #include "SimpleAmqpClient/SimpleAmqpClient.h"
-#include "server/common/config.hpp"
+#include "server/config.hpp"
 
 namespace judge::server {
 

@@ -1,4 +1,4 @@
-#include "server/common/redis.hpp"
+#include "server/redis.hpp"
 #include <glog/logging.h>
 
 namespace judge::server {

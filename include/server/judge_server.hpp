@@ -4,23 +4,19 @@
 #include "common/messages.hpp"
 #include "common/status.hpp"
 #include "config.hpp"
-#include "server/submission.hpp"
+#include "judge/programming.hpp"
+#include "worker_state.hpp"
 
 namespace judge::server {
 using namespace std;
-
-enum class client_state {
-    START,
-    IDLE,
-    CRASHED,
-    STOPPED
-};
 
 /**
  * @brief 表示一个远程服务器
  * 比如可以表示 MOJ 的评测类型，运行时可以注册多个远程服务器拉取提交
  */
 struct judge_server {
+    virtual ~judge_server();
+
     /**
      * @brief 评测服务器的 id，用于标记 submission 是哪个
      * 远程服务器拉取的提交。
@@ -44,7 +40,7 @@ struct judge_server {
      * 该函数可能立即返回不阻塞，此时获取到提交才返回 true；
      * 也可能阻塞到有提交为止，此时返回总是 true。
      */
-    virtual bool fetch_submission(submission &submit) = 0;
+    virtual bool fetch_submission(unique_ptr<submission> &submit) = 0;
 
     /**
      * @brief 将提交返回给服务器
@@ -52,9 +48,9 @@ struct judge_server {
      * 评测过程而阻塞，获取提交和返回评测结果都能很快完成，因此 server 是单线程的。
      * @param submit 该提交的信息
      * @param completed 该提交完成了多少组评测
-     * @param task_results 评测结果
+     * @param judge_task_results 评测结果
      */
-    virtual void summarize(submission &submit, size_t completed, const vector<judge::message::task_result> &task_results) = 0;
+    virtual void summarize(submission &submit) = 0;
 
     /**
      * @brief 处理不合法的提交
@@ -66,6 +62,8 @@ struct judge_server {
      * @brief 获取服务器对应的 executable manager
      */
     virtual const executable_manager &get_executable_manager() const = 0;
+
+    virtual void report_worker_state(int worker_id, worker_state state);
 };
 
 }  // namespace judge::server

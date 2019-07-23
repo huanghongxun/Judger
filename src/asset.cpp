@@ -1,8 +1,8 @@
-#include "server/asset.hpp"
+#include "asset.hpp"
 #include <curl/curl.h>
 #include <fstream>
 
-namespace judge::server {
+namespace judge {
 using namespace std;
 
 asset::asset(const string &name) : name(name) {}
@@ -46,4 +46,4 @@ void remote_asset::fetch(const filesystem::path &path) {
     }
 }
 
-}  // namespace judge::server
+}  // namespace judge

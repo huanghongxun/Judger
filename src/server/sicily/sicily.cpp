@@ -6,7 +6,9 @@
 #include <tuple>
 #include "common/io_utils.hpp"
 #include "common/status.hpp"
-#include "server/common/config.hpp"
+#include "config.hpp"
+#include "judge/programming.hpp"
+#include "server/config.hpp"
 using namespace boost::assign;
 
 namespace judge::server::sicily {
@@ -70,7 +72,7 @@ static filesystem::path get_data_path(const filesystem::path &testdata, const st
     return testdata / prob_id / filename;
 }
 
-static bool fetch_queue(configuration &sicily, submission &submit) {
+static bool fetch_queue(configuration &sicily, programming_submission &submit) {
     submit.category = sicily.category();
 
     string time, sourcecode;
@@ -101,13 +103,13 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
 
     {
         // 编译任务
-        test_check kase;
+        judge_task kase;
         kase.is_random = false;
         kase.score = 0;
-        kase.check_script = message::client_task::COMPILE_TYPE;
+        kase.check_script = "compile";
         kase.testcase_id = 0;
         kase.depends_on = -1;  // 编译任务没有依赖，因此可以先执行
-        submit.test_cases.push_back(kase);
+        submit.judge_tasks.push_back(kase);
     }
 
     // Sicily 评测需要处理比赛信息
@@ -178,7 +180,7 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
                 submit.test_data.push_back(move(data));
 
                 // 添加评测任务，sicily 只有标准测试，因此为每个测试数据添加一个标准测试数据组
-                test_check kase;
+                judge_task kase;
                 kase.check_script = "standard";
                 kase.run_script = "standard";
                 kase.is_random = false;
@@ -186,18 +188,19 @@ static bool fetch_queue(configuration &sicily, submission &submit) {
                 kase.check_type = 1;
                 kase.testcase_id = i;
                 kase.depends_on = i;  // 当前的 kase 是第 i + 1 组测试点，依赖第 i 组测试点，最开始的测试数据将依赖编译
-                kase.depends_cond = test_check::depends_condition::ACCEPTED;
+                kase.depends_cond = judge_task::depends_condition::ACCEPTED;
                 kase.time_limit = time_limit;
                 kase.memory_limit = memory_limit;
                 kase.file_limit = file_limit;
                 kase.proc_limit = proc_limit;
-                submit.test_cases.push_back(kase);
+                submit.judge_tasks.push_back(kase);
             }
         }
     }
 
     submit.submission = move(prog);
-    submit.tag = judge::message::task_result(0, 0, 0);
+    submit.config = judge_task_result(0, 0);
+    submit.sub_type = "programming";
 
     return true;
 }
@@ -276,7 +279,7 @@ static void update_user(configuration &sicily, bool compilation_error, bool solv
  * @param task_result 当前测试点的评测结果
  * @param current_case 当前测试点编号
  */
-static void set_status(configuration &sicily, const judge::message::task_result &task_result, int current_case, const submission &submit) {
+static void set_status(configuration &sicily, const judge_task_result &task_result, int current_case, const programming_submission &submit) {
     // final_status 保存可以统计运行时间和运行内存占用的评测结果状态
     static set<status> final_status = {status::COMPILING, status::RUNNING, status::ACCEPTED, status::PRESENTATION_ERROR,
                                        status::WRONG_ANSWER, status::TIME_LIMIT_EXCEEDED, status::MEMORY_LIMIT_EXCEEDED,
@@ -307,24 +310,29 @@ static void popup_queue(configuration &sicily, submission &submit) {
                       submit.queue_id);
 }
 
-bool configuration::fetch_submission(submission &submit) {
-    return fetch_queue(*this, submit);
+bool configuration::fetch_submission(unique_ptr<submission> &origin) {
+    auto submit = make_unique<programming_submission>();
+    bool ret = fetch_queue(*this, *submit.get());
+    origin = move(submit);
+    return ret;
 }
 
-void configuration::summarize(submission &submit, size_t completed, const vector<judge::message::task_result> &task_results) {
-    if (completed < 1 || completed > task_results.size()) return;
+void configuration::summarize(submission &origin) {
+    auto &submit = dynamic_cast<programming_submission &>(origin);
+    size_t completed = submit.finished;
+    if (completed < 1 || completed > submit.results.size()) return;
 
-    if (completed == task_results.size())
+    if (completed == submit.results.size())
         popup_queue(*this, submit);
-    set_compilelog(*this, task_results[0].error_log, submit);
+    set_compilelog(*this, submit.results[0].error_log, submit);
 
-    judge::message::task_result current = task_results[completed - 1];
-    auto final_result = any_cast<judge::message::task_result>(submit.tag);
+    judge_task_result current = submit.results[completed - 1];
+    auto final_result = any_cast<judge_task_result>(submit.config);
 
     if (completed == 1) {
         if (current.status != judge::status::ACCEPTED) {
             // 先检查是否存在编译错误的情况
-            set_status(*this, task_results[0], 0, submit);
+            set_status(*this, submit.results[0], 0, submit);
             update_user(*this, /* compilation_error */ true, /* solved */ false, submit);
             return;
         }
@@ -333,7 +341,7 @@ void configuration::summarize(submission &submit, size_t completed, const vector
         final_result.memory_used = max(final_result.memory_used, current.memory_used);
     }
 
-    submit.tag = final_result;
+    submit.config = final_result;
 
     // 如果选手程序在当前测试点失败，则直接返回提交结果。
     // 根据我们构造的 submission，之后一定不会再调用 summarize 函数
@@ -347,7 +355,7 @@ void configuration::summarize(submission &submit, size_t completed, const vector
 
     // 所有测试数据都通过了测试，此时我们返回 Accepted
     // 对于可能没有标准测试数据的题目，completed == 1 满足之后会到这里返回 Accepted
-    if (completed == task_results.size()) {
+    if (completed == submit.results.size()) {
         set_status(*this, final_result, submit.test_data.size(), submit);
         update_user(*this, /* compilation_error */ false, /* solved */ true, submit);
     }

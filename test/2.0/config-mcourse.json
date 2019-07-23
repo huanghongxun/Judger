@@ -14,8 +14,9 @@
     "submission_queue": {
         "port": 25565,
         "exchange": "",
+        "exchange_type": "direct",
         "hostname": "localhost",
-        "queue": "matrix",
+        "queue": "CourseSubmission",
         "routing_key": "matrix"
     },
     "systemConfig": {
@@ -28,5 +29,6 @@
             "randomGenerate": 10.0,
             "valgrind": 20.0
         }
-    }
+    },
+    "host": "localhost"
 }

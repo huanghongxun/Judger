@@ -1,4 +1,4 @@
-#include "server/program.hpp"
+#include "program.hpp"
 #include <fmt/core.h>
 #include <glog/logging.h>
 #include <stdlib.h>
@@ -12,7 +12,7 @@
 #include "config.hpp"
 using namespace std;
 
-namespace judge::server {
+namespace judge {
 
 compilation_error::compilation_error(const string &what, const string &error_log)
     : runtime_error(what), error_log(error_log) {}
@@ -173,4 +173,4 @@ fs::path source_code::get_run_path(const fs::path &path) {
     return path / "compile";
 }
 
-}  // namespace judge::server
+}  // namespace judge

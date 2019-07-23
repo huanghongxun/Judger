@@ -22,7 +22,7 @@ struct judge_request {
         programming = 0,
         choice = 1,
         output = 4,
-        problem_blank_filling = 5
+        program_blank_filling = 5
     };
 
     /**
@@ -96,8 +96,6 @@ struct judge_report {
 
     bool is_complete;
 };
-
-void to_json(json &j, const judge_report &report);
 
 /**
  * @brief 错误检查报告

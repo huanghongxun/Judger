@@ -1,11 +1,8 @@
 #pragma once
 
-#include <map>
-#include <nlohmann/json.hpp>
-#include "server/common/redis.hpp"
-#include "server/common/submission_fetcher.hpp"
 #include "server/judge_server.hpp"
-#include "server/moj/config.hpp"
+#include "server/redis.hpp"
+#include "server/submission_fetcher.hpp"
 #include "sql/dbng.hpp"
 #include "sql/mysql.hpp"
 
@@ -30,7 +27,7 @@ struct configuration : public judge_server {
     redis_conn redis_server;
 
     database dbcfg;
-    
+
     /**
      * @brief 修改数据库中有关提交的状态
      */
@@ -39,14 +36,14 @@ struct configuration : public judge_server {
     /**
      * @brief 拉取选择题评测的消息队列
      */
-    amqp choice_submission;
+    amqp choice_queue;
 
     unique_ptr<submission_fetcher> choice_fetcher;
 
     /**
      * @brief 拉取编程题评测的消息队列
      */
-    amqp programming_submission;
+    amqp programming_queue;
 
     unique_ptr<submission_fetcher> programming_fetcher;
 
@@ -68,16 +65,16 @@ struct configuration : public judge_server {
      * 该函数可能立即返回不阻塞，此时获取到提交才返回 true；
      * 也可能阻塞到有提交为止，此时返回总是 true。
      */
-    bool fetch_submission(submission &submit) override;
+    bool fetch_submission(unique_ptr<submission> &submit) override;
 
     /**
      * @brief 将提交返回给服务器
      * 该函数是阻塞的。评测系统不需要通过多线程来并发写服务器，因为 server 并不会因为
      * 评测过程而阻塞，获取提交和返回评测结果都能很快完成，因此 server 是单线程的。
      * @param submit 该提交的信息
-     * @param task_results 评测结果
+     * @param judge_task_results 评测结果
      */
-    void summarize(submission &submit, size_t completed, const vector<judge::message::task_result> &task_results) override;
+    void summarize(submission &submit) override;
 
     /**
      * @brief 处理不合法的提交

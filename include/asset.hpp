@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-namespace judge::server {
+namespace judge {
 using namespace std;
 
 /**
@@ -68,4 +68,4 @@ struct remote_asset : public asset {
 typedef shared_ptr<asset> asset_ptr;
 typedef unique_ptr<asset> asset_uptr;
 
-}  // namespace judge::server
+}  // namespace judge

@@ -1,4 +1,4 @@
-#include "client/client.hpp"
+#include "judge/programming.hpp"
 #include <glog/logging.h>
 #include <unistd.h>
 #include <boost/algorithm/string/join.hpp>
@@ -10,28 +10,25 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <fstream>
-#include "client/judge.hpp"
 #include "common/interprocess.hpp"
 #include "common/io_utils.hpp"
 #include "common/stl_utils.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
-#include "server/server.hpp"
+#include "runguard.hpp"
+#include "worker.hpp"
+#include "server/judge_server.hpp"
 
-namespace judge::client {
-using namespace std;
+namespace judge {
 
-thread start_client(const cpu_set_t &set, const string &execcpuset, concurrent_queue<message::client_task> &testcase_queue) {
-    thread thd([execcpuset, &testcase_queue] {
-        client(execcpuset, testcase_queue);
-    });
+test_case_data::test_case_data() {}
 
-    // 设置当前线程（客户端线程）的 CPU 亲和性，要求操作系统将 thd 线程放在指定的 cpuset 上运行
-    int ret = pthread_setaffinity_np(thd.native_handle(), sizeof(cpu_set_t), &set);
-    if (ret < 0) throw std::system_error();
+test_case_data::test_case_data(test_case_data &&other)
+    : inputs(move(other.inputs)), outputs(move(other.outputs)) {}
 
-    return thd;
-}
+judge_task_result::judge_task_result() : score(0) {}
+judge_task_result::judge_task_result(size_t id, uint8_t type)
+    : id(id), type(type), score(0), run_time(0), memory_used(0) {}
 
 /**
  * @brief 执行程序评测任务
@@ -41,17 +38,17 @@ thread start_client(const cpu_set_t &set, const string &execcpuset, concurrent_q
  * @param execcpuset 当前评测任务能允许运行在那些 cpu 核心上
  * @param result_queue 评测结果队列
  */
-static message::task_result judge(message::client_task &client_task, server::submission &submit, server::test_check &task, const string &execcpuset) {
+static judge_task_result judge_impl(const message::client_task &client_task, programming_submission &submit, judge_task &task, const string &execcpuset) {
     namespace ip = boost::interprocess;
     string uuid = boost::lexical_cast<string>(boost::uuids::random_generator()());
     filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;               // 题目的缓存文件夹
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;  // 本提交的工作文件夹
     filesystem::path rundir = workdir / ("run-" + uuid);                                    // 本测试点的运行文件夹
 
-    message::task_result result{client_task.judge_id, client_task.id, client_task.type};
+    judge_task_result result{client_task.id, client_task.type};
     result.run_dir = rundir;
 
-    server::judge_server &server = server::get_judge_server_by_category(submit.category);
+    server::judge_server &server = get_judge_server_by_category(submit.category);
     auto &exec_mgr = server.get_executable_manager();
 
     // <check-script> <std.in> <std.out> <timelimit> <chrootdir> <workdir> <run-id> <run-script> <compare-script>
@@ -61,9 +58,9 @@ static message::task_result judge(message::client_task &client_task, server::sub
     auto run_script = exec_mgr.get_run_script(task.run_script);
     run_script->fetch(execcpuset, CHROOT_DIR);
 
-    unique_ptr<judge::server::program> exec_compare_script = task.compare_script.empty() ? nullptr : exec_mgr.get_compare_script(task.compare_script);
+    unique_ptr<judge::program> exec_compare_script = task.compare_script.empty() ? nullptr : exec_mgr.get_compare_script(task.compare_script);
     auto &compare_script = task.compare_script.empty() ? submit.compare : exec_compare_script;
-    if (!compare_script) { // 没有 submit.compare，但却存在需求 submit.compare 的 task 时报错
+    if (!compare_script) {  // 没有 submit.compare，但却存在需求 submit.compare 的 task 时报错
         result.status = status::SYSTEM_ERROR;
         result.error_log = "no compare script";
         return result;
@@ -74,8 +71,8 @@ static message::task_result judge(message::client_task &client_task, server::sub
     filesystem::path datadir;
 
     int depends_on = task.depends_on;
-    server::test_check *father = nullptr;
-    if (depends_on >= 0) father = &submit.test_cases[depends_on];
+    judge_task *father = nullptr;
+    if (depends_on >= 0) father = &submit.judge_tasks[depends_on];
 
     // 获得输入输出数据
     // TODO: 根据 submission 的 last_update 更新数据
@@ -230,22 +227,22 @@ static message::task_result judge(message::client_task &client_task, server::sub
         filesystem::remove(datadir);
     }
 
-    auto metadata = read_runguard_result(rundir / "program.meta");
+    auto metadata = client::read_runguard_result(rundir / "program.meta");
     result.run_time = metadata.wall_time;  // TODO: 支持题目选择 cpu_time 或者 wall_time 进行时间
     result.memory_used = metadata.memory / 1024;
     return result;
 }
 
-static void compile(server::program *program, const filesystem::path &workdir, const string &execcpuset, message::task_result &task_result) {
+static void compile(judge::program *program, const filesystem::path &workdir, const string &execcpuset, judge_task_result &task_result) {
     try {
         // 将程序存放在 workdir 下，program->fetch 会自行组织 workdir 内的文件存储结构
         // 并编译程序，编译需要的运行环境就是全局的 CHROOT_DIR，这样可以获得比较完整的环境
         program->fetch(execcpuset, workdir, CHROOT_DIR);
         task_result.status = status::ACCEPTED;
-    } catch (server::executable_compilation_error &ex) {
+    } catch (executable_compilation_error &ex) {
         task_result.status = status::EXECUTABLE_COMPILATION_ERROR;
         task_result.error_log = string(ex.what()) + "\n" + program->get_compilation_log(workdir);
-    } catch (server::compilation_error &ex) {
+    } catch (compilation_error &ex) {
         task_result.status = status::COMPILATION_ERROR;
         task_result.error_log = string(ex.what()) + "\n" + program->get_compilation_log(workdir);
     } catch (exception &ex) {
@@ -262,16 +259,16 @@ static void compile(server::program *program, const filesystem::path &workdir, c
  * @param execcpuset 当前评测任务能允许运行在那些 cpu 核心上
  * @param result_queue 评测结果队列
  */
-static message::task_result compile(message::client_task &client_task, server::submission &submit, const string &execcpuset) {
+static judge_task_result compile(const message::client_task &client_task, programming_submission &submit, judge_task &task, const string &execcpuset) {
     filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;
 
-    message::task_result result{client_task.judge_id, client_task.id, client_task.type};
+    judge_task_result result{client_task.id, client_task.type};
 
     // 编译选手程序，submit.submission 都为非空，否则在 server.cpp 中的 fetch_submission 会阻止该提交的评测
     if (submit.submission) {
         filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
         compile(submit.submission.get(), workdir, execcpuset, result);
-        auto metadata = read_runguard_result(workdir / "compile" / "compile.meta");
+        auto metadata = client::read_runguard_result(workdir / "compile" / "compile.meta");
         result.run_time = metadata.wall_time;
         result.memory_used = metadata.memory / 1024;
         if (result.status != status::ACCEPTED) return result;
@@ -306,34 +303,176 @@ static message::task_result compile(message::client_task &client_task, server::s
     return result;
 }
 
-void client(const string &execcpuset, concurrent_queue<message::client_task> &testcase_queue) {
-    while (true) {
-        // 从队列中读取评测信息
-        message::client_task client_task;
-        {
-            if (!testcase_queue.try_pop(client_task)) {
-                if (!server::fetch_submission(testcase_queue))
-                    usleep(10 * 1000);  // 10ms，这里必须等待，不可以忙等，否则会挤占 process 函数的执行权
-                continue;
+string programming_judger::type() {
+    return "programming";
+}
+
+bool programming_judger::verify(unique_ptr<submission> &submit) {
+    auto sub = dynamic_cast<programming_submission *>(submit.get());
+    if (!sub) return false;
+    LOG(INFO) << "Judging submission [" << sub->category << "-" << sub->prob_id << "-" << sub->sub_id << "]";
+
+    // 检查 judge_server 获取的 sub 是否包含编译任务，且确保至多一个编译任务
+    bool has_compile_case = false;
+    for (size_t i = 0; i < sub->judge_tasks.size(); ++i) {
+        auto &judge_task = sub->judge_tasks[i];
+
+        if (judge_task.depends_on >= (int)i) {  // 如果每个任务都只依赖前面的任务，那么这个图将是森林，确保不会出现环
+            LOG(WARNING) << "Submission from [" << sub->category << "-" << sub->prob_id << "-" << sub->sub_id << "] may contains circular dependency.";
+            return false;
+        }
+
+        if (judge_task.check_script == "compile") {
+            if (!has_compile_case) {
+                has_compile_case = true;
+            } else {
+                LOG(WARNING) << "Submission from [" << sub->category << "-" << sub->prob_id << "-" << sub->sub_id << "] has multiple compilation subtasks.";
+                return false;
             }
         }
+    }
 
-        server::submission &submit = *client_task.submit;
-        message::task_result result;
+    if (!sub->submission) return false;
 
-        try {
-            if (client_task.type == message::client_task::COMPILE_TYPE)
-                result = compile(client_task, submit, execcpuset);
-            else
-                result = judge(client_task, submit, *client_task.test_check, execcpuset);
-        } catch (exception &ex) {
-            result = {client_task.judge_id, client_task.id, client_task.type};
-            result.status = status::SYSTEM_ERROR;
-            result.error_log = ex.what();
+    // 检查是否存在可以直接评测的测试点，如果不存在则直接返回
+    bool sent_testcase = false;
+    for (size_t i = 0; i < sub->judge_tasks.size(); ++i)
+        if (sub->judge_tasks[i].depends_on < 0) {
+            sent_testcase = true;
+            break;
         }
 
-        server::process(testcase_queue, result);
+    if (!sent_testcase) {
+        // 如果不存在评测任务，直接返回
+        LOG(WARNING) << "Submission from [" << sub->category << "-" << sub->prob_id << "-" << sub->sub_id << "] does not have entry test task.";
+        return false;
+    }
+
+    return true;
+}
+
+bool programming_judger::distribute(concurrent_queue<message::client_task> &task_queue, unique_ptr<submission> &submit) {
+    auto sub = dynamic_cast<programming_submission *>(submit.get());
+    // 初始化当前提交的所有评测任务状态为 PENDING
+    sub->results.resize(sub->judge_tasks.size());
+    for (size_t i = 0; i < sub->results.size(); ++i) {
+        sub->results[i].status = judge::status::PENDING;
+        sub->results[i].id = i;
+        sub->results[i].type = sub->judge_tasks[i].check_type;
+    }
+
+    // 寻找没有依赖的评测点，并发送评测消息
+    for (size_t i = 0; i < sub->judge_tasks.size(); ++i) {
+        if (sub->judge_tasks[i].depends_on < 0) {  // 不依赖任何任务的任务可以直接开始评测
+            judge::message::client_task client_task = {
+                .submit = submit.get(),
+                .id = i,
+                .type = sub->judge_tasks[i].check_type};
+            task_queue.push(client_task);
+        }
+    }
+    return true;
+}
+
+static void summarize(programming_submission &submit) {
+    auto &judge_server = get_judge_server_by_category(submit.category);
+    judge_server.summarize(submit);
+
+    filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
+    try {
+        filesystem::remove_all(workdir);
+    } catch (exception &e) {
+        LOG(ERROR) << "Unable to delete directory " << workdir << ":" << e.what();
     }
 }
 
-}  // namespace judge::client
+/**
+ * @brief 处理 client 返回的评测结果
+ * 
+ * @param task_result client 返回的评测结果
+ */
+void programming_judger::process(concurrent_queue<message::client_task> &testcase_queue, programming_submission &submit, const judge_task_result &result) {
+    // 记录测试信息
+    submit.results[result.id] = result;
+
+    DLOG(INFO) << "Testcase [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id
+               << ", status: " << (int)result.status << ", runtime: " << result.run_time
+               << ", memory: " << result.memory_used << ", run_dir: " << result.run_dir
+               << ", data_dir: " << result.data_dir << "]";
+
+    for (size_t i = 0; i < submit.judge_tasks.size(); ++i) {
+        judge_task &kase = submit.judge_tasks[i];
+        // 寻找依赖当前评测点的评测点
+        if (kase.depends_on == (int)result.id) {
+            bool satisfied;
+            switch (kase.depends_cond) {
+                case judge_task::depends_condition::ACCEPTED:
+                    satisfied = result.status == status::ACCEPTED;
+                    break;
+                case judge_task::depends_condition::PARTIAL_CORRECT:
+                    satisfied = result.status == status::PARTIAL_CORRECT ||
+                                result.status == status::ACCEPTED;
+                    break;
+                case judge_task::depends_condition::NON_TIME_LIMIT:
+                    satisfied = result.status != status::SYSTEM_ERROR &&
+                                result.status != status::COMPARE_ERROR &&
+                                result.status != status::COMPILATION_ERROR &&
+                                result.status != status::DEPENDENCY_NOT_SATISFIED &&
+                                result.status != status::TIME_LIMIT_EXCEEDED &&
+                                result.status != status::EXECUTABLE_COMPILATION_ERROR &&
+                                result.status != status::OUT_OF_CONTEST_TIME &&
+                                result.status != status::RANDOM_GEN_ERROR;
+                    break;
+            }
+
+            if (satisfied) {
+                judge::message::client_task client_task = {
+                    .submit = &submit,
+                    .id = i,
+                    .type = submit.judge_tasks[i].check_type};
+                testcase_queue.push(client_task);
+            } else {
+                judge_task_result next_result = result;
+                next_result.status = status::DEPENDENCY_NOT_SATISFIED;
+                next_result.id = i;
+                next_result.type = kase.check_type;
+                process(testcase_queue, submit, next_result);
+            }
+        }
+    }
+
+    size_t finished = ++submit.finished;
+    // 如果当前提交的所有测试点都完成测试，则返回评测结果
+    if (finished == submit.judge_tasks.size()) {
+        summarize(submit);
+        fire_judge_finished(submit);
+        return;  // 跳过本次评测过程
+    } else if (finished > submit.judge_tasks.size()) {
+        LOG(ERROR) << "Test case exceeded [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "]";
+        return;  // 跳过本次评测过程
+    } else {
+        // TODO: 发送 incomplete 的评测报告
+    }
+}
+
+void programming_judger::judge(const message::client_task &client_task, concurrent_queue<message::client_task> &task_queue, const string &execcpuset) {
+    auto submit = dynamic_cast<programming_submission *>(client_task.submit);
+    judge_task &task = submit->judge_tasks[client_task.id];
+    judge_task_result result;
+
+    try {
+        if (task.check_script == "compile")
+            result = compile(client_task, *submit, task, execcpuset);
+        else
+            result = judge_impl(client_task, *submit, task, execcpuset);
+    } catch (exception &ex) {
+        result = {client_task.id, client_task.type};
+        result.status = status::SYSTEM_ERROR;
+        result.error_log = ex.what();
+    }
+
+    lock_guard<mutex> guard(mut);
+    process(task_queue, *submit, result);
+}
+
+}  // namespace judge

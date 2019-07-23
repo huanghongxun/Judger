@@ -27,16 +27,17 @@ public:
 
     //restriction, all the args are string, the first is the where condition, rest are append conditions
     template <typename T, typename... Args>
-    std::vector<T> query(const char *sql, Args&&... args) {
+    constexpr std::vector<T> query(const char *sql, Args&&... args) {
         std::vector<T> result;
         db_.template query<T>(result, sql, std::forward<Args>(args)...);
+        return result;
     }
 
     //restriction, all the args are string, the first is the where condition, rest are append conditions
     template <typename... Args>
-    int execute(const char *sql, Args&&... args) {
-        std::vector<tuple<>> result;
-        return db_.template query<tuple<>>(result, sql, std::forward<Args>(args)...);
+    constexpr int execute(const char *sql, Args&&... args) {
+        std::vector<std::tuple<>> result;
+        return db_.template query<std::tuple<>>(result, sql, std::forward<Args>(args)...);
     }
 
     //transaction

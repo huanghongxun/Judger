@@ -15,6 +15,14 @@
 
 namespace ormpp {
 
+template <typename S>
+constexpr int count_char(S str, char ch) {
+    int ans = 0;
+    for (char c : str)
+        if (c == ch) ++ans;
+    return ans;
+}
+
 class mysql {
 public:
     ~mysql() {
@@ -80,7 +88,7 @@ public:
 
     //for tuple and string with args...
     template <typename T, typename... Args>
-    constexpr int query(std::vector<T>& result, const char* sql, Args&&... args) {
+    constexpr int query(std::vector<T> &result, const char *sql, Args&&... args) {
         static_assert(iguana::is_tuple<T>::value);
 
         constexpr auto args_sz = sizeof...(Args);

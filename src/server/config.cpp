@@ -1,4 +1,4 @@
-#include "server/common/config.hpp"
+#include "server/config.hpp"
 
 namespace judge::server {
 using namespace std;

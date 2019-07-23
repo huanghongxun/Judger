@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
-#include "server/asset.hpp"
+#include "asset.hpp"
 
 /**
  * 这个头文件包含表示可以编译的可执行文件的类
@@ -19,7 +19,7 @@
  * source_code 需要提供语言，在选择 Makefile 语言之后其实也可以表示成 executable。
  * 2. executable 一般不在保护模式下运行，且有 root 权限；而 source code 在保护模式下运行。
  */
-namespace judge::server {
+namespace judge {
 using namespace std;
 
 /**
@@ -258,4 +258,4 @@ protected:
     executable_manager &exec_mgr;
 };
 
-}  // namespace judge::server
+}  // namespace judge

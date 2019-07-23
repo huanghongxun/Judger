@@ -8,8 +8,9 @@
 #include "common/stl_utils.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
-#include "server/common/config.hpp"
-#include "server/mcourse/choice.hpp"
+#include "judge/choice.hpp"
+#include "judge/program_output.hpp"
+#include "judge/programming.hpp"
 #include "server/mcourse/feedback.hpp"
 
 namespace judge::server::mcourse {
@@ -27,7 +28,7 @@ const int GTEST_CHECK_TYPE = 5;
 const unordered_map<status, const char *> status_string = boost::assign::map_list_of
     (status::PENDING, "")
     (status::RUNNING, "")
-    (status::ACCEPTED, "OK")
+    (status::ACCEPTED, "AC")
     (status::COMPILATION_ERROR, "CE")
     (status::WRONG_ANSWER, "WA")
     (status::RUNTIME_ERROR, "RE")
@@ -81,17 +82,6 @@ static function<asset_uptr(const string &)> moj_url_to_remote_file(configuration
     return [&](const string &name) {
         return make_unique<remote_asset>(name, config.system.file_api + "/" + subpath + "/" + name);
     };
-}
-
-void from_json_mcourse(const json &j, configuration &server, submission &submit) {
-    judge_request request = j;
-
-    from_json_mcourse_config(request.config, request.detail, request.sub_type, server, submit);
-
-    if (request.prob_type == judge_request::programming) {
-        // 标记当前 submission 正在评测
-        server.matrix_db.execute("UPDATE submission SET grade=-1 WHERE sub_id=?", request.sub_id);
-    }
 }
 
 /**
@@ -182,7 +172,7 @@ void from_json_mcourse(const json &j, configuration &server, submission &submit)
  * detail:
  * {"language": "c++"} 或者是 {"is_standard": 1}
  */
-void from_json_mcourse_config(const json &config, const json &detail, judge_request::submission_type sub_type, configuration &server, submission &submit) {
+void from_json_programming(const json &config, const json &detail, judge_request::submission_type sub_type, configuration &server, programming_submission &submit) {
     unique_ptr<source_code> submission = make_unique<source_code>(server.exec_mgr);
     unique_ptr<source_code> standard = make_unique<source_code>(server.exec_mgr);
 
@@ -199,13 +189,10 @@ void from_json_mcourse_config(const json &config, const json &detail, judge_requ
     }
 
     // compiler 项因为我们忽略课程系统的编译参数，因此也忽略掉
-    // FIXME: exec_flag, entry_point, output_program 项暂时忽略掉
+    // standard_score 看起来像满分，但我们可以根据 grading 把满分算出来，所以不知道这个有啥用
+    // FIXME: exec_flag, entry_point, output_program, standard_score 项暂时忽略掉
 
     config.at("standard_language").get_to(standard->language);
-
-    [[unused]] int total_score;
-    // standard_score 看起来像满分，但我们可以根据 grading 把满分算出来，所以不知道这个有啥用
-    config.at("standard_score").get_to(total_score);
 
     int memory_limit;
     double time_limit;
@@ -282,10 +269,10 @@ void from_json_mcourse_config(const json &config, const json &detail, judge_requ
     vector<int> random_checks;    // 随机测试的评测点编号
 
     {  // 编译测试
-        test_check testcase;
+        judge_task testcase;
         testcase.score = grading.count("compile check") ? grading.at("compile check").get<int>() : 0;
         testcase.depends_on = -1;
-        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+        testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = COMPILE_CHECK_TYPE;
         testcase.check_script = "compile";
         testcase.is_random = false;
@@ -294,15 +281,15 @@ void from_json_mcourse_config(const json &config, const json &detail, judge_requ
         testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
-        submit.test_cases.push_back(testcase);
+        submit.judge_tasks.push_back(testcase);
     }
 
     {  // 随机测试
-        test_check testcase;
+        judge_task testcase;
         testcase.score = grading.count("random tests") ? grading.at("random tests").get<int>() : 0;
         testcase.score /= max(random_test_times, 1);
         testcase.depends_on = 0;  // 依赖编译任务
-        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+        testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = RANDOM_CHECK_TYPE;
         testcase.check_script = "standard";
         testcase.run_script = "standard";
@@ -316,17 +303,17 @@ void from_json_mcourse_config(const json &config, const json &detail, judge_requ
         for (int i = 0; i < random_test_times && testcase.score > 0; ++i) {
             testcase.testcase_id = -1;  // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
             // 将当前的随机测试点编号记录下来，给内存测试依赖
-            random_checks.push_back(submit.test_cases.size());
-            submit.test_cases.push_back(testcase);
+            random_checks.push_back(submit.judge_tasks.size());
+            submit.judge_tasks.push_back(testcase);
         }
     }
 
     {  // 标准测试
-        test_check testcase;
+        judge_task testcase;
         testcase.score = grading.count("standard tests") ? grading.at("standard tests").get<int>() : 0;
-        testcase.score /= submit.test_data.size();
+        testcase.score /= submit.judge_tasks.size();
         testcase.depends_on = 0;  // 依赖编译任务
-        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+        testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = STANDARD_CHECK_TYPE;
         testcase.check_script = "standard";
         testcase.run_script = "standard";
@@ -337,16 +324,16 @@ void from_json_mcourse_config(const json &config, const json &detail, judge_requ
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
 
-        for (size_t i = 0; i < submit.test_data.size() && testcase.score > 0; ++i) {
+        for (size_t i = 0; i < submit.judge_tasks.size() && testcase.score > 0; ++i) {
             testcase.testcase_id = i;
             // 将当前的标准测试点编号记录下来，给内存测试依赖
-            standard_checks.push_back(submit.test_cases.size());
-            submit.test_cases.push_back(testcase);
+            standard_checks.push_back(submit.judge_tasks.size());
+            submit.judge_tasks.push_back(testcase);
         }
     }
 
     {  // 静态测试
-        test_check testcase;
+        judge_task testcase;
         testcase.score = grading.count("static check") ? grading.at("static check").get<int>() : 0;
         testcase.depends_on = -1;  // 静态测试不需要通过编译？
         testcase.check_type = STATIC_CHECK_TYPE;
@@ -360,14 +347,14 @@ void from_json_mcourse_config(const json &config, const json &detail, judge_requ
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
         if (testcase.score > 0)
-            submit.test_cases.push_back(testcase);
+            submit.judge_tasks.push_back(testcase);
     }
 
     {  // GTest 测试
-        test_check testcase;
+        judge_task testcase;
         testcase.score = grading.count("google tests") ? grading.at("google tests").get<int>() : 0;
         testcase.depends_on = 0;  // 依赖编译任务
-        testcase.depends_cond = test_check::depends_condition::ACCEPTED;
+        testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = GTEST_CHECK_TYPE;
         testcase.check_script = "standard";
         testcase.run_script = "gtest";
@@ -379,17 +366,17 @@ void from_json_mcourse_config(const json &config, const json &detail, judge_requ
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
         if (testcase.score > 0)
-            submit.test_cases.push_back(testcase);
+            submit.judge_tasks.push_back(testcase);
     }
 
     {  // 内存测试需要依赖标准测试或随机测试以便可以在标准或随机测试没有 AC 的情况下终止内存测试以加速评测速度
-        test_check testcase;
+        judge_task testcase;
         testcase.score = grading.count("memory check") ? grading.at("memory check").get<int>() : 0;
         testcase.check_type = MEMORY_CHECK_TYPE;
         testcase.check_script = "standard";
         testcase.run_script = "valgrind";
         testcase.compare_script = "valgrind";
-        testcase.is_random = submit.test_cases.empty();
+        testcase.is_random = submit.judge_tasks.empty();
         testcase.time_limit = server.system.time_limit.valgrind;
         testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
         testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
@@ -399,59 +386,137 @@ void from_json_mcourse_config(const json &config, const json &detail, judge_requ
         if (testcase.is_random) {
             if (!random_checks.empty()) {  // 如果存在随机测试，则依赖随机测试点的数据
                 for (int &i : random_checks) {
-                    testcase.testcase_id = submit.test_cases[i].testcase_id;
+                    testcase.testcase_id = submit.judge_tasks[i].testcase_id;
                     testcase.depends_on = i;
-                    testcase.depends_cond = test_check::depends_condition::ACCEPTED;
-                    submit.test_cases.push_back(testcase);
+                    testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+                    submit.judge_tasks.push_back(testcase);
                 }
                 test_count = random_checks.size();
             } else {  // 否则只能生成 10 组随机测试数据
                 for (size_t i = 0; i < 10; ++i) {
                     testcase.testcase_id = i;
                     testcase.depends_on = 0;  // 依赖编译任务
-                    testcase.depends_cond = test_check::depends_condition::ACCEPTED;
-                    submit.test_cases.push_back(testcase);
+                    testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+                    submit.judge_tasks.push_back(testcase);
                 }
                 test_count = 10;
             }
         } else {
             for (int &i : standard_checks) {
-                testcase.testcase_id = submit.test_cases[i].testcase_id;
+                testcase.testcase_id = submit.judge_tasks[i].testcase_id;
                 testcase.depends_on = i;
-                testcase.depends_cond = test_check::depends_condition::ACCEPTED;
-                submit.test_cases.push_back(testcase);
+                testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+                submit.judge_tasks.push_back(testcase);
             }
             test_count = standard_checks.size();
         }
         testcase.score /= test_count;
     }
+
+    submit.sub_type = "programming";
+}
+
+void from_json_choice(const json &config, const json &detail, judge_request::submission_type, configuration &, choice_submission &submit) {
+    auto &standard = config.at("questions");
+    auto &answer = detail.at("answers");
+
+    int id = 0;
+    for (json::const_iterator qit = standard.begin(), ait = answer.begin();
+         qit != standard.end() && ait != standard.end();
+         ++qit, ++ait, ++id) {
+        choice_question q;
+
+        const json &qobj = *qit;
+        const json &aobj = *ait;
+
+        if (qobj.at("id").get<int>() != id) throw invalid_argument("question id is not continuous");
+        if (aobj.at("question_id").get<int>() != id) throw invalid_argument("question id is not continuous");
+        qobj.at("grading").at("max_grade").get_to(q.full_grade);
+        if (qobj.at("grading").count("half_grade"))
+            qobj.at("grading").at("half_grade").get_to(q.half_grade);
+        qobj.at("choice_type").get_to(q.type);
+        qobj.at("standard_answer").get_to(q.standard_answer);
+        aobj.at("choice_id").get_to(q.student_answer);
+        submit.questions.push_back(q);
+    }
+
+    submit.sub_type = "choice";
+}
+
+void from_json_program_output(const json &config, const json &detail, judge_request::submission_type, configuration &, program_output_submission &submit) {
+    vector<string> standard_answers, student_answers;
+    vector<int> scores;
+    config.at("standard_answers").get_to(standard_answers);
+    config.at("answer_scores").get_to(scores);
+    detail.at("student_answers").get_to(student_answers);
+
+    for (size_t i = 0; i < standard_answers.size() && i < scores.size() && i < student_answers.size(); ++i) {
+        program_output_question q;
+        q.full_grade = scores[i];
+        q.standard_answer = standard_answers[i];
+        q.student_answer = student_answers[i];
+        submit.questions.push_back(q);
+    }
+
+    submit.sub_type = "output";
+}
+
+static void from_json_mcourse(const json &j, configuration &server, unique_ptr<submission> &submit) {
+    judge_request request = j;
+
+    switch (request.prob_type) {
+        case judge_request::programming: {
+            auto prog_submit = make_unique<programming_submission>();
+            from_json_programming(request.config, request.detail, request.sub_type, server, *prog_submit.get());
+            submit = move(prog_submit);
+        } break;
+        case judge_request::choice: {
+            auto choice_submit = make_unique<choice_submission>();
+            from_json_choice(request.config, request.detail, request.sub_type, server, *choice_submit.get());
+            submit = move(choice_submit);
+        } break;
+        case judge_request::program_blank_filling: {
+            // TODO:
+        } break;
+        case judge_request::output: {
+            auto prog_submit = make_unique<program_output_submission>();
+            from_json_program_output(request.config, request.detail, request.sub_type, server, *prog_submit.get());
+            submit = move(prog_submit);
+        } break;
+        default: {
+            throw runtime_error("Unrecognized problem type");
+        } break;
+    }
+
+    // 标记当前 submission 正在评测
+    server.matrix_db.execute("UPDATE submission SET grade=-1 WHERE sub_id=?", request.sub_id);
 }
 
 static bool report_to_server(configuration &server, bool is_complete, const judge_report &report) {
     try {
-        LOG(INFO) << "MOJ Submission Reporter: updating submission " << report.sub_id;
-            server.matrix_db.execute("UPDATE submission SET report=? WHERE sub_id=?",
-                              report.report.dump(), report.sub_id);
+        LOG(INFO) << "Matrix Course Submission Reporter: updating submission " << report.sub_id;
+        server.matrix_db.execute("UPDATE submission SET report=? WHERE sub_id=?",
+                                 report.report.dump(), report.sub_id);
         if (is_complete) {
             LOG(INFO) << "Matrix Course Submission Reporter: updating database record of submission " << report.sub_id;
             if (!server.matrix_db.ping()) connect_database(server.matrix_db, server.matrix_dbcfg);
             server.matrix_db.execute("UPDATE submission SET grade=?, report=? WHERE sub_id=?",
-                              report.grade, report.report.dump(), report.sub_id);
+                                     report.grade, report.report.dump(), report.sub_id);
         }
         return true;
     } catch (std::exception &ex) {
-        LOG(ERROR) << "MOJ Submission Reporter: unable to report to server: " << ex.what() << ", report: " << endl
+        LOG(ERROR) << "Matrix Course Submission Reporter: unable to report to server: " << ex.what() << ", report: " << endl
                    << report.report;
         return false;
     }
 }
 
-bool configuration::fetch_submission(submission &submit) {
+bool configuration::fetch_submission(unique_ptr<submission> &submit) {
     AmqpClient::Envelope::ptr_t envelope;
     if (sub_fetcher->fetch(envelope, 0)) {
-        submit.envelope = envelope;
         try {
             from_json_mcourse(json::parse(envelope->Message()->Body()), *this, submit);
+            submit->envelope = envelope;
             return true;
         } catch (exception &ex) {
             sub_fetcher->ack(envelope);
@@ -466,7 +531,7 @@ void configuration::summarize_invalid(submission &) {
     throw runtime_error("Invalid submission");
 }
 
-static json get_error_report(const judge::message::task_result &result) {
+static json get_error_report(const judge_task_result &result) {
     error_report report;
     report.message = "SystemError: " + result.error_log;
     return report;
@@ -477,20 +542,20 @@ static json get_error_report(const judge::message::task_result &result) {
  * 1. 配置中开启编译检测（编译检测满分大于0）
  * 2. 已存在提交代码的源文件
  */
-static void summarize_compile_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &compile_check_json) {
+static void summarize_compile_check(boost::rational<int> &total_score, programming_submission &submit, json &compile_check_json) {
     compile_check_report compile_check;
-    int full_grade = (int)round(boost::rational_cast<double>(submit.test_cases[0].score));
+    int full_grade = (int)round(boost::rational_cast<double>(submit.judge_tasks[0].score));
     compile_check.cont = false;
-    compile_check.message = task_results[0].error_log;
-    if (task_results[0].status == status::ACCEPTED) {
+    compile_check.message = submit.results[0].error_log;
+    if (submit.results[0].status == status::ACCEPTED) {
         compile_check.cont = true;
         compile_check.grade = full_grade;
         compile_check.message = "pass";
-        total_score += submit.test_cases[0].score;
+        total_score += submit.judge_tasks[0].score;
         compile_check_json = compile_check;
-    } else if (task_results[0].status == status::SYSTEM_ERROR) {
+    } else if (submit.results[0].status == status::SYSTEM_ERROR) {
         compile_check.grade = 0;
-        compile_check_json = get_error_report(task_results[0]);
+        compile_check_json = get_error_report(submit.results[0]);
     } else {
         compile_check.grade = 0;
         compile_check_json = compile_check;
@@ -508,20 +573,20 @@ static void summarize_compile_check(boost::rational<int> &total_score, submissio
  * 评分规则
  * 得分=（通过的测试数）/（总测试数）× 总分。
  */
-static void summarize_random_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &random_check_json) {
+static void summarize_random_check(boost::rational<int> &total_score, programming_submission &submit, json &random_check_json) {
     random_check_report random_check;
     boost::rational<int> score;
-    for (size_t i = 0; i < task_results.size(); ++i) {
-        auto &task_result = task_results[i];
+    for (size_t i = 0; i < submit.results.size(); ++i) {
+        auto &task_result = submit.results[i];
         if (task_result.type == RANDOM_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
 
             if (task_result.status == status::ACCEPTED) {
-                score += submit.test_cases[i].score;
+                score += submit.judge_tasks[i].score;
             } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
                 continue;
             } else if (task_result.status == status::PARTIAL_CORRECT) {
-                score += task_result.score * submit.test_cases[i].score;
+                score += task_result.score * submit.judge_tasks[i].score;
             } else if (task_result.status == status::SYSTEM_ERROR ||
                        task_result.status == status::RANDOM_GEN_ERROR ||
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
@@ -546,20 +611,20 @@ static void summarize_random_check(boost::rational<int> &total_score, submission
     total_score += score;
 }
 
-static void summarize_standard_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &standard_check_json) {
+static void summarize_standard_check(boost::rational<int> &total_score, programming_submission &submit, json &standard_check_json) {
     standard_check_report standard_check;
     boost::rational<int> score;
-    for (size_t i = 0; i < task_results.size(); ++i) {
-        auto &task_result = task_results[i];
+    for (size_t i = 0; i < submit.results.size(); ++i) {
+        auto &task_result = submit.results[i];
         if (task_result.type == STANDARD_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
 
             if (task_result.status == status::ACCEPTED) {
-                score += submit.test_cases[i].score;
+                score += submit.judge_tasks[i].score;
             } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
                 continue;
             } else if (task_result.status == status::PARTIAL_CORRECT) {
-                score += task_result.score * submit.test_cases[i].score;
+                score += task_result.score * submit.judge_tasks[i].score;
             } else if (task_result.status == status::SYSTEM_ERROR ||
                        task_result.status == status::RANDOM_GEN_ERROR ||
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
@@ -595,11 +660,11 @@ static void summarize_standard_check(boost::rational<int> &total_score, submissi
  * oclint评测违规分3个等级：priority 1、priority 2、priority 3
  * 评测代码每违规一个 priority 1 扣 20%，每违规一个 priority 2 扣 10%，违规 priority 3 不扣分。扣分扣至 0 分为止.
  */
-static void summarize_static_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &static_check_json) {
+static void summarize_static_check(boost::rational<int> &total_score, programming_submission &submit, json &static_check_json) {
     static_check_report static_check;
     boost::rational<int> score;
-    for (size_t i = 0; i < task_results.size(); ++i) {
-        auto &task_result = task_results[i];
+    for (size_t i = 0; i < submit.results.size(); ++i) {
+        auto &task_result = submit.results[i];
         if (task_result.type == STATIC_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
 
@@ -607,11 +672,11 @@ static void summarize_static_check(boost::rational<int> &total_score, submission
             static_check.report = json::parse(report_text);
 
             if (task_result.status == status::ACCEPTED) {
-                score += submit.test_cases[i].score;
+                score += submit.judge_tasks[i].score;
             } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
                 continue;
             } else if (task_result.status == status::PARTIAL_CORRECT) {
-                score += task_result.score * submit.test_cases[i].score;
+                score += task_result.score * submit.judge_tasks[i].score;
             } else if (task_result.status == status::SYSTEM_ERROR ||
                        task_result.status == status::RANDOM_GEN_ERROR ||
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
@@ -638,17 +703,17 @@ static void summarize_static_check(boost::rational<int> &total_score, submission
  * 评分规则
  * 内存检测会多次运行提交代码，未检测出问题则通过，最后总分为通过数/总共运行次数 × 内存检测满分分数
  */
-static void summarize_memory_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &memory_check_json) {
+static void summarize_memory_check(boost::rational<int> &total_score, programming_submission &submit, json &memory_check_json) {
     memory_check_report memory_check;
     boost::rational<int> score, full_score;
-    for (size_t i = 0; i < task_results.size(); ++i) {
-        auto &task_result = task_results[i];
+    for (size_t i = 0; i < submit.results.size(); ++i) {
+        auto &task_result = submit.results[i];
         if (task_result.type == MEMORY_CHECK_TYPE) {
-            full_score += submit.test_cases[i].score;
+            full_score += submit.judge_tasks[i].score;
             if (task_result.status == status::PENDING) continue;
 
             if (task_result.status == status::ACCEPTED) {
-                score += submit.test_cases[i].score;
+                score += submit.judge_tasks[i].score;
             } else if (task_result.status == status::WRONG_ANSWER) {
                 memory_check_error_report kase;
                 kase.valgrindoutput = json::parse(read_file_content(task_result.run_dir / "feedback" / "report.txt"));
@@ -675,17 +740,17 @@ static void summarize_memory_check(boost::rational<int> &total_score, submission
     total_score += score;
 }
 
-static void summarize_gtest_check(boost::rational<int> &total_score, submission &submit, const vector<judge::message::task_result> &task_results, json &gtest_check_json) {
+static void summarize_gtest_check(boost::rational<int> &total_score, programming_submission &submit, json &gtest_check_json) {
     gtest_check_report gtest_check;
     boost::rational<int> score;
     json config = any_cast<json>(submit.config);
     gtest_check.info = config.at("google tests info");
-    for (size_t i = 0; i < task_results.size(); ++i) {
-        auto &task_result = task_results[i];
+    for (size_t i = 0; i < submit.results.size(); ++i) {
+        auto &task_result = submit.results[i];
         if (task_result.type == GTEST_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
 
-            score = submit.test_cases[i].score;
+            score = submit.judge_tasks[i].score;
 
             // 这里将 report.txt 的 json 格式进行转换，偷懒就直接对 json 操作了
             // report.txt 的格式参见 exec/compare/gtest/run
@@ -720,31 +785,31 @@ static void summarize_gtest_check(boost::rational<int> &total_score, submission 
     total_score += score;
 }
 
-void configuration::summarize(submission &submit, size_t completed, const vector<judge::message::task_result> &task_results) {
+void summarize_programming(configuration &server, programming_submission &submit) {
     judge_report report;
     report.sub_id = submit.sub_id;
     report.prob_id = submit.prob_id;
-    report.is_complete = completed == submit.test_cases.size();
+    report.is_complete = submit.finished == submit.judge_tasks.size();
 
     boost::rational<int> total_score;
 
     json compile_check_json;
-    summarize_compile_check(total_score, submit, task_results, compile_check_json);
+    summarize_compile_check(total_score, submit, compile_check_json);
 
     json memory_check_json;
-    summarize_memory_check(total_score, submit, task_results, memory_check_json);
+    summarize_memory_check(total_score, submit, memory_check_json);
 
     json random_check_json;
-    summarize_random_check(total_score, submit, task_results, random_check_json);
+    summarize_random_check(total_score, submit, random_check_json);
 
     json standard_check_json;
-    summarize_standard_check(total_score, submit, task_results, standard_check_json);
+    summarize_standard_check(total_score, submit, standard_check_json);
 
     json static_check_json;
-    summarize_static_check(total_score, submit, task_results, static_check_json);
+    summarize_static_check(total_score, submit, static_check_json);
 
     json gtest_check_json;
-    summarize_gtest_check(total_score, submit, task_results, gtest_check_json);
+    summarize_gtest_check(total_score, submit, gtest_check_json);
 
     report.grade = (int)round(boost::rational_cast<double>(total_score));
 
@@ -755,31 +820,90 @@ void configuration::summarize(submission &submit, size_t completed, const vector
                      {"static check", static_check_json},
                      {"google tests", gtest_check_json}};
 
-    if (report_to_server(*this, report.is_complete, report))
-        sub_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.envelope));
+    if (report_to_server(server, report.is_complete, report))
+        server.sub_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.envelope));
 
-    // DLOG(INFO) << "MOJ submission report: " << report_json.dump(4);
+    // DLOG(INFO) << "Matrix Course submission report: " << report_json.dump(4);
 }
 
-void configuration::report_client_state(int client_id, client_state state) {
+void summarize_choice(configuration &server, choice_submission &submit) {
+    judge_report report;
+    report.grade = 0;
+    report.sub_id = submit.sub_id;
+    report.prob_id = submit.prob_id;
+    report.is_complete = true;
+    json detail = json::array();
+    int qid = 0;
+    for (auto &q : submit.questions) {
+        report.grade += q.grade;
+        detail += {{"grade", q.grade},
+                   {"question_id", qid++},
+                   {"student_answer", q.student_answer},
+                   {"standard_answer", q.standard_answer}};
+    }
+
+    report.report = {{"report", detail}};
+
+    if (report_to_server(server, report.is_complete, report))
+        server.sub_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.envelope));
+
+    // DLOG(INFO) << "Matrix Course choice submission report: " << report_json.dump(4);
+}
+
+void summarize_program_output(configuration &server, program_output_submission &submit) {
+    judge_report report;
+    report.grade = 0;
+    report.sub_id = submit.sub_id;
+    report.prob_id = submit.prob_id;
+    report.is_complete = true;
+
+    vector<double> grade_detail;
+    for (auto &q : submit.questions) {
+        report.grade += q.grade;
+        grade_detail.push_back(q.grade);
+    }
+
+    report.report = {{"grade", report.grade},
+                     {"grade_detail", grade_detail}};
+
+    if (report_to_server(server, report.is_complete, report))
+        server.sub_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.envelope));
+
+    // DLOG(INFO) << "Matrix Course program output submission report: " << report_json.dump(4);
+}
+
+void configuration::summarize(submission &submit) {
+    if (submit.sub_type == "programming") {
+        summarize_programming(*this, dynamic_cast<programming_submission &>(submit));
+    } else if (submit.sub_type == "choice") {
+        summarize_choice(*this, dynamic_cast<choice_submission &>(submit));
+    } else if (submit.sub_type == "program_blank_filling") {
+    } else if (submit.sub_type == "output") {
+        summarize_program_output(*this, dynamic_cast<program_output_submission &>(submit));
+    } else {
+        throw runtime_error("Unrecognized submission type " + submit.sub_type);
+    }
+}
+
+void configuration::report_worker_state(int client_id, worker_state state) {
     switch (state) {
-        case client_state::START:
+        case worker_state::START:
             monitor_db.execute("UPDATE judge_worker_status SET is_running=true, worker_stage='idle' WHERE host=? AND worker_id=?",
                                host, client_id);
             monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number+1, load_factor=load_factor+1 WHERE host=?",
                                host);
             break;
-        case client_state::STOPPED:
+        case worker_state::STOPPED:
             monitor_db.execute("UPDATE judge_worker_status SET is_running=false, worker_stage='down' WHERE host=? AND worker_id=?",
                                host, client_id);
             monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number-1, load_factor=load_factor-1 WHERE host=?",
                                host);
             break;
-        case client_state::IDLE:
+        case worker_state::IDLE:
             monitor_db.execute("UPDATE judge_worker_status SET worker_stage='idle' WHERE host=? AND worker_id=?",
                                host, client_id);
             break;
-        case client_state::CRASHED:
+        case worker_state::CRASHED:
             monitor_db.execute("UPDATE judge_worker_status SET is_running=false, worker_stage='crashed' WHERE host=? AND worker_id=?",
                                host, client_id);
             monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number-1, load_factor=load_factor-1 WHERE host=?",

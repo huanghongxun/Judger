@@ -1,1 +1,8 @@
 xmltodict
+tornado
+pika
+requests
+mysqlclient
+ConfigParser
+pymysql
+colorlog

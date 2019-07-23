@@ -25,7 +25,7 @@ void from_json(const json &j, judge_request &report) {
     else if (problem_type == "output")
         report.prob_type = judge_request::output;
     else if (problem_type == "programBlankFilling")
-        report.prob_type = judge_request::problem_blank_filling;
+        report.prob_type = judge_request::program_blank_filling;
     else
         throw out_of_range("Unrecognized problem type " + problem_type);
 
@@ -50,6 +50,10 @@ void from_json(const json &j, judge_request &report) {
     if (j.count("token")) j.at("token").get_to(report.token);
     if (j.count("config")) report.config = j.at("config");
     if (j.count("detail")) report.detail = j.at("detail");
+}
+
+void to_json(json &j, const error_report &report) {
+    j = {{"message", report.message}};
 }
 
 void to_json(json &j, const compile_check_report &report) {

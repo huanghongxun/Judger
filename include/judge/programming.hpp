@@ -4,16 +4,21 @@
 #include <boost/rational.hpp>
 #include <map>
 #include <nlohmann/json.hpp>
-#include "server/program.hpp"
+#include "common/concurrent_queue.hpp"
+#include "common/messages.hpp"
+#include "common/status.hpp"
+#include "judge/judger.hpp"
+#include "judge/submission.hpp"
+#include "program.hpp"
 
 /**
  * 这个头文件包含提交信息
  * 包含：
  * 1. submission 类（表示一个提交）
  * 2. test_case_data 类（表示一个标准测试数据组）
- * 3. test_check 类（表示一个测试点）
+ * 3. judge_task 类（表示一个测试点）
  */
-namespace judge::server {
+namespace judge {
 using namespace std;
 using namespace nlohmann;
 
@@ -53,7 +58,7 @@ struct test_case_data {
 /**
  * @brief 表示一个测试点
  */
-struct test_check {
+struct judge_task {
     enum class depends_condition {
         ACCEPTED,         // 要求依赖的测试点通过后才能执行本测试
         PARTIAL_CORRECT,  // 要求依赖的测试点不为 0 分时才能执行本测试
@@ -153,83 +158,84 @@ struct test_check {
     int proc_limit = -1;
 };
 
+struct judge_task_result {
+    judge_task_result();
+    judge_task_result(size_t id, uint8_t type);
+
+    judge::status status;
+
+    /**
+     * @brief 本测试点的 id，是 submission.test_cases 的下标
+     * 用于返回评测结果的时候统计
+     */
+    size_t id;
+
+    /**
+     * @brief 本测试点的类型
+     * 一道题的评测可以包含多种评测类型，方便 judge_server 进行统计
+     */
+    uint8_t type;
+
+    /**
+     * @brief 对于部分分情况，保存 0~1 范围内的部分分比例
+     * 测试点的真实分数将根据测试点总分乘上 score 计算得到
+     */
+    boost::rational<int> score;
+
+    /**
+     * @brief 本测试点程序运行用时
+     * 单位为秒
+     */
+    double run_time;
+
+    /**
+     * @brief 本测试点程序运行使用的内存
+     * 单位为字节
+     */
+    int memory_used;
+
+    /**
+     * @brief 错误报告
+     * 如果 status 为 SYSTEM_ERROR/RANDOM_GEN_ERROR/EXECUTABLE_COMPILATION_ERROR 时起效
+     */
+    string error_log;
+
+    /**
+     * @brief 指向当前评测的运行路径
+     * 
+     * RUN_DIR // 选手程序的运行目录，包含选手程序输出结果
+     * ├── run // 运行路径
+     * ├── work // 运行路径
+     * ├── program.out // 选手程序的 stdout 输出
+     * ├── program.err // 选手程序的 stderr 输出
+     * └── runguard.err // runguard 的错误输出
+     */
+    filesystem::path run_dir;
+
+    /**
+     * @brief 指向当前评测的数据路径
+     * 这个文件夹内必须包含 input 文件夹和 output 文件夹
+     * 
+     * DATA_DIR
+     * ├── input  // 输入数据文件夹
+     * │   ├── testdata.in  // 标准输入数据
+     * │   └── something.else  // 其他输入数据，由选手自行打开
+     * └── output // 输出数据文件夹
+     *     └── testdata.out // 标准输出数据
+     */
+    filesystem::path data_dir;
+};
+
 /**
- * @class server::moj::submission
+ * @class judge::programming_submission
  * @brief 一个选手代码提交
  */
-struct submission {
-    /**
-     * @brief 选手代码归属的程序
-     * 如：oj, course, sicily 来区分数据包应该发送给哪一个消息队列
-     */
-    string category;
-
-    /**
-     * @brief 选手代码提交的 id
-     * string 可以兼容一切情况
-     */
-    string sub_id;
-
-    /**
-     * @brief 选手代码提交的题目 id
-     * string 可以兼容一切情况
-     */
-    string prob_id;
-
-    /**
-     * @brief 队列 id
-     * string 可以兼容一切情况
-     * 此项是可选项，给特定的评测服务器使用
-     */
-    string queue_id;
-
-    /**
-     * @brief 选手用户 id
-     * string 可以兼容一切情况
-     * 此项是可选项，给特定的评测服务器使用
-     */
-    string user_id;
-
-    /**
-     * @brief 题目所属比赛 id，如果不存在比赛则为空
-     * string 可以兼容一切情况
-     * 此项是可选项，给特定的评测服务器使用
-     */
-    string contest_id;
-
-    /**
-     * @brief 题目所属比赛的题目 id，如果不存在比赛则为空
-     * string 可以兼容一切情况
-     * 此项是可选项，给特定的评测服务器使用
-     */
-    string contest_prob_id;
-
+struct programming_submission : public submission {
     /**
      * @brief 选手代码的提交语言
      * @note ["c", "cpp", "haskell", "java", "pas", "python2", "python3"]
      */
     string language;
-
-    /**
-     * @brief 题目最后更新时间
-     * 根据最后更新时间来确定是否需要重新编译随机数据生成器、标程、生成随机测试数据
-     */
-    int last_update;
-
-    /**
-     * @brief 提交时间
-     */
-    time_t submit_time;
-
-    /**
-     * @brief 比赛开始时间
-     */
-    time_t contest_start_time;
-
-    /**
-     * @brief 比赛结束时间
-     */
-    time_t contest_end_time;
 
     /**
      * @brief 本题的评分标准
@@ -238,19 +244,19 @@ struct submission {
      * 示例：
      * @code
      * [
-     * { check_type: COMPILE_CHECK, score: 20, check_script: null, compare_script: null, is_random: false }
+     *   { check_type: COMPILE_CHECK, score: 20, check_script: null, compare_script: null, is_random: false }
      * ]
      * @endcode
      * {
-     *     "CompileCheck": 20,
-     *     "MemoryCheck": 0,
-     *     "RandomCheck": 50,
-     *     "StandardCheck": 20,
-     *     "StaticCheck": 10,
-     *     "GTestCheck": 0
+     *   "CompileCheck": 20,
+     *   "MemoryCheck": 0,
+     *   "RandomCheck": 50,
+     *   "StandardCheck": 20,
+     *   "StaticCheck": 10,
+     *   "GTestCheck": 0
      * }
      */
-    vector<test_check> test_cases;
+    vector<judge_task> judge_tasks;
 
     /**
      * @brief 标准测试的测试数据
@@ -282,13 +288,36 @@ struct submission {
     unique_ptr<program> compare;
 
     /**
-     * @brief 给 judge_server 保存消息队列信封的地方
+     * @brief 存储评测结果
      */
-    any envelope;
+    vector<judge_task_result> results;
 
     /**
-     * @brief 给 judge_server 保存题目配置的地方
+     * @brief 已经完成了多少个测试点的评测
      */
-    any config;
+    size_t finished = 0;
 };
-}  // namespace judge::server
+
+struct programming_judger : public judger {
+    string type() override;
+
+    bool verify(unique_ptr<submission> &submit) override;
+
+    bool distribute(concurrent_queue<message::client_task> &task_queue, unique_ptr<submission> &submit) override;
+
+    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const string &execcpuset) override;
+
+private:
+    mutex mut;
+
+    /**
+     * @brief 完成评测结果的统计，如果统计的是编译任务，则会分发具体的评测任务
+     * 在评测完成后，通过调用 process 函数来完成数据点的统计，如果发现评测完了一个提交，则立刻返回。
+     * 因此大部分情况下评测队列不会过长：只会拉取适量的评测，确保评测队列不会过长。
+     * 
+     * @param result 评测结果
+     */
+    void process(concurrent_queue<message::client_task> &testcase_queue, programming_submission &submit, const judge_task_result &result);
+};
+
+}  // namespace judge

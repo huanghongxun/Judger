@@ -1,4 +1,4 @@
-#include "server/common/submission_fetcher.hpp"
+#include "server/submission_fetcher.hpp"
 #include <glog/logging.h>
 
 namespace judge::server {
