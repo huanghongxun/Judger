@@ -45,7 +45,9 @@ INC=()
 for i in "${HEADER_FILES_SPLITTED[@]}"; do INC+=(-I); INC+=("$WORKDIR/compile/$i"); done
 
 # oclint 是安全的，不需要挂载也可以完成评测
-runcheck "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
+runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
+    --user "$RUNUSER" \
+    --group "$RUNGROUP" \
     --wall-time "$TIMELIMIT" \
     --standard-error-file program.err \
     --standard-output-file oclint.json \
@@ -54,6 +56,17 @@ runcheck "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROC
 
 # RUNDIR 还剩下 program.meta, program.err, system.out 供评测客户端检查
 # RUNDIR 由评测客户端删除
+
+# 检查是否编译器出错/runguard 崩溃
+if [ ! -s program.meta ]; then
+    echo "Runguard exited with code $exitcode and 'program.meta' is empty, it likely crashed."
+    cleanexit ${E_INTERNAL_ERROR:--1}
+fi
+
+if grep -E '^internal-error: .+$' program.meta >/dev/null 2>&1; then
+    echo "Internal Error"
+    cleanexit ${E_INTERNAL_ERROR:-1}
+fi
 
 echo "Checking program run status"
 read_metadata program.meta

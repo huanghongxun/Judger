@@ -30,5 +30,6 @@
             "valgrind": 20.0
         }
     },
-    "host": "localhost"
+    "host": "localhost",
+    "port": 9000
 }

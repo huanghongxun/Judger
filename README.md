@@ -190,8 +190,10 @@ sudo bash $EXEC_DIR/create_cgroups.sh domjudge-run
 然后安装评测系统所需的依赖库，比如 cgroup 用来控制 CPU 和 内存使用；libcurl 用来从远程服务器下载文件；libboost 是 boost 库，注意 boost 的版本至少为 1.65；python3 是评测脚本依赖环境，允许评测脚本使用 python3 编写；python3-pip 方便评测脚本按需下载依赖代码；libmysqlclient-dev 用来连接 MySQL 数据库（Sicily 和 2.0 接口需要数据库访问支持）。其中 gcc 和 g++ 版本至少是 8，并不一定必须安装 8.
 ```bash
 sudo apt update
-sudo apt install libcgroup-dev libcurl4-openssl-dev curl make xz-utils python3 python3-pip libboost-all-dev cmake libgtest-dev gcc-8 g++-8 libmysqlclient-dev
+sudo apt install libcgroup-dev clang libclang-dev libcurl4-openssl-dev curl make xz-utils python3 python3-pip libboost-all-dev cmake libgtest-dev gcc-8 g++-8 libmysqlclient-dev
 ```
+
+同时你还必须在宿主机安装 oclint，否则评测系统的静态测试将永远失败。
 
 5. 构建评测系统
 一般情况下，依赖安装完成之后都可以正常通过编译，但请确保 g++ 版本是 8 以上，因为评测系统使用了 `std::filesystem`，这个 g++-7 尚未提供稳定版本。以下代码中的 `gcc-8`、`g++-8` 可以替换成更高版本的 `gcc` 和 `g++`。

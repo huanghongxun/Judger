@@ -2,6 +2,7 @@
 #include <glog/logging.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/assign.hpp>
+#include <boost/exception/diagnostic_information.hpp>
 #include <boost/lexical_cast.hpp>
 #include <fstream>
 #include "common/io_utils.hpp"
@@ -354,7 +355,8 @@ void from_json_programming(const json &config, const json &detail, judge_request
     {  // 静态测试
         judge_task testcase;
         testcase.score = grading.count("static check") ? grading.at("static check").get<int>() : 0;
-        testcase.depends_on = -1;  // 静态测试不需要通过编译？
+        testcase.depends_on = 0;
+        testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = STATIC_CHECK_TYPE;
         testcase.check_script = "static";
         testcase.run_script = "standard";
@@ -619,13 +621,11 @@ static bool summarize_random_check(boost::rational<int> &total_score, programmin
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == RANDOM_CHECK_TYPE) {
-            if (task_result.status == status::PENDING) continue;
+            if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.judge_tasks[i].score;
-            } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
-                continue;
             } else if (task_result.status == status::PARTIAL_CORRECT) {
                 score += task_result.score * submit.judge_tasks[i].score;
             } else if (task_result.status == status::SYSTEM_ERROR ||
@@ -660,13 +660,11 @@ static bool summarize_standard_check(boost::rational<int> &total_score, programm
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == STANDARD_CHECK_TYPE) {
-            if (task_result.status == status::PENDING) continue;
+            if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.judge_tasks[i].score;
-            } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
-                continue;
             } else if (task_result.status == status::PARTIAL_CORRECT) {
                 score += task_result.score * submit.judge_tasks[i].score;
             } else if (task_result.status == status::SYSTEM_ERROR ||
@@ -712,16 +710,20 @@ static bool summarize_static_check(boost::rational<int> &total_score, programmin
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == STATIC_CHECK_TYPE) {
-            if (task_result.status == status::PENDING) continue;
+            if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
             string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
-            static_check.report = json::parse(report_text);
+            try {
+                static_check.report = json::parse(report_text);
+            } catch (std::exception &e) {  // 非法 json 文件
+                task_result.status = status::SYSTEM_ERROR;
+                task_result.error_log = boost::diagnostic_information(e) + "\n" + report_text;
+                static_check_json = get_error_report(task_result);
+            }
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.judge_tasks[i].score;
-            } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
-                continue;
             } else if (task_result.status == status::PARTIAL_CORRECT) {
                 score += task_result.score * submit.judge_tasks[i].score;
             } else if (task_result.status == status::SYSTEM_ERROR ||
@@ -759,24 +761,25 @@ static bool summarize_memory_check(boost::rational<int> &total_score, programmin
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == MEMORY_CHECK_TYPE) {
             full_score += submit.judge_tasks[i].score;
-            if (task_result.status == status::PENDING) continue;
+            if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.judge_tasks[i].score;
             } else if (task_result.status == status::WRONG_ANSWER) {
                 memory_check_error_report kase;
-                kase.valgrindoutput = json::parse(read_file_content(task_result.run_dir / "feedback" / "report.txt"));
+                string valgrindoutput = read_file_content(task_result.run_dir / "feedback" / "report.txt");
+                try {
+                    kase.valgrindoutput = json::parse(valgrindoutput);
+                } catch (std::exception &e) {  // 非法 json 文件
+                    kase.message = boost::diagnostic_information(e) + "\n" + valgrindoutput;
+                }
                 kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
                 memory_check.report.push_back(kase);
             } else if (task_result.status == status::TIME_LIMIT_EXCEEDED) {
                 memory_check_error_report kase;
                 kase.message = "Time limit exceeded";
                 kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
-                memory_check.report.push_back(kase);
-            } else if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) {
-                memory_check_error_report kase;
-                kase.message = "Dependency not satisfied";
                 memory_check.report.push_back(kase);
             } else {
                 memory_check_error_report kase;
@@ -800,7 +803,7 @@ static bool summarize_gtest_check(boost::rational<int> &total_score, programming
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == GTEST_CHECK_TYPE) {
-            if (task_result.status == status::PENDING) continue;
+            if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
             score = submit.judge_tasks[i].score;
@@ -808,15 +811,20 @@ static bool summarize_gtest_check(boost::rational<int> &total_score, programming
             // 这里将 report.txt 的 json 格式进行转换，偷懒就直接对 json 操作了
             // report.txt 的格式参见 exec/compare/gtest/run
             string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
-            json report = json::parse(report_text);
-            if (report.count("report") && report.at("report").is_array()) {
-                json cases = report.at("report");
-                for (const json &testcase : cases) {
-                    if (!testcase.count("name")) continue;
-                    int grade = config.at("grading").at("google tests detail").at(testcase.at("name").get<string>()).get<int>();
-                    score -= grade;
-                    gtest_check.failed_cases[testcase.at("name").get<string>()] = grade;
+            try {
+                json report = json::parse(report_text);
+                if (report.count("report") && report.at("report").is_array()) {
+                    json cases = report.at("report");
+                    for (const json &testcase : cases) {
+                        if (!testcase.count("name")) continue;
+                        int grade = config.at("grading").at("google tests detail").at(testcase.at("name").get<string>()).get<int>();
+                        score -= grade;
+                        gtest_check.failed_cases[testcase.at("name").get<string>()] = grade;
+                    }
                 }
+            } catch (std::exception &e) {  // 非法 json 文件
+                gtest_check.error_message = boost::diagnostic_information(e) + "\n" + report_text;
+                break;
             }
 
             if (task_result.status == status::ACCEPTED ||
