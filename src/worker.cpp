@@ -63,14 +63,14 @@ static bool fetch_submission_nolock(concurrent_queue<message::client_task> &task
                     unsigned judge_id = global_judge_id++;
                     submission->judge_id = judge_id;
                     submissions[judge_id] = move(submission);
-                    judgers[submission->sub_type]->distribute(task_queue, submissions[judge_id]);
+                    judgers[submissions[judge_id]->sub_type]->distribute(task_queue, submissions[judge_id]);
                     success = true;
                 } else {
                     report_failure(submission);
                 }
             }
         } catch (exception &ex) {
-            LOG(WARNING) << "Fetching from " << category << ex.what() << endl
+            LOG(WARNING) << "Fetching from " << category << ' ' << ex.what() << endl
                          << boost::stacktrace::stacktrace();
         }
     }

@@ -2,6 +2,7 @@ import json
 import pika
 import sys
 import MySQLdb
+import redis
 
 if len(sys.argv) != 3:
     sys.stderr.write('{0}: 2 arguments needed, {1} given\n'.format(sys.argv[0], len(sys.argv) - 1))
@@ -40,14 +41,29 @@ def main():
         `is_aborted` tinyint(4) DEFAULT '0',
         PRIMARY KEY (`sub_id`)
     ) DEFAULT CHARSET=utf8""")
+    cursor.execute('DROP TABLE IF EXISTS submission_detail')
+    cursor.execute("""CREATE TABLE `submission_detail` (
+        `sub_detail_id` int(11) NOT NULL AUTO_INCREMENT,
+        `sub_id` int(11) NOT NULL,
+        `detail` json DEFAULT NULL,
+        `report` json DEFAULT NULL,
+        PRIMARY KEY (`sub_detail_id`)
+    ) DEFAULT CHARSET=utf8""")
 
     cursor.execute('INSERT INTO submission (sub_id, prob_id) VALUES ({0}, {1})'.format(sub_id, prob_id))
+    cursor.execute('INSERT INTO submission_detail (sub_id) VALUES ({0})'.format(sub_id))
     db.commit()
     db.close()
 
     global queue_name, exchange
     channel.basic_publish(exchange=exchange, routing_key=queue_name, body=json.dumps(req))
     channel.start_consuming()
+
+    r = redis.Redis(host='localhost', port=6379)
+    sub = r.pubsub()
+    sub.subscribe('test')
+    for message in sub.listen():
+        print(message)
 
 if __name__ == "__main__":
     main()

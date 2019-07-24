@@ -17,17 +17,36 @@ void from_json(const json &j, judge_request &report) {
     else
         report.prob_id = lexical_cast<int>(j.at("standardId").get<string>());
 
-    string problem_type = j.at("problemType").get<string>();
-    if (problem_type == "programming")
-        report.prob_type = judge_request::programming;
-    else if (problem_type == "choice")
-        report.prob_type = judge_request::choice;
-    else if (problem_type == "output")
-        report.prob_type = judge_request::output;
-    else if (problem_type == "programBlankFilling")
-        report.prob_type = judge_request::program_blank_filling;
-    else
-        throw out_of_range("Unrecognized problem type " + problem_type);
+    if (j.at("problemType").is_number()) {
+        switch (j.at("problemType").get<int>()) {
+            case 0:
+                report.prob_type = judge_request::programming;
+                break;
+            case 1:
+                report.prob_type = judge_request::choice;
+                break;
+            case 4:
+                report.prob_type = judge_request::output;
+                break;
+            case 5:
+                report.prob_type = judge_request::program_blank_filling;
+                break;
+            default:
+                throw out_of_range("Unrecognized problem type");
+        }
+    } else {
+        string problem_type = j.at("problemType").get<string>();
+        if (problem_type == "programming")
+            report.prob_type = judge_request::programming;
+        else if (problem_type == "choice")
+            report.prob_type = judge_request::choice;
+        else if (problem_type == "output")
+            report.prob_type = judge_request::output;
+        else if (problem_type == "programBlankFilling")
+            report.prob_type = judge_request::program_blank_filling;
+        else
+            throw out_of_range("Unrecognized problem type " + problem_type);
+    }
 
     if (j.at("submissionType").is_number()) {
         int sub_type = j.at("submissionType").get<int>();
@@ -39,9 +58,9 @@ void from_json(const json &j, judge_request &report) {
             throw out_of_range("Unrecognized submission type " + to_string(sub_type));
     } else {
         string sub_type = j.at("submissionType").get<string>();
-        if (sub_type == "0")
+        if (sub_type == "0" || sub_type == "student")
             report.sub_type = judge_request::student;
-        else if (sub_type == "1")
+        else if (sub_type == "1" || sub_type == "teacher")
             report.sub_type = judge_request::teacher;
         else
             throw out_of_range("Unrecognized submission type " + sub_type);

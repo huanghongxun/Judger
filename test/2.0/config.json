@@ -1,0 +1,46 @@
+{
+    "limits": {
+        "time": 1000,
+        "memory": 32
+    },
+    "random": {
+        "run_times": 2,
+        "compile_command": "python3"
+    },
+    "grading": {
+        "google tests": 0,
+        "memory check": 0,
+        "random tests": 40,
+        "static check": 0,
+        "compile check": 20,
+        "standard tests": 40,
+        "google tests detail": {}
+    },
+    "language": [
+        "c++"
+    ],
+    "standard": {
+        "support": [
+            "main.cpp",
+            "header.hpp"
+        ],
+        "random_source": [
+            "random_gen.py"
+        ],
+        "hidden_support": [],
+        "standard_input": [
+            "input0",
+            "input1"
+        ],
+        "standard_output": [
+            "output0",
+            "output1"
+        ]
+    },
+    "submission": [
+        "sub_main.cpp",
+        "sub_header.hpp"
+    ],
+    "google tests info": {},
+    "standard_language": "c++"
+}

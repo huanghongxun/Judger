@@ -29,15 +29,15 @@
                         "sub_main.cpp"
                     ],
                     "header_files": [
-                        "sub_header.h"
+                        "sub_header.hpp"
                     ]
                 },
                 "standard": {
                     "source_files": [
-                        "stand_main.cpp"
+                        "sub_main.cpp"
                     ],
                     "header_files": [
-                        "stand_header.h"
+                        "sub_header.hpp"
                     ],
                     "input": [
                         "input0",

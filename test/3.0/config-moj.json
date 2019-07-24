@@ -24,7 +24,8 @@
     "redis": {
         "host": "127.0.0.1",
         "port": 6379,
-        "password": ""
+        "password": "",
+        "channel": "test"
     },
     "systemConfig": {
         "fileApi": "http://127.0.0.1:8999",

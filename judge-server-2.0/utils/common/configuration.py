@@ -5,4 +5,4 @@ from utils.logger.loggerUtils import getLogger
 
 g_config = configparser.ConfigParser()
 log = getLogger("server", "[Configuration]")
-g_config.read(sys.argv[2])
+g_config.read(sys.argv[1])

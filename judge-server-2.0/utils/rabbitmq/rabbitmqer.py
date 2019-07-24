@@ -37,12 +37,12 @@ class RabbitMQer(object):
     def connect(self):
         self.conn = pika.BlockingConnection(pika.ConnectionParameters(host=self.host, port=self.port))
         self.channel = self.conn.channel()
-        self.channel.queue_declare(queue=self.queue_name, durable=True, exclusive=False, auto_delete=False)
         self.channel.exchange_declare(exchange=self.exchange, durable=True, exchange_type=self.exchange_type)
+        self.channel.queue_declare(queue=self.queue_name, durable=True, exclusive=False, auto_delete=False)
+        self.channel.queue_bind(exchange=self.exchange, queue=self.queue_name)
 
     def sendMessage(self, json_obj):
-        body = json.dumps(json_obj, ensure_ascii=False)
-        body += '\0'
+        body = json.dumps(json_obj, ensure_ascii=False, default=str)
         if self.last_connect_time + self.timeout < time.time():
             self.connect()
         try:

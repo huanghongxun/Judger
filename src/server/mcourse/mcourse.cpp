@@ -1,5 +1,6 @@
 #include "server/mcourse/mcourse.hpp"
 #include <glog/logging.h>
+#include <boost/algorithm/string.hpp>
 #include <boost/assign.hpp>
 #include <boost/lexical_cast.hpp>
 #include <fstream>
@@ -187,6 +188,9 @@ void from_json_programming(const json &config, const json &detail, judge_request
             if (language.empty()) throw invalid_argument("submission.config.language is empty");
             submission->language = language[0];
         }
+
+        if (submission->language == "c++")
+            submission->language = "cpp";
     }
 
     // compiler 项因为我们忽略课程系统的编译参数，因此也忽略掉
@@ -194,6 +198,8 @@ void from_json_programming(const json &config, const json &detail, judge_request
     // FIXME: exec_flag, entry_point, output_program, standard_score 项暂时忽略掉
 
     config.at("standard_language").get_to(standard->language);
+    if (standard->language == "c++")
+        standard->language = "cpp";
 
     int memory_limit;
     double time_limit;
@@ -220,7 +226,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         // 选手提交的下载地址：FILE_API/submission/<sub_id>/<filename>
         append(submission->source_files, src_url, moj_url_to_remote_file(server, fmt::format("submission/{}", submit.sub_id)));
         // 标准程序的下载地址：FILE_API/problem/<prob_id>/support/<filename>
-        append(standard->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.sub_id)));
+        append(standard->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
     }
 
     {
@@ -251,12 +257,17 @@ void from_json_programming(const json &config, const json &detail, judge_request
 
     if (config.count("random")) {  // 随机数据生成器
         auto random_ptr = make_unique<source_code>(server.exec_mgr);
-        random_ptr->language = "cpp";
 
         auto &random_json = config.at("random");
         random_json.at("run_times").get_to(random_test_times);
         // 因为课程系统评测的编译命令貌似都是写死的，我们这里忽略掉提供的编译参数
-        // random_json.at("compile_command").get_to();
+        auto compile_command = random_json.at("compile_command").get<string>();
+        if (boost::algorithm::starts_with(compile_command, "gcc") ||
+            boost::algorithm::starts_with(compile_command, "g++") ||
+            boost::algorithm::starts_with(compile_command, "clang"))
+            random_ptr->language = "cpp";
+        else
+            random_ptr->language = compile_command;
 
         auto src_url = standard_json.at("random_source").get<vector<string>>();
         // 随机数据生成器的下载地址：FILE_API/problem/<prob_id>/random_source/<filename>
@@ -312,7 +323,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
     {  // 标准测试
         judge_task testcase;
         testcase.score = grading.count("standard tests") ? grading.at("standard tests").get<int>() : 0;
-        testcase.score /= submit.judge_tasks.size();
+        testcase.score /= submit.test_data.size();
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = STANDARD_CHECK_TYPE;
@@ -325,7 +336,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
 
-        for (size_t i = 0; i < submit.judge_tasks.size() && testcase.score > 0; ++i) {
+        for (size_t i = 0; i < submit.test_data.size() && testcase.score > 0; ++i) {
             testcase.testcase_id = i;
             // 将当前的标准测试点编号记录下来，给内存测试依赖
             standard_checks.push_back(submit.judge_tasks.size());
@@ -462,17 +473,31 @@ void from_json_program_output(const json &config, const json &detail, judge_requ
     submit.sub_type = "output";
 }
 
-static void from_json_mcourse(const json &j, configuration &server, unique_ptr<submission> &submit) {
+static void from_json_mcourse(AmqpClient::Envelope::ptr_t envelope, const json &j, configuration &server, unique_ptr<submission> &submit) {
+    DLOG(INFO) << "Receive matrix course submission: " << j.dump(4);
+
     judge_request request = j;
 
     switch (request.prob_type) {
         case judge_request::programming: {
             auto prog_submit = make_unique<programming_submission>();
+            prog_submit->category = server.category();
+            prog_submit->sub_id = to_string(request.sub_id);
+            prog_submit->prob_id = to_string(request.prob_id);
+            prog_submit->envelope = envelope;
+            prog_submit->config = request.config;
+
             from_json_programming(request.config, request.detail, request.sub_type, server, *prog_submit.get());
             submit = move(prog_submit);
         } break;
         case judge_request::choice: {
             auto choice_submit = make_unique<choice_submission>();
+            choice_submit->category = server.category();
+            choice_submit->sub_id = to_string(request.sub_id);
+            choice_submit->prob_id = to_string(request.prob_id);
+            choice_submit->envelope = envelope;
+            choice_submit->config = request.config;
+
             from_json_choice(request.config, request.detail, request.sub_type, server, *choice_submit.get());
             submit = move(choice_submit);
         } break;
@@ -481,6 +506,12 @@ static void from_json_mcourse(const json &j, configuration &server, unique_ptr<s
         } break;
         case judge_request::output: {
             auto prog_submit = make_unique<program_output_submission>();
+            prog_submit->category = server.category();
+            prog_submit->sub_id = to_string(request.sub_id);
+            prog_submit->prob_id = to_string(request.prob_id);
+            prog_submit->envelope = envelope;
+            prog_submit->config = request.config;
+
             from_json_program_output(request.config, request.detail, request.sub_type, server, *prog_submit.get());
             submit = move(prog_submit);
         } break;
@@ -516,8 +547,7 @@ bool configuration::fetch_submission(unique_ptr<submission> &submit) {
     AmqpClient::Envelope::ptr_t envelope;
     if (sub_fetcher->fetch(envelope, 0)) {
         try {
-            from_json_mcourse(json::parse(envelope->Message()->Body()), *this, submit);
-            submit->envelope = envelope;
+            from_json_mcourse(envelope, json::parse(envelope->Message()->Body()), *this, submit);
             return true;
         } catch (exception &ex) {
             sub_fetcher->ack(envelope);
@@ -575,12 +605,14 @@ static void summarize_compile_check(boost::rational<int> &total_score, programmi
  * 得分=（通过的测试数）/（总测试数）× 总分。
  */
 static void summarize_random_check(boost::rational<int> &total_score, programming_submission &submit, json &random_check_json) {
+    bool exists = false;
     random_check_report random_check;
     boost::rational<int> score;
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == RANDOM_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
+            exists = true;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.judge_tasks[i].score;
@@ -610,15 +642,19 @@ static void summarize_random_check(boost::rational<int> &total_score, programmin
     random_check.grade = (int)round(boost::rational_cast<double>(score));
     random_check_json = random_check;
     total_score += score;
+
+    if (!exists) random_check_json = json();
 }
 
 static void summarize_standard_check(boost::rational<int> &total_score, programming_submission &submit, json &standard_check_json) {
+    bool exists = false;
     standard_check_report standard_check;
     boost::rational<int> score;
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == STANDARD_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
+            exists = true;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.judge_tasks[i].score;
@@ -648,6 +684,8 @@ static void summarize_standard_check(boost::rational<int> &total_score, programm
     standard_check.grade = (int)round(boost::rational_cast<double>(score));
     standard_check_json = standard_check;
     total_score += score;
+
+    if (!exists) standard_check_json = json();
 }
 
 /**
@@ -662,12 +700,14 @@ static void summarize_standard_check(boost::rational<int> &total_score, programm
  * 评测代码每违规一个 priority 1 扣 20%，每违规一个 priority 2 扣 10%，违规 priority 3 不扣分。扣分扣至 0 分为止.
  */
 static void summarize_static_check(boost::rational<int> &total_score, programming_submission &submit, json &static_check_json) {
+    bool exists = false;
     static_check_report static_check;
     boost::rational<int> score;
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == STATIC_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
+            exists = true;
 
             string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
             static_check.report = json::parse(report_text);
@@ -690,6 +730,8 @@ static void summarize_static_check(boost::rational<int> &total_score, programmin
     static_check.grade = (int)round(boost::rational_cast<double>(score));
     static_check_json = static_check;
     total_score += score;
+
+    if (!exists) static_check_json = json();
 }
 
 /**
@@ -705,6 +747,7 @@ static void summarize_static_check(boost::rational<int> &total_score, programmin
  * 内存检测会多次运行提交代码，未检测出问题则通过，最后总分为通过数/总共运行次数 × 内存检测满分分数
  */
 static void summarize_memory_check(boost::rational<int> &total_score, programming_submission &submit, json &memory_check_json) {
+    bool exists = false;
     memory_check_report memory_check;
     boost::rational<int> score, full_score;
     for (size_t i = 0; i < submit.results.size(); ++i) {
@@ -712,6 +755,7 @@ static void summarize_memory_check(boost::rational<int> &total_score, programmin
         if (submit.judge_tasks[i].check_type == MEMORY_CHECK_TYPE) {
             full_score += submit.judge_tasks[i].score;
             if (task_result.status == status::PENDING) continue;
+            exists = true;
 
             if (task_result.status == status::ACCEPTED) {
                 score += submit.judge_tasks[i].score;
@@ -739,9 +783,12 @@ static void summarize_memory_check(boost::rational<int> &total_score, programmin
     memory_check.grade = (int)round(boost::rational_cast<double>(score));
     memory_check_json = memory_check;
     total_score += score;
+
+    if (!exists) memory_check_json = json();
 }
 
 static void summarize_gtest_check(boost::rational<int> &total_score, programming_submission &submit, json &gtest_check_json) {
+    bool exists = false;
     gtest_check_report gtest_check;
     boost::rational<int> score;
     json config = any_cast<json>(submit.config);
@@ -750,6 +797,7 @@ static void summarize_gtest_check(boost::rational<int> &total_score, programming
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == GTEST_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
+            exists = true;
 
             score = submit.judge_tasks[i].score;
 
@@ -784,6 +832,8 @@ static void summarize_gtest_check(boost::rational<int> &total_score, programming
     gtest_check.grade = (int)round(boost::rational_cast<double>(score));
     gtest_check_json = gtest_check;
     total_score += score;
+
+    if (!exists) gtest_check_json = json();
 }
 
 void summarize_programming(configuration &server, programming_submission &submit) {

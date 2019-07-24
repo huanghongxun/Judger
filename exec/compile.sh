@@ -41,10 +41,10 @@ cleanexit ()
     exit $1
 }
 
-# 导入 runcheck 函数
-. "$JUDGE_UTILS/utils.sh"
-. "$JUDGE_UTILS/logging.sh"
-. "$JUDGE_UTILS/chroot_setup.sh"
+. "$JUDGE_UTILS/utils.sh" # runcheck
+. "$JUDGE_UTILS/logging.sh" # logmsg, error
+. "$JUDGE_UTILS/chroot_setup.sh" # chroot_setup
+. "$JUDGE_UTILS/runguard.sh" # read_metadata
 
 CPUSET=""
 CPUSET_OPT=""
@@ -157,6 +157,26 @@ rm -rf "$RUNDIR"
 $GAINROOT chown -R "$(id -un):" "$WORKDIR/compile"
 chmod -R go-w+x "$WORKDIR/compile"
 
+# 检查是否编译器出错/runguard 崩溃
+if [ ! -s compile.meta ]; then
+    echo "Runguard exited with code $exitcode and 'compile.meta' is empty, it likely crashed."
+    cat compile.tmp
+    cleanexit ${E_INTERNAL_ERROR:--1}
+fi
+
+if grep -E '^internal-error: .+$' compile.meta >/dev/null 2>&1; then
+    echo "Internal Error"
+    cat compile.tmp
+    cleanexit ${E_INTERNAL_ERROR:-1}
+fi
+
+# Check if the compile script auto-detected the entry point, and if
+# so, store it in the compile.meta for later reuse, e.g. in a replay.
+grep '[Dd]etected entry_point: ' compile.tmp | sed 's/^.*etected //' >>compile.meta
+
+echo "checking compilation exit-status"
+read_metadata compile.meta
+
 # 检查是否编译超时，time-result 可能为空、soft-timelimit、hard-timelimit，空表示没有超时
 if grep '^time-result: .*timelimit' compile.meta >/dev/null 2>&1; then
     echo "Compilation aborted after $SCRIPTTIMELIMIT seconds."
@@ -164,14 +184,10 @@ if grep '^time-result: .*timelimit' compile.meta >/dev/null 2>&1; then
     cleanexit ${E_COMPILER_ERROR:--1}
 fi
 
-# 检查是否编译器出错/runguard 崩溃
-if [ $exitcode -ne 0 ]; then
-    echo "Compilation failed with exitcode $exitcode."
+if [ $progexit -ne 0 ]; then
+    echo "Compilation failed with exitcode $progexit."
     cat compile.tmp
-    if [ ! -s compile.meta ]; then
-        printf "\n****************runguard crash*****************\n"
-    fi
-    cleanexit ${E_INTERNAL_ERROR:--1}
+    cleanexit ${E_COMPILER_ERROR:--1}
 fi
 
 # 检查是否成功编译出程序

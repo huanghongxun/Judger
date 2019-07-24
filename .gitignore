@@ -32,3 +32,5 @@
 # CMake
 build
 bin
+
+__pycache__

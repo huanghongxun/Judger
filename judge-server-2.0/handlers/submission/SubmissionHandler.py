@@ -53,6 +53,7 @@ class SubmissionHandler(tornado.web.RequestHandler):
             if result is None or len(result) == 0:
                 self.send("query file_structure failed")
                 return
+
             try:
                 self.genRelative(result[0], body)
             except Exception as e:

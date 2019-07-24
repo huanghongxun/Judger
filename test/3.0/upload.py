@@ -13,13 +13,13 @@ def main():
     upload("./fake_file/main.cpp", "problem/1234/support/main.cpp")
     upload("./fake_file/header.hpp", "problem/1234/support/header.hpp")
     upload("./fake_file/random_gen.py", "problem/1234/random_source/random_gen.py")
-    upload("./fake_file/stand_header.h", "problem/1234/support/stand_header.h")
-    upload("./fake_file/stand_main.cpp", "problem/1234/support/stand_main.cpp")
+    upload("./fake_file/support/sub_header.hpp", "problem/1234/support/sub_header.hpp")
+    upload("./fake_file/support/sub_main.cpp", "problem/1234/support/sub_main.cpp")
     upload("./fake_file/stand_input.in", "problem/1234/standard_input/input0")
     upload("./fake_file/stand_output.out", "problem/1234/standard_output/output0")
     upload("./fake_file/stand_input1.in", "problem/1234/standard_input/input1")
     upload("./fake_file/stand_output1.out", "problem/1234/standard_output/output1")
-    upload("./fake_file/sub_header.h", "submission/12340/sub_header.h")
+    upload("./fake_file/sub_header.hpp", "submission/12340/sub_header.hpp")
     upload("./fake_file/sub_main.cpp", "submission/12340/sub_main.cpp")
 
 if __name__ == "__main__":

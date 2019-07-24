@@ -3,21 +3,21 @@
         "host": "localhost",
         "user": "test",
         "password": "test",
-        "database": "matrix"
+        "database": "matrix_course"
     },
     "monitor_db": {
         "host": "localhost",
         "user": "test",
         "password": "test",
-        "database": "matrix_monitor"
+        "database": "matrix_course"
     },
     "submission_queue": {
         "port": 25565,
-        "exchange": "",
+        "exchange": "CourseSubmission",
         "exchange_type": "direct",
         "hostname": "localhost",
         "queue": "CourseSubmission",
-        "routing_key": "matrix"
+        "routing_key": "CourseSubmission"
     },
     "systemConfig": {
         "fileApi": "http://127.0.0.1:8999",
