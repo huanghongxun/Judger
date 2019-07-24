@@ -68,8 +68,12 @@ void configuration::init(const filesystem::path &config_path) {
     config.at("submission_queue").get_to(sub_queue);
     config.at("systemConfig").get_to(system);
     config.at("host").get_to(host);
+    config.at("port").get_to(port);
 
     sub_fetcher = make_unique<submission_fetcher>(sub_queue);
+
+    monitor_db.execute("INSERT INTO judge_node_config (host, port, thread_number, is_working, load_factor) VALUES (?, ?, 0, true, 0) ON DUPLICATE KEY UPDATE host=?, port=?, load_factor=0, thread_number=0",
+                       host, port, host, port);
 }
 
 string configuration::category() const {
@@ -178,6 +182,17 @@ void from_json_programming(const json &config, const json &detail, judge_request
     unique_ptr<source_code> submission = make_unique<source_code>(server.exec_mgr);
     unique_ptr<source_code> standard = make_unique<source_code>(server.exec_mgr);
 
+    // compiler 项因为我们忽略课程系统的编译参数，因此也忽略掉
+    // standard_score 看起来像满分，但我们可以根据 grading 把满分算出来，所以不知道这个有啥用
+    // FIXME: exec_flag, entry_point, output_program, standard_score 项暂时忽略掉
+
+    // 对于老师提交，我们通过将 submission 和 standard 设置完全一样来进行测试
+    // 这样标准测试可以正常测试数据，随机测试也可以因为 RANDOM_GEN_ERROR 返回错误
+
+    config.at("standard_language").get_to(standard->language);
+    if (standard->language == "c++")
+        standard->language = "cpp";
+
     // 对于学生提交，我们从 detail 中获得当前学生提交的编程语言
     if (sub_type == judge_request::submission_type::student) {
         if (detail.count("language")) {
@@ -191,15 +206,9 @@ void from_json_programming(const json &config, const json &detail, judge_request
 
         if (submission->language == "c++")
             submission->language = "cpp";
+    } else {
+        submission->language = standard->language;
     }
-
-    // compiler 项因为我们忽略课程系统的编译参数，因此也忽略掉
-    // standard_score 看起来像满分，但我们可以根据 grading 把满分算出来，所以不知道这个有啥用
-    // FIXME: exec_flag, entry_point, output_program, standard_score 项暂时忽略掉
-
-    config.at("standard_language").get_to(standard->language);
-    if (standard->language == "c++")
-        standard->language = "cpp";
 
     int memory_limit;
     double time_limit;
@@ -224,7 +233,10 @@ void from_json_programming(const json &config, const json &detail, judge_request
     {  // submission
         auto src_url = config.at("submission").get<vector<string>>();
         // 选手提交的下载地址：FILE_API/submission/<sub_id>/<filename>
-        append(submission->source_files, src_url, moj_url_to_remote_file(server, fmt::format("submission/{}", submit.sub_id)));
+        if (sub_type == judge_request::submission_type::student)
+            append(submission->source_files, src_url, moj_url_to_remote_file(server, fmt::format("submission/{}", submit.sub_id)));
+        else
+            append(submission->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
         // 标准程序的下载地址：FILE_API/problem/<prob_id>/support/<filename>
         append(standard->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
     }
@@ -242,12 +254,6 @@ void from_json_programming(const json &config, const json &detail, judge_request
             datacase.outputs[0]->name = "testdata.out";  // 我们要求输出数据文件名必须为 testdata.out
             submit.test_data.push_back(move(datacase));
         }
-    }
-
-    if (sub_type == judge_request::submission_type::student) {  // 对于学生提交
-    } else {                                                    // 对于老师提交，我们目的是测试标准程序，因此将标准程序放入 submission，并清空标准程序
-        submission = nullptr;
-        std::swap(submission, standard);
     }
 
     submit.submission = move(submission);
@@ -269,11 +275,12 @@ void from_json_programming(const json &config, const json &detail, judge_request
         else
             random_ptr->language = compile_command;
 
-        auto src_url = standard_json.at("random_source").get<vector<string>>();
-        // 随机数据生成器的下载地址：FILE_API/problem/<prob_id>/random_source/<filename>
-        append(random_ptr->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/random_source", submit.prob_id)));
-
-        submit.random = move(random_ptr);
+        if (standard_json.count("random_source")) {
+            auto src_url = standard_json.at("random_source").get<vector<string>>();
+            // 随机数据生成器的下载地址：FILE_API/problem/<prob_id>/random_source/<filename>
+            append(random_ptr->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/random_source", submit.prob_id)));
+            submit.random = move(random_ptr);
+        }
     }
 
     const json &grading = config.at("grading");
@@ -573,7 +580,7 @@ static json get_error_report(const judge_task_result &result) {
  * 1. 配置中开启编译检测（编译检测满分大于0）
  * 2. 已存在提交代码的源文件
  */
-static void summarize_compile_check(boost::rational<int> &total_score, programming_submission &submit, json &compile_check_json) {
+static bool summarize_compile_check(boost::rational<int> &total_score, programming_submission &submit, json &compile_check_json) {
     compile_check_report compile_check;
     int full_grade = (int)round(boost::rational_cast<double>(submit.judge_tasks[0].score));
     compile_check.cont = false;
@@ -591,6 +598,7 @@ static void summarize_compile_check(boost::rational<int> &total_score, programmi
         compile_check.grade = 0;
         compile_check_json = compile_check;
     }
+    return true;
 }
 
 /**
@@ -604,7 +612,7 @@ static void summarize_compile_check(boost::rational<int> &total_score, programmi
  * 评分规则
  * 得分=（通过的测试数）/（总测试数）× 总分。
  */
-static void summarize_random_check(boost::rational<int> &total_score, programming_submission &submit, json &random_check_json) {
+static bool summarize_random_check(boost::rational<int> &total_score, programming_submission &submit, json &random_check_json) {
     bool exists = false;
     random_check_report random_check;
     boost::rational<int> score;
@@ -625,7 +633,7 @@ static void summarize_random_check(boost::rational<int> &total_score, programmin
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
                        task_result.status == status::COMPARE_ERROR) {
                 random_check_json = get_error_report(task_result);
-                return;
+                return true;
             }
 
             check_case_report kase;
@@ -642,11 +650,10 @@ static void summarize_random_check(boost::rational<int> &total_score, programmin
     random_check.grade = (int)round(boost::rational_cast<double>(score));
     random_check_json = random_check;
     total_score += score;
-
-    if (!exists) random_check_json = json();
+    return exists;
 }
 
-static void summarize_standard_check(boost::rational<int> &total_score, programming_submission &submit, json &standard_check_json) {
+static bool summarize_standard_check(boost::rational<int> &total_score, programming_submission &submit, json &standard_check_json) {
     bool exists = false;
     standard_check_report standard_check;
     boost::rational<int> score;
@@ -667,7 +674,7 @@ static void summarize_standard_check(boost::rational<int> &total_score, programm
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
                        task_result.status == status::COMPARE_ERROR) {
                 standard_check_json = get_error_report(task_result);
-                return;
+                return true;
             }
 
             check_case_report kase;
@@ -684,8 +691,7 @@ static void summarize_standard_check(boost::rational<int> &total_score, programm
     standard_check.grade = (int)round(boost::rational_cast<double>(score));
     standard_check_json = standard_check;
     total_score += score;
-
-    if (!exists) standard_check_json = json();
+    return exists;
 }
 
 /**
@@ -699,7 +705,7 @@ static void summarize_standard_check(boost::rational<int> &total_score, programm
  * oclint评测违规分3个等级：priority 1、priority 2、priority 3
  * 评测代码每违规一个 priority 1 扣 20%，每违规一个 priority 2 扣 10%，违规 priority 3 不扣分。扣分扣至 0 分为止.
  */
-static void summarize_static_check(boost::rational<int> &total_score, programming_submission &submit, json &static_check_json) {
+static bool summarize_static_check(boost::rational<int> &total_score, programming_submission &submit, json &static_check_json) {
     bool exists = false;
     static_check_report static_check;
     boost::rational<int> score;
@@ -723,15 +729,14 @@ static void summarize_static_check(boost::rational<int> &total_score, programmin
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
                        task_result.status == status::COMPARE_ERROR) {
                 static_check_json = get_error_report(task_result);
-                return;
+                return true;
             }
         }
     }
     static_check.grade = (int)round(boost::rational_cast<double>(score));
     static_check_json = static_check;
     total_score += score;
-
-    if (!exists) static_check_json = json();
+    return exists;
 }
 
 /**
@@ -746,7 +751,7 @@ static void summarize_static_check(boost::rational<int> &total_score, programmin
  * 评分规则
  * 内存检测会多次运行提交代码，未检测出问题则通过，最后总分为通过数/总共运行次数 × 内存检测满分分数
  */
-static void summarize_memory_check(boost::rational<int> &total_score, programming_submission &submit, json &memory_check_json) {
+static bool summarize_memory_check(boost::rational<int> &total_score, programming_submission &submit, json &memory_check_json) {
     bool exists = false;
     memory_check_report memory_check;
     boost::rational<int> score, full_score;
@@ -783,11 +788,10 @@ static void summarize_memory_check(boost::rational<int> &total_score, programmin
     memory_check.grade = (int)round(boost::rational_cast<double>(score));
     memory_check_json = memory_check;
     total_score += score;
-
-    if (!exists) memory_check_json = json();
+    return exists;
 }
 
-static void summarize_gtest_check(boost::rational<int> &total_score, programming_submission &submit, json &gtest_check_json) {
+static bool summarize_gtest_check(boost::rational<int> &total_score, programming_submission &submit, json &gtest_check_json) {
     bool exists = false;
     gtest_check_report gtest_check;
     boost::rational<int> score;
@@ -832,8 +836,7 @@ static void summarize_gtest_check(boost::rational<int> &total_score, programming
     gtest_check.grade = (int)round(boost::rational_cast<double>(score));
     gtest_check_json = gtest_check;
     total_score += score;
-
-    if (!exists) gtest_check_json = json();
+    return exists;
 }
 
 void summarize_programming(configuration &server, programming_submission &submit) {
@@ -841,35 +844,29 @@ void summarize_programming(configuration &server, programming_submission &submit
     report.sub_id = submit.sub_id;
     report.prob_id = submit.prob_id;
     report.is_complete = submit.finished == submit.judge_tasks.size();
+    report.report = {};
 
     boost::rational<int> total_score;
 
-    json compile_check_json;
-    summarize_compile_check(total_score, submit, compile_check_json);
+    if (json compile_check_json; summarize_compile_check(total_score, submit, compile_check_json))
+        report.report["compile check"] = compile_check_json;
 
-    json memory_check_json;
-    summarize_memory_check(total_score, submit, memory_check_json);
+    if (json memory_check_json; summarize_memory_check(total_score, submit, memory_check_json))
+        report.report["memory check"] = memory_check_json;
 
-    json random_check_json;
-    summarize_random_check(total_score, submit, random_check_json);
+    if (json random_check_json; summarize_random_check(total_score, submit, random_check_json))
+        report.report["random tests"] = random_check_json;
 
-    json standard_check_json;
-    summarize_standard_check(total_score, submit, standard_check_json);
+    if (json standard_check_json; summarize_standard_check(total_score, submit, standard_check_json))
+        report.report["standard tests"] = standard_check_json;
 
-    json static_check_json;
-    summarize_static_check(total_score, submit, static_check_json);
+    if (json static_check_json; summarize_static_check(total_score, submit, static_check_json))
+        report.report["static check"] = static_check_json;
 
-    json gtest_check_json;
-    summarize_gtest_check(total_score, submit, gtest_check_json);
+    if (json gtest_check_json; summarize_gtest_check(total_score, submit, gtest_check_json))
+        report.report["google tests"] = gtest_check_json;
 
     report.grade = (int)round(boost::rational_cast<double>(total_score));
-
-    report.report = {{"compile check", compile_check_json},
-                     {"memory check", memory_check_json},
-                     {"random tests", random_check_json},
-                     {"standard tests", standard_check_json},
-                     {"static check", static_check_json},
-                     {"google tests", gtest_check_json}};
 
     if (report_to_server(server, report.is_complete, report))
         server.sub_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.envelope));
@@ -936,27 +933,35 @@ void configuration::summarize(submission &submit) {
     }
 }
 
-void configuration::report_worker_state(int client_id, worker_state state) {
+void configuration::report_worker_state(int worker_id, worker_state state) {
     switch (state) {
         case worker_state::START:
-            monitor_db.execute("UPDATE judge_worker_status SET is_running=true, worker_stage='idle' WHERE host=? AND worker_id=?",
-                               host, client_id);
-            monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number+1, load_factor=load_factor+1 WHERE host=?",
+            monitor_db.execute("INSERT INTO judge_worker_status (host, worker_id, worker_type, is_running, worker_stage) VALUES (?, ?, 'Universal', true, 'idle') ON DUPLICATE KEY UPDATE is_running=true, worker_stage='idle', worker_type='Universal'",
+                               host, worker_id);
+            monitor_db.execute("UPDATE judge_node_config SET load_factor=load_factor+1 WHERE host=?",
                                host);
             break;
-        case worker_state::STOPPED:
-            monitor_db.execute("UPDATE judge_worker_status SET is_running=false, worker_stage='down' WHERE host=? AND worker_id=?",
-                               host, client_id);
-            monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number-1, load_factor=load_factor-1 WHERE host=?",
+        case worker_state::JUDGING:
+            monitor_db.execute("UPDATE judge_worker_status SET worker_stage='judging' WHERE host=? AND worker_id=?",
+                               host, worker_id);
+            monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number+1 WHERE host=?",
                                host);
             break;
         case worker_state::IDLE:
             monitor_db.execute("UPDATE judge_worker_status SET worker_stage='idle' WHERE host=? AND worker_id=?",
-                               host, client_id);
+                               host, worker_id);
+            monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number-1 WHERE host=?",
+                               host);
+            break;
+        case worker_state::STOPPED:
+            monitor_db.execute("UPDATE judge_worker_status SET is_running=false, worker_stage='down' WHERE host=? AND worker_id=?",
+                               host, worker_id);
+            monitor_db.execute("UPDATE judge_node_config SET load_factor=load_factor-1 WHERE host=?",
+                               host);
             break;
         case worker_state::CRASHED:
             monitor_db.execute("UPDATE judge_worker_status SET is_running=false, worker_stage='crashed' WHERE host=? AND worker_id=?",
-                               host, client_id);
+                               host, worker_id);
             monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number-1, load_factor=load_factor-1 WHERE host=?",
                                host);
             break;

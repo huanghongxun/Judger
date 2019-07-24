@@ -32,6 +32,7 @@ struct configuration : public judge_server {
     amqp sub_queue;
 
     std::string host;
+    int port;
 
     std::unique_ptr<submission_fetcher> sub_fetcher;
 

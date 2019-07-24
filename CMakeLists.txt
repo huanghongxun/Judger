@@ -9,9 +9,9 @@ set(CMAKE_BUILD_TYPE Debug)
 # set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 set(MATRIX_JUDGE_TARGET judge-system)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -no-pie -fno-pie")
 
-add_definitions(-DORMPP_ENABLE_MYSQL)
+add_definitions(-DORMPP_ENABLE_MYSQL -DBOOST_STACKTRACE_USE_ADDR2LINE)
 
 #  CMake control options
 ################################################################################
@@ -116,7 +116,7 @@ if (BUILD_ENTRY)
     mysqlclient
     curl
     cpp_redis
-    boost_stacktrace_backtrace
+    boost_stacktrace_addr2line
     dl
     ${Boost_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}

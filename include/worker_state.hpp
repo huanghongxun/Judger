@@ -4,6 +4,7 @@ namespace judge {
 
 enum class worker_state {
     START,
+    JUDGING,
     IDLE,
     CRASHED,
     STOPPED

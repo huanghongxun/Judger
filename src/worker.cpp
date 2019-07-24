@@ -1,6 +1,7 @@
 #include "worker.hpp"
 #include <glog/logging.h>
 #include <boost/stacktrace.hpp>
+#include <boost/exception/diagnostic_information.hpp>
 
 namespace judge {
 using namespace std;
@@ -71,7 +72,8 @@ static bool fetch_submission_nolock(concurrent_queue<message::client_task> &task
             }
         } catch (exception &ex) {
             LOG(WARNING) << "Fetching from " << category << ' ' << ex.what() << endl
-                         << boost::stacktrace::stacktrace();
+                         << boost::diagnostic_information(ex);
+            success = false;
         }
     }
     return success;
@@ -110,6 +112,9 @@ static bool fetch_submission(concurrent_queue<message::client_task> &task_queue)
 static void worker_loop(int worker_id, const string &execcpuset, concurrent_queue<message::client_task> &task_queue) {
 #define REPORT_WORKER_STATE(state) \
     for (auto &[category, server] : judge_servers) server->report_worker_state(worker_id, worker_state::state)
+
+    REPORT_WORKER_STATE(START);
+
     while (true) {
         try {
             // 从队列中读取评测信息
@@ -122,7 +127,7 @@ static void worker_loop(int worker_id, const string &execcpuset, concurrent_queu
                 }
             }
 
-            REPORT_WORKER_STATE(START);
+            REPORT_WORKER_STATE(JUDGING);
 
             judger &j = get_judger_by_type(client_task.submit->sub_type);
             j.judge(client_task, task_queue, execcpuset);

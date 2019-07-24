@@ -9,6 +9,7 @@ import utils.logger.loggerUtils as logger
 import sys
 
 from handlers.main.MainHandler import MainHandler
+from handlers.rejudge.RejudgeHandler import RejudgeHandler
 from handlers.submission.SubmissionHandler import SubmissionHandler
 
 if len(sys.argv) != 2:
@@ -19,6 +20,7 @@ if len(sys.argv) != 2:
 
 application = tornado.web.Application([
     (r"/", MainHandler),
+    (r"/rejudge", RejudgeHandler),
     (r"/submission", SubmissionHandler)
 ])
 

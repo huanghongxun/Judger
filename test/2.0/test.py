@@ -1,7 +1,13 @@
 import MySQLdb
+import sys
 import json
 import time
 import requests
+
+if len(sys.argv) != 3:
+    sys.stderr.write('{0}: 2 arguments needed, {1} given\n'.format(sys.argv[0], len(sys.argv) - 1))
+    print("Usage: {0} [config.json] [detail.json]".format(sys.argv[0]))
+    sys.exit(2)
 
 url = "http://localhost:9000/submission"
 
@@ -34,8 +40,8 @@ cursor.execute("""CREATE TABLE `library_problem` (
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`prob_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8""")
-cursor.execute("INSERT INTO library_problem (prob_id, lib_id, ptype_id, title, description, config, creator) VALUES (1234, 0, 0, 'Test', 'Test', '{0}', 1)".format(open('config.json').read()))
-cursor.execute("INSERT INTO submission (sub_id, user_id, prob_id, detail) VALUES (12340, 1, 1234, '{0}')".format(open('detail.json').read()))
+cursor.execute("INSERT INTO library_problem (prob_id, lib_id, ptype_id, title, description, config, creator) VALUES (1234, 0, 0, 'Test', 'Test', '{0}', 1)".format(open(sys.argv[1]).read()))
+cursor.execute("INSERT INTO submission (sub_id, user_id, prob_id, detail) VALUES (12340, 1, 1234, '{0}')".format(open(sys.argv[2]).read()))
 db.commit()
 post_data = {
     "token": "",

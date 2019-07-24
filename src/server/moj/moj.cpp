@@ -593,7 +593,7 @@ static json get_error_report(const judge_task_result &result) {
  * 1. 配置中开启编译检测（编译检测满分大于0）
  * 2. 已存在提交代码的源文件
  */
-static void summarize_compile_check(boost::rational<int> &total_score, programming_submission &submit, json &compile_check_json) {
+static bool summarize_compile_check(boost::rational<int> &total_score, programming_submission &submit, json &compile_check_json) {
     compile_check_report compile_check;
     compile_check.full_grade = (int)round(boost::rational_cast<double>(submit.judge_tasks[0].score));
     compile_check.report = submit.results[0].error_log;
@@ -609,6 +609,7 @@ static void summarize_compile_check(boost::rational<int> &total_score, programmi
         compile_check.grade = 0;
         compile_check_json = compile_check;
     }
+    return true;
 }
 
 /**
@@ -622,7 +623,7 @@ static void summarize_compile_check(boost::rational<int> &total_score, programmi
  * 评分规则
  * 得分=（通过的测试数）/（总测试数）× 总分。
  */
-static void summarize_random_check(boost::rational<int> &total_score, programming_submission &submit, json &random_check_json) {
+static bool summarize_random_check(boost::rational<int> &total_score, programming_submission &submit, json &random_check_json) {
     bool exists = false;
     random_check_report random_check;
     random_check.pass_cases = 0;
@@ -648,7 +649,7 @@ static void summarize_random_check(boost::rational<int> &total_score, programmin
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
                        task_result.status == status::COMPARE_ERROR) {
                 random_check_json = get_error_report(task_result);
-                return;
+                return true;
             }
 
             check_case_report kase;
@@ -663,11 +664,10 @@ static void summarize_random_check(boost::rational<int> &total_score, programmin
     random_check.full_grade = (int)round(boost::rational_cast<double>(full_score));
     random_check_json = random_check;
     total_score += score;
-
-    if (!exists) random_check_json = json();
+    return exists;
 }
 
-static void summarize_standard_check(boost::rational<int> &total_score, programming_submission &submit, json &standard_check_json) {
+static bool summarize_standard_check(boost::rational<int> &total_score, programming_submission &submit, json &standard_check_json) {
     bool exists = false;
     standard_check_report standard_check;
     standard_check.pass_cases = 0;
@@ -693,7 +693,7 @@ static void summarize_standard_check(boost::rational<int> &total_score, programm
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
                        task_result.status == status::COMPARE_ERROR) {
                 standard_check_json = get_error_report(task_result);
-                return;
+                return true;
             }
 
             check_case_report kase;
@@ -708,8 +708,7 @@ static void summarize_standard_check(boost::rational<int> &total_score, programm
     standard_check.full_grade = (int)round(boost::rational_cast<double>(full_score));
     standard_check_json = standard_check;
     total_score += score;
-
-    if (!exists) standard_check_json = json();
+    return exists;
 }
 
 /**
@@ -723,7 +722,7 @@ static void summarize_standard_check(boost::rational<int> &total_score, programm
  * oclint评测违规分3个等级：priority 1、priority 2、priority 3
  * 评测代码每违规一个 priority 1 扣 20%，每违规一个 priority 2 扣 10%，违规 priority 3 不扣分。扣分扣至 0 分为止.
  */
-static void summarize_static_check(boost::rational<int> &total_score, programming_submission &submit, json &static_check_json) {
+static bool summarize_static_check(boost::rational<int> &total_score, programming_submission &submit, json &static_check_json) {
     bool exists = false;
     static_check_report static_check;
     boost::rational<int> score, full_score;
@@ -751,7 +750,7 @@ static void summarize_static_check(boost::rational<int> &total_score, programmin
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
                        task_result.status == status::COMPARE_ERROR) {
                 static_check_json = get_error_report(task_result);
-                return;
+                return true;
             }
         }
     }
@@ -760,8 +759,7 @@ static void summarize_static_check(boost::rational<int> &total_score, programmin
     static_check.report["oclintoutput"] = oclint_violations;
     static_check_json = static_check;
     total_score += score;
-
-    if (!exists) static_check_json = json();
+    return exists;
 }
 
 /**
@@ -776,7 +774,7 @@ static void summarize_static_check(boost::rational<int> &total_score, programmin
  * 评分规则
  * 内存检测会多次运行提交代码，未检测出问题则通过，最后总分为通过数/总共运行次数 × 内存检测满分分数
  */
-static void summarize_memory_check(boost::rational<int> &total_score, programming_submission &submit, json &memory_check_json) {
+static bool summarize_memory_check(boost::rational<int> &total_score, programming_submission &submit, json &memory_check_json) {
     bool exists = false;
     memory_check_report memory_check;
     memory_check.pass_cases = 0;
@@ -819,8 +817,7 @@ static void summarize_memory_check(boost::rational<int> &total_score, programmin
     memory_check.full_grade = (int)round(boost::rational_cast<double>(full_score));
     memory_check_json = memory_check;
     total_score += score;
-
-    if (!exists) memory_check_json = json();
+    return exists;
 }
 
 /*
@@ -854,7 +851,7 @@ static void summarize_memory_check(boost::rational<int> &total_score, programmin
  * }
  * @endcode
  */
-static void summarize_gtest_check(boost::rational<int> &total_score, programming_submission &submit, json &gtest_check_json) {
+static bool summarize_gtest_check(boost::rational<int> &total_score, programming_submission &submit, json &gtest_check_json) {
     bool exists = false;
     boost::rational<int> score, full_score;
     for (size_t i = 0; i < submit.results.size(); ++i) {
@@ -884,15 +881,14 @@ static void summarize_gtest_check(boost::rational<int> &total_score, programming
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
                        task_result.status == status::COMPARE_ERROR) {
                 gtest_check_json = get_error_report(task_result);
-                return;
+                return true;
             }
         }
     }
     gtest_check_json["grade"] = (int)round(boost::rational_cast<double>(score));
     gtest_check_json["full_grade"] = (int)round(boost::rational_cast<double>(full_score));
     total_score += score;
-
-    if (!exists) gtest_check_json = json();
+    return exists;
 }
 
 void summarize_programming(configuration &server, programming_submission &submit) {
@@ -900,35 +896,30 @@ void summarize_programming(configuration &server, programming_submission &submit
     report.sub_id = boost::lexical_cast<unsigned>(submit.sub_id);
     report.prob_id = boost::lexical_cast<unsigned>(submit.prob_id);
     report.is_complete = submit.finished == submit.judge_tasks.size();
+    report.report = {};
 
     boost::rational<int> total_score;
 
-    json compile_check_json;
-    summarize_compile_check(total_score, submit, compile_check_json);
+    if (json compile_check_json; summarize_compile_check(total_score, submit, compile_check_json))
+        report.report["CompileCheck"] = compile_check_json;
 
-    json memory_check_json;
-    summarize_memory_check(total_score, submit, memory_check_json);
+    if (json memory_check_json; summarize_memory_check(total_score, submit, memory_check_json))
+        report.report["MemoryCheck"] = memory_check_json;
 
-    json random_check_json;
-    summarize_random_check(total_score, submit, random_check_json);
 
-    json standard_check_json;
-    summarize_standard_check(total_score, submit, standard_check_json);
+    if (json random_check_json; summarize_random_check(total_score, submit, random_check_json))
+        report.report["RandomCheck"] = random_check_json;
 
-    json static_check_json;
-    summarize_static_check(total_score, submit, static_check_json);
+    if (json standard_check_json; summarize_standard_check(total_score, submit, standard_check_json))
+        report.report["StandardCheck"] = standard_check_json;
 
-    json gtest_check_json;
-    summarize_gtest_check(total_score, submit, gtest_check_json);
+    if (json static_check_json; summarize_static_check(total_score, submit, static_check_json))
+        report.report["StaticCheck"] = static_check_json;
+
+    if (json gtest_check_json; summarize_gtest_check(total_score, submit, gtest_check_json))
+        report.report["GTestCheck"] = gtest_check_json;
 
     report.grade = (int)round(boost::rational_cast<double>(total_score));
-
-    report.report = {{"CompileCheck", compile_check_json},
-                     {"MemoryCheck", memory_check_json},
-                     {"RandomCheck", random_check_json},
-                     {"StandardCheck", standard_check_json},
-                     {"StaticCheck", static_check_json},
-                     {"GTestCheck", gtest_check_json}};
 
     if (report_to_server(server, report.is_complete, report))
         server.programming_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.envelope));
