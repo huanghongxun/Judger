@@ -9,7 +9,7 @@ matrix_database = getDatabase("Matrix_database")
 
 GET_SUBMISSION_SQL = """SELECT sub_id, submission.prob_id as prob_id, config, detail, updated_at, ptype_id, is_standard
                         FROM submission, library_problem
-                        WHERE sub_id = %(sub_id)s AND submission.prob_id=library_problem.prob_id AND grade IS NULL
+                        WHERE sub_id = %(sub_id)s AND submission.prob_id=library_problem.prob_id
                      """
 
 class RejudgeHandler(tornado.web.RequestHandler):

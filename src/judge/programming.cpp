@@ -399,7 +399,7 @@ void programming_judger::process(concurrent_queue<message::client_task> &testcas
     submit.results[result.id] = result;
 
     DLOG(INFO) << "Testcase [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "-" << result.id
-               << ", type: " << submit.judge_tasks[result.id].check_type
+               << ", type: " << (int)submit.judge_tasks[result.id].check_type
                << ", status: " << (int)result.status << ", runtime: " << result.run_time
                << ", memory: " << result.memory_used << ", run_dir: " << result.run_dir
                << ", data_dir: " << result.data_dir << "]";

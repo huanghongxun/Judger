@@ -403,6 +403,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         size_t test_count;
         if (testcase.is_random) {
             if (!random_checks.empty()) {  // 如果存在随机测试，则依赖随机测试点的数据
+                testcase.score /= random_checks.size();
                 for (int &i : random_checks) {
                     testcase.testcase_id = submit.judge_tasks[i].testcase_id;
                     testcase.depends_on = i;
@@ -411,6 +412,7 @@ static void from_json_programming(const json &j, configuration &server, programm
                 }
                 test_count = random_checks.size();
             } else {  // 否则只能生成 10 组随机测试数据
+                testcase.score /= 10;
                 for (size_t i = 0; i < 10; ++i) {
                     testcase.testcase_id = i;
                     testcase.depends_on = 0;  // 依赖编译任务
@@ -420,6 +422,7 @@ static void from_json_programming(const json &j, configuration &server, programm
                 test_count = 10;
             }
         } else {
+            testcase.score /= standard_checks.size();
             for (int &i : standard_checks) {
                 testcase.testcase_id = submit.judge_tasks[i].testcase_id;
                 testcase.depends_on = i;

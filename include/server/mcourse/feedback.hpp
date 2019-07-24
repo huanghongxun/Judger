@@ -195,6 +195,8 @@ struct static_check_report {
      */
     int grade;
 
+    bool cont;
+
     /**
      * @brief oclint 输出，而且是原文输出
      */
