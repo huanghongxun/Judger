@@ -1,20 +1,19 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
-#include <string>
 #include <vector>
 #include "judge/judger.hpp"
 
 namespace judge {
-using namespace std;
-using namespace nlohmann;
 
+/**
+ * @brief 表示一道选择题
+ */
 struct choice_question {
     /**
      * @brief 表示当前是单选题还是多选题。
      * 可选值：single、multi。
      */
-    string type;
+    std::string type;
 
     /**
      * @brief 该选择题实际得分
@@ -36,29 +35,35 @@ struct choice_question {
     /**
      * @brief 选手选择的选项
      */
-    vector<int> student_answer;
+    std::vector<int> student_answer;
 
     /**
      * @brief 标准选项
      */
-    vector<int> standard_answer;
+    std::vector<int> standard_answer;
 };
 
+/**
+ * @brief 表示一个学生选择题提交
+ */
 struct choice_submission : public submission {
     /**
      * @brief 该选择题提交的所有选择题、标答、学生作答
      */
-    vector<choice_question> questions;
+    std::vector<choice_question> questions;
 };
 
+/**
+ * @brief 评测选择题的 Judger 类，选择题评测的逻辑都在这个类里
+ */
 struct choice_judger : public judger {
-    string type() override;
+    std::string type() override;
 
-    bool verify(unique_ptr<submission> &submit) override;
+    bool verify(std::unique_ptr<submission> &submit) override;
 
-    bool distribute(concurrent_queue<message::client_task> &task_queue, unique_ptr<submission> &submit) override;
+    bool distribute(concurrent_queue<message::client_task> &task_queue, std::unique_ptr<submission> &submit) override;
 
-    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const string &execcpuset) override;
+    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const std::string &execcpuset) override;
 };
 
 }  // namespace judge

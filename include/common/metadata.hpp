@@ -1,16 +1,14 @@
 #pragma once
 
 #include <filesystem>
-#include <string>
 #include <map>
 
 namespace judge {
-using namespace std;
 
 /**
  * @brief 读入并解析 runguard 产生的 metadata 文件
- * 
+ * @return metadata 文件的解析结果
  */
-map<string, string> read_metadata(const filesystem::path &metadata_file);
+std::map<std::string, std::string> read_metadata(const std::filesystem::path &metadata_file);
 
 }  // namespace judge

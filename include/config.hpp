@@ -1,10 +1,8 @@
 #pragma once
 
 #include <filesystem>
-#include <variant>
 
 namespace judge {
-using namespace std;
 
 enum error_codes {
     E_SUCCESS = 0,
@@ -55,7 +53,7 @@ extern int SCRIPT_FILE_LIMIT;
  * └── run // 运行脚本
  *     └── standard // 标准运行脚本
  */
-extern filesystem::path EXEC_DIR;
+extern std::filesystem::path EXEC_DIR;
 
 /**
  * @brief 
@@ -70,8 +68,7 @@ extern filesystem::path EXEC_DIR;
  * ├── moj
  * └── mcourse
  */
-extern filesystem::path CACHE_DIR;
-
+extern std::filesystem::path CACHE_DIR;
 
 /**
  * @brief 只存放将要评测的测试数据的文件夹，测试完成后数据将被删除
@@ -84,7 +81,7 @@ extern filesystem::path CACHE_DIR;
  * │   └── output // 当前测试数据组的输出数据文件夹
  * └── ...
  */
-extern filesystem::path DATA_DIR;
+extern std::filesystem::path DATA_DIR;
 
 /**
  * @brief 是否启用 DATA_DIR
@@ -116,12 +113,12 @@ extern bool USE_DATA_DIR;
  * ├── moj
  * └── mcourse
  */
-extern filesystem::path RUN_DIR;
+extern std::filesystem::path RUN_DIR;
 
 /**
  * @brief 配置好的 chroot 路径
  * 必须是通过 exec/chroot_make.sh 创建的 chroot 环境
  */
-extern filesystem::path CHROOT_DIR;
+extern std::filesystem::path CHROOT_DIR;
 
 }  // namespace judge

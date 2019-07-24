@@ -32,7 +32,6 @@ if [ "\${0%/*}" != "\$0" ]; then
 fi
 
 export HOME=/what/the/fuck
-export ONLINE_JUDGE=1
 
 # 这里不编译 python 代码
 exec pypy "$MAINSOURCE" "\$@"

@@ -2,8 +2,8 @@
 
 #include <any>
 #include <boost/rational.hpp>
+#include <filesystem>
 #include <map>
-#include <nlohmann/json.hpp>
 #include "common/concurrent_queue.hpp"
 #include "common/messages.hpp"
 #include "common/status.hpp"
@@ -14,13 +14,11 @@
 /**
  * 这个头文件包含提交信息
  * 包含：
- * 1. submission 类（表示一个提交）
+ * 1. programming_submission 类（表示一个编程题提交）
  * 2. test_case_data 类（表示一个标准测试数据组）
  * 3. judge_task 类（表示一个测试点）
  */
 namespace judge {
-using namespace std;
-using namespace nlohmann;
 
 /**
  * @brief 表示一组标准测试数据
@@ -46,13 +44,13 @@ struct test_case_data {
      * @brief 该组标准测试的输入数据
      * @note 输入数据由选手程序手动打开，若输入数据文件名为 testdata.in 则喂给 stdin
      */
-    vector<asset_uptr> inputs;
+    std::vector<asset_uptr> inputs;
 
     /**
      * @brief 该组标准测试的输出数据
      * @note 输入数据由选手程序手动打开，若输出数据文件名为 testdata.out 则和 stdout 比对
      */
-    vector<asset_uptr> outputs;
+    std::vector<asset_uptr> outputs;
 };
 
 /**
@@ -66,14 +64,18 @@ struct judge_task {
     };
 
     /**
-     * @brief 测试点类型
-     * 提供给 judge_server 来区分测试类型，比如对于 MOJ：
+     * @brief 本测试点的类型，提供给 judge_server 来区分测试类型
+     * 一道题的评测可以包含多种评测类型
+     * 
+     * 这个类型由 judge_server 自行决定，比如对于 MOJ、Matrix Course:
      * 0: CompileCheck
      * 1: MemoryCheck
      * 2: RandomCheck
      * 3: StandardCheck
      * 4: StaticCheck
      * 5: GTestCheck
+     * 
+     * 对于 Sicily、Judge-System 4.0 不分 type
      */
     uint8_t check_type;
 
@@ -82,7 +84,7 @@ struct judge_task {
      * 不同的测试点可能有不同的 check script
      * 对于 StaticCheck，check script 需要选择 static
      */
-    string check_script;
+    std::string check_script;
 
     /**
      * @brief 本测试点使用的 run script
@@ -90,7 +92,7 @@ struct judge_task {
      * 对于 MemoryCheck，需要选择 valgrind
      * 对于 GTestCheck，需要选择 gtest
      */
-    string run_script;
+    std::string run_script;
 
     /**
      * @brief 本测试点使用的比较脚本
@@ -98,7 +100,7 @@ struct judge_task {
      * 对于 MemoryCheck，需要选择 valgrind
      * 对于 GTestCheck，需要选择 gtest
      */
-    string compare_script;
+    std::string compare_script;
 
     /**
      * @brief 本测试点总分
@@ -160,21 +162,15 @@ struct judge_task {
 
 struct judge_task_result {
     judge_task_result();
-    judge_task_result(size_t id, uint8_t type);
+    judge_task_result(std::size_t id);
 
     judge::status status;
 
     /**
-     * @brief 本测试点的 id，是 submission.test_cases 的下标
+     * @brief 本测试点的 id，是 submission.judge_tasks 的下标
      * 用于返回评测结果的时候统计
      */
-    size_t id;
-
-    /**
-     * @brief 本测试点的类型
-     * 一道题的评测可以包含多种评测类型，方便 judge_server 进行统计
-     */
-    uint8_t type;
+    std::size_t id;
 
     /**
      * @brief 对于部分分情况，保存 0~1 范围内的部分分比例
@@ -198,7 +194,7 @@ struct judge_task_result {
      * @brief 错误报告
      * 如果 status 为 SYSTEM_ERROR/RANDOM_GEN_ERROR/EXECUTABLE_COMPILATION_ERROR 时起效
      */
-    string error_log;
+    std::string error_log;
 
     /**
      * @brief 指向当前评测的运行路径
@@ -210,7 +206,7 @@ struct judge_task_result {
      * ├── program.err // 选手程序的 stderr 输出
      * └── runguard.err // runguard 的错误输出
      */
-    filesystem::path run_dir;
+    std::filesystem::path run_dir;
 
     /**
      * @brief 指向当前评测的数据路径
@@ -223,92 +219,79 @@ struct judge_task_result {
      * └── output // 输出数据文件夹
      *     └── testdata.out // 标准输出数据
      */
-    filesystem::path data_dir;
+    std::filesystem::path data_dir;
 };
 
 /**
- * @class judge::programming_submission
  * @brief 一个选手代码提交
  */
 struct programming_submission : public submission {
     /**
      * @brief 选手代码的提交语言
-     * @note ["c", "cpp", "haskell", "java", "pas", "python2", "python3"]
+     * @note ["bash", "c", "cpp", "go", "haskell", "java", "make", "pas", "python2", "python3", "rust", "swift"]
      */
-    string language;
+    std::string language;
 
     /**
-     * @brief 本题的评分标准
-     * 第 0 号必须为编译任务，整道题只能有一个编译任务。
+     * @brief 本题的评测任务
      * 
-     * 示例：
-     * @code
-     * [
-     *   { check_type: COMPILE_CHECK, score: 20, check_script: null, compare_script: null, is_random: false }
-     * ]
-     * @endcode
-     * {
-     *   "CompileCheck": 20,
-     *   "MemoryCheck": 0,
-     *   "RandomCheck": 50,
-     *   "StandardCheck": 20,
-     *   "StaticCheck": 10,
-     *   "GTestCheck": 0
-     * }
      */
-    vector<judge_task> judge_tasks;
+    std::vector<judge_task> judge_tasks;
 
     /**
      * @brief 标准测试的测试数据
      */
-    vector<test_case_data> test_data;
+    std::vector<test_case_data> test_data;
 
     /**
      * @brief 选手程序的下载地址和编译命令
      */
-    unique_ptr<source_code> submission;
+    std::unique_ptr<source_code> submission;
 
     /**
      * @brief 标准程序的下载地址和编译命令
      * @note 如果存在随机测试，该项有效
      */
-    unique_ptr<program> standard;
+    std::unique_ptr<program> standard;
 
     /**
      * @brief 随机数据生成程序的下载地址和编译命令
      * @note 如果存在随机测试，该项有效
      */
-    unique_ptr<program> random;
+    std::unique_ptr<program> random;
 
     /**
      * @brief 表示题目的评测方式，此项不能为空，
      * 比如你可以选择 diff-all 来使用默认的比较方式，
      * 或者自行提供 source_code 或者 executable 来实现自定义校验
      */
-    unique_ptr<program> compare;
+    std::unique_ptr<program> compare;
 
     /**
      * @brief 存储评测结果
      */
-    vector<judge_task_result> results;
+    std::vector<judge_task_result> results;
 
     /**
      * @brief 已经完成了多少个测试点的评测
      */
-    size_t finished = 0;
+    std::size_t finished = 0;
 };
 
+/**
+ * @brief 评测编程题的 Judger 类，编程题评测的逻辑都在这个类里
+ */
 struct programming_judger : public judger {
-    string type() override;
+    std::string type() override;
 
-    bool verify(unique_ptr<submission> &submit) override;
+    bool verify(std::unique_ptr<submission> &submit) override;
 
-    bool distribute(concurrent_queue<message::client_task> &task_queue, unique_ptr<submission> &submit) override;
+    bool distribute(concurrent_queue<message::client_task> &task_queue, std::unique_ptr<submission> &submit) override;
 
-    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const string &execcpuset) override;
+    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const std::string &execcpuset) override;
 
 private:
-    mutex mut;
+    std::mutex mut;
 
     /**
      * @brief 完成评测结果的统计，如果统计的是编译任务，则会分发具体的评测任务

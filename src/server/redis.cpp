@@ -2,6 +2,7 @@
 #include <glog/logging.h>
 
 namespace judge::server {
+using namespace std;
 
 static bool connect_to_server(cpp_redis::client &redis_client, const redis &redis_config) {
     redis_client.connect(redis_config.host, redis_config.port,
@@ -29,7 +30,7 @@ static bool connect_to_server(cpp_redis::client &redis_client, const redis &redi
     }
 }
 
-void redis_conn::init(const redis &redis_config) {
+void redis_conn::init(const redis &redis_config) noexcept {
     this->redis_config = redis_config;
 }
 

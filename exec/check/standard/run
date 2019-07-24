@@ -79,7 +79,8 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
     --group "$RUNGROUP" \
     --wall-time "$TIMELIMIT" \
     --standard-error-file program.err \
-    --out-meta program.meta -- \
+    --out-meta program.meta \
+    -VONLINE_JUDGE=1 -- \
     /run/run testdata.in program.out /judge/run "$@"
 
 # 比较选手程序输出
@@ -99,6 +100,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --standard-output-file compare.out \
     --standard-error-file compare.err \
     --out-meta compare.meta \
+    -VONLINE_JUDGE=1 \
     -VJUDGE_UTILS=/judge_utils -- \
     /compare/run /testin/testdata.in program.out /testout/testdata.out /feedback
 

@@ -108,8 +108,8 @@ int exec_program(const std::map<std::string, std::string> &env, const char **arg
  * @note 与 system(cmd) 的区别是，这个函数避免了转义导致的安全问题
  * @param args 转送给应用程序的参数列表，比如可以传入 filesystem::path 给 args[0] 来表示应用程序路径
  * @code{.cpp}
- *     fs::path shell("/bin/bash");
- *     fs::path script("/tmp/shell.sh");
+ *     std::filesystem::path shell("/bin/bash");
+ *     std::filesystem::path script("/tmp/shell.sh");
  *     // 相当于 system("bin/bash /tmp/shell.sh");
  *     int exitcode = call_process(shell, script);
  * @endcode

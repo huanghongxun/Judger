@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# ADA compile wrapper-script for 'compile.sh'.
+# See that script for syntax and more info.
+
+DEST="$1" ; shift
+MAINSOURCE="$1"
+
+gnatmake -o "$DEST" "$@"
+exitcode=$?
+
+# clean created files:
+rm -f "$DEST.o" "$DEST.ali"
+
+exit $exitcode

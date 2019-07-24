@@ -16,12 +16,13 @@
 namespace judge::server::mcourse {
 using namespace std;
 using namespace nlohmann;
+using namespace ormpp;
 
 const int COMPILE_CHECK_TYPE = 0;
-const int STANDARD_CHECK_TYPE = 1;
+const int MEMORY_CHECK_TYPE = 1;
 const int RANDOM_CHECK_TYPE = 2;
-const int STATIC_CHECK_TYPE = 3;
-const int MEMORY_CHECK_TYPE = 4;
+const int STANDARD_CHECK_TYPE = 3;
+const int STATIC_CHECK_TYPE = 4;
 const int GTEST_CHECK_TYPE = 5;
 
 // clang-format off
@@ -578,7 +579,7 @@ static void summarize_random_check(boost::rational<int> &total_score, programmin
     boost::rational<int> score;
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
-        if (task_result.type == RANDOM_CHECK_TYPE) {
+        if (submit.judge_tasks[i].check_type == RANDOM_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
 
             if (task_result.status == status::ACCEPTED) {
@@ -616,7 +617,7 @@ static void summarize_standard_check(boost::rational<int> &total_score, programm
     boost::rational<int> score;
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
-        if (task_result.type == STANDARD_CHECK_TYPE) {
+        if (submit.judge_tasks[i].check_type == STANDARD_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
 
             if (task_result.status == status::ACCEPTED) {
@@ -665,7 +666,7 @@ static void summarize_static_check(boost::rational<int> &total_score, programmin
     boost::rational<int> score;
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
-        if (task_result.type == STATIC_CHECK_TYPE) {
+        if (submit.judge_tasks[i].check_type == STATIC_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
 
             string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
@@ -708,7 +709,7 @@ static void summarize_memory_check(boost::rational<int> &total_score, programmin
     boost::rational<int> score, full_score;
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
-        if (task_result.type == MEMORY_CHECK_TYPE) {
+        if (submit.judge_tasks[i].check_type == MEMORY_CHECK_TYPE) {
             full_score += submit.judge_tasks[i].score;
             if (task_result.status == status::PENDING) continue;
 
@@ -747,7 +748,7 @@ static void summarize_gtest_check(boost::rational<int> &total_score, programming
     gtest_check.info = config.at("google tests info");
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
-        if (task_result.type == GTEST_CHECK_TYPE) {
+        if (submit.judge_tasks[i].check_type == GTEST_CHECK_TYPE) {
             if (task_result.status == status::PENDING) continue;
 
             score = submit.judge_tasks[i].score;

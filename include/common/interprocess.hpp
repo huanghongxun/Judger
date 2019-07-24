@@ -8,8 +8,6 @@
  * 这个类包含 boost/interprocess 的帮助函数
  */
 namespace judge {
-namespace fs = std::filesystem;
-namespace ip = boost::interprocess;
 
 /**
  * @brief 锁文件夹
@@ -17,6 +15,6 @@ namespace ip = boost::interprocess;
  * @param dir 要被加锁的文件夹
  * @return 文件锁，可以配合 ip::scoped_lock 使用
  */
-ip::file_lock lock_directory(const fs::path &dir);
+boost::interprocess::file_lock lock_directory(const std::filesystem::path &dir);
 
 }  // namespace judge

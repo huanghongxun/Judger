@@ -1,11 +1,10 @@
 #include "runguard.hpp"
+#include <boost/lexical_cast.hpp>
 #include <fstream>
 #include <map>
-#include <regex>
-#include <boost/lexical_cast.hpp>
-using namespace std;
 
-namespace judge::client {
+namespace judge {
+using namespace std;
 
 static map<string, string> read_metadata(const filesystem::path &metadata_file) {
     map<string, string> mp;
@@ -50,4 +49,4 @@ runguard_result read_runguard_result(const filesystem::path &metafile) {
     return result;
 }
 
-}  // namespace judge::client
+}  // namespace judge

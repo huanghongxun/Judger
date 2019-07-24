@@ -1,11 +1,9 @@
 #pragma once
 
 #include <filesystem>
-#include <string>
 #include "common/status.hpp"
 
-namespace judge::client {
-using namespace std;
+namespace judge {
 
 struct runguard_result {
     /**
@@ -36,16 +34,16 @@ struct runguard_result {
 
     int signal = -1;
 
-    string internal_error;
+    std::string internal_error;
 
     /**
      * @brief 实际内存使用（单位为字节）
      */
     int memory = -1;
 
-    string time_result;
+    std::string time_result;
 };
 
-runguard_result read_runguard_result(const filesystem::path &metafile);
+runguard_result read_runguard_result(const std::filesystem::path &metafile);
 
-}  // namespace judge::client
+}  // namespace judge

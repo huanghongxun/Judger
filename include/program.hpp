@@ -1,7 +1,5 @@
 #pragma once
 
-#include <filesystem>
-#include <string>
 #include <vector>
 #include "asset.hpp"
 
@@ -20,17 +18,16 @@
  * 2. executable 一般不在保护模式下运行，且有 root 权限；而 source code 在保护模式下运行。
  */
 namespace judge {
-using namespace std;
 
 /**
  * @brief 表示 program 编译错误
  * 可以表示 program 格式不正确，或者编译错误
  */
-struct compilation_error : public runtime_error {
+struct compilation_error : public std::runtime_error {
 public:
-    const string error_log;
+    const std::string error_log;
 
-    explicit compilation_error(const string &what, const string &error_log);
+    explicit compilation_error(const std::string &what, const std::string &error_log) noexcept;
 };
 
 /**
@@ -38,9 +35,9 @@ public:
  */
 struct executable_compilation_error : public compilation_error {
 public:
-    const string error_log;
+    const std::string error_log;
 
-    explicit executable_compilation_error(const string &what, const string &error_log);
+    explicit executable_compilation_error(const std::string &what, const std::string &error_log) noexcept;
 };
 
 /**
@@ -54,21 +51,21 @@ struct program {
      * @param workdir 评测的工作路径，源代码将下载到这个文件夹中
      * @param chrootdir 配置好的 Linux 子系统环境
      */
-    virtual void fetch(const string &cpuset, const filesystem::path &workdir, const filesystem::path &chrootdir) = 0;
+    virtual void fetch(const std::string &cpuset, const std::filesystem::path &workdir, const std::filesystem::path &chrootdir) = 0;
 
     /**
      * @brief 获取程序的编译信息
      * @param workdir 评测的工作路径
      * @return 获得的编译信息
      */
-    virtual string get_compilation_log(const filesystem::path &workdir) = 0;
+    virtual std::string get_compilation_log(const std::filesystem::path &workdir) = 0;
 
     /**
      * @brief 获得程序的可执行文件路径
      * @param path 评测的工作路径
      * @return 可执行文件路径，有些程序可能必须要使用参数，你可以通过一个不需要参数的 bash 脚本来运行这个程序
      */
-    virtual filesystem::path get_run_path(const filesystem::path &path) = 0;
+    virtual std::filesystem::path get_run_path(const std::filesystem::path &path) noexcept = 0;
 };
 
 /**
@@ -79,8 +76,8 @@ struct program {
  * 脚本来执行你的程序。
  */
 struct executable : program {
-    filesystem::path dir, runpath;
-    string id, md5sum;
+    std::filesystem::path dir, runpath;
+    std::string id, md5sum;
 
     /**
      * @brief executable 的构造函数
@@ -89,29 +86,29 @@ struct executable : program {
      * @param asset 这个 executable 的获取方式，可以是本地复制，或者远程下载
      * @param md5sum 如果 executable 是远程的，那么我们需要比对哈希值来验证下载下来的 zip 压缩包是否无损
      */
-    executable(const string &id, const filesystem::path &workdir, asset_uptr &&asset, const string &md5sum = "");
+    executable(const std::string &id, const std::filesystem::path &workdir, asset_uptr &&asset, const std::string &md5sum = "");
 
     /**
      * @brief 获取并编译 executable
      * executable 有自己的文件存放路径，因此不使用 fetch 传入的 path
      */
-    void fetch(const string &cpuset, const filesystem::path &dir, const filesystem::path &chrootdir) override;
+    void fetch(const std::string &cpuset, const std::filesystem::path &dir, const std::filesystem::path &chrootdir) override;
 
     /**
      * @brief 获取并编译 executable
      */
-    void fetch(const string &cpuset, const filesystem::path &chrootdir);
+    void fetch(const std::string &cpuset, const std::filesystem::path &chrootdir);
 
-    string get_compilation_log(const filesystem::path &workdir) override;
+    std::string get_compilation_log(const std::filesystem::path &workdir) override;
 
     /**
      * @brief 获得 executable 的可执行文件路径
      * executable 有自己的文件存放路径，因此不使用传入的 path 来计算可执行文件路径
      */
-    filesystem::path get_run_path(const filesystem::path & = filesystem::path()) override;
+    std::filesystem::path get_run_path(const std::filesystem::path & = std::filesystem::path()) noexcept override;
 
 protected:
-    filesystem::path md5path, deploypath, buildpath;
+    std::filesystem::path md5path, deploypath, buildpath;
     asset_uptr asset;
 };
 
@@ -120,11 +117,11 @@ protected:
  * 本地复制方式支持从 execdir 文件夹内获得已经配置好的 executables
  */
 struct local_executable_asset : public asset {
-    filesystem::path dir, execdir;
+    std::filesystem::path dir, execdir;
 
-    local_executable_asset(const string &type, const string &id, const filesystem::path &execdir);
+    local_executable_asset(const std::string &type, const std::string &id, const std::filesystem::path &execdir);
 
-    void fetch(const filesystem::path &dir) override;
+    void fetch(const std::filesystem::path &dir) override;
 };
 
 /**
@@ -134,12 +131,12 @@ struct local_executable_asset : public asset {
  * 压缩包的 md5 哈希值来确保压缩包正确，并予以解压
  */
 struct remote_executable_asset : public asset {
-    string md5sum;
+    std::string md5sum;
     asset_uptr remote_asset;
 
-    remote_executable_asset(asset_uptr &&remote_asset, const string &md5sum);
+    remote_executable_asset(asset_uptr &&remote_asset, const std::string &md5sum);
 
-    void fetch(const filesystem::path &dir) override;
+    void fetch(const std::filesystem::path &dir) override;
 };
 
 /**
@@ -152,28 +149,28 @@ struct executable_manager {
      * @param language 编程语言，必须和该编译脚本的外置脚本名一致
      * @return 尚未完成下载、编译的编译脚本信息 executable 类，需要手动调用 fetch 来进行下载
      */
-    virtual unique_ptr<executable> get_compile_script(const string &language) const = 0;
+    virtual std::unique_ptr<executable> get_compile_script(const std::string &language) const = 0;
 
     /**
      * @brief 根据语言获取运行脚本
-     * @param language 编程语言，必须和该编译脚本的外置脚本名一致
+     * @param name 运行脚本名，必须和该编译脚本的外置脚本名一致
      * @return 尚未完成下载、编译的编译脚本信息 executable 类，需要手动调用 fetch 来进行下载
      */
-    virtual unique_ptr<executable> get_run_script(const string &language) const = 0;
+    virtual std::unique_ptr<executable> get_run_script(const std::string &name) const = 0;
 
     /**
      * @brief 根据名称获取测试脚本
      * @param name 测试脚本名
      * @return 尚未完成下载、编译的编译脚本信息 executable 类，需要手动调用 fetch 来进行下载
      */
-    virtual unique_ptr<executable> get_check_script(const string &name) const = 0;
+    virtual std::unique_ptr<executable> get_check_script(const std::string &name) const = 0;
 
     /**
      * @brief 根据语言获取编译脚本
-     * @param name 比较脚本名，可能的名称有 diff-ignore-tailing-space，diff-all
+     * @param name 比较脚本名，可能的名称有 diff-ign-space，diff-all
      * @return 尚未完成下载、编译的编译脚本信息 executable 类，需要手动调用 fetch 来进行下载
      */
-    virtual unique_ptr<executable> get_compare_script(const string &name) const = 0;
+    virtual std::unique_ptr<executable> get_compare_script(const std::string &name) const = 0;
 };
 
 /**
@@ -185,18 +182,18 @@ struct local_executable_manager : public executable_manager {
      * @param workdir 存放 executable 的临时文件夹，用于存放编译后的程序
      * @param execdir 存放 executable 的本地预设文件夹
      */
-    local_executable_manager(const filesystem::path &workdir, const filesystem::path &execdir);
+    local_executable_manager(const std::filesystem::path &workdir, const std::filesystem::path &execdir);
 
-    unique_ptr<executable> get_compile_script(const string &language) const;
-    unique_ptr<executable> get_run_script(const string &language) const;
-    unique_ptr<executable> get_check_script(const string &name) const;
-    unique_ptr<executable> get_compare_script(const string &name) const;
+    std::unique_ptr<executable> get_compile_script(const std::string &language) const override;
+    std::unique_ptr<executable> get_run_script(const std::string &name) const override;
+    std::unique_ptr<executable> get_check_script(const std::string &name) const override;
+    std::unique_ptr<executable> get_compare_script(const std::string &name) const override;
 
 private:
     // 存放 executable 的临时文件夹，用于存放编译后的程序
-    filesystem::path workdir;
+    std::filesystem::path workdir;
     // 存放 executable 的本地预设文件夹
-    filesystem::path execdir;
+    std::filesystem::path execdir;
 };
 
 /**
@@ -208,14 +205,14 @@ struct source_code : program {
      * @note 不能为空，这涉及判题时使用的编译器与执行器
      * 因此对于 source_code，其会自行查找 get_run_script 和 get_compile_script
      */
-    string language;
+    std::string language;
 
     /**
      * @brief 应用程序入口
      * 对于 Java，entry_point 为应用程序主类。若空，默认为 Main
      * 对于 Python，entry_point 为默认的 python 脚本。若空，为 source_files 的第一个文件
      */
-    string entry_point;
+    std::string entry_point;
 
     /**
      * @brief 该程序的所有源文件的文件系统路径
@@ -224,7 +221,7 @@ struct source_code : program {
      * ["somedir/framework.cpp", "somedir/source.cpp"]
      * @endcode
      */
-    vector<asset_uptr> source_files;
+    std::vector<asset_uptr> source_files;
 
     /**
      * @brief 该程序的所有不参与编译（比如 c/c++ 的头文件）的文件的文件系统路径
@@ -237,7 +234,7 @@ struct source_code : program {
      * ["somedir/source.cpp"]
      * @endcode
      */
-    vector<asset_uptr> assist_files;
+    std::vector<asset_uptr> assist_files;
 
     /**
      * @brief 该程序的额外编译命令
@@ -246,13 +243,13 @@ struct source_code : program {
      * 示例（对于 gcc）:
      * -g -lcgroup -Wno-long-long -nostdinc -nostdinc++
      */
-    vector<string> compile_command;
+    std::vector<std::string> compile_command;
 
     source_code(executable_manager &exec_mgr);
 
-    void fetch(const string &cpuset, const filesystem::path &dir, const filesystem::path &chrootdir) override;
-    string get_compilation_log(const filesystem::path &workdir) override;
-    filesystem::path get_run_path(const filesystem::path &path) override;
+    void fetch(const std::string &cpuset, const std::filesystem::path &dir, const std::filesystem::path &chrootdir) override;
+    std::string get_compilation_log(const std::filesystem::path &workdir) override;
+    std::filesystem::path get_run_path(const std::filesystem::path &path) noexcept override;
 
 protected:
     executable_manager &exec_mgr;

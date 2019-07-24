@@ -3,13 +3,6 @@
 
 using namespace std;
 using namespace boost;
-namespace fs = std::filesystem;
-
-int count_directories_in_directory(const fs::path &dir) {
-    if (!fs::is_directory(dir))
-        return -1;
-    return count_if(fs::directory_iterator(dir), {}, (bool (*)(const fs::path &))fs::is_directory);
-}
 
 int random(int L, int R) {
     return L + rand() / ((RAND_MAX + 1u) / (R - L));

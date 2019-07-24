@@ -2,6 +2,7 @@
 #include <glog/logging.h>
 
 namespace judge::server {
+using namespace std;
 
 submission_fetcher::submission_fetcher(amqp &amqp) {
     channel = AmqpClient::Channel::Create(amqp.hostname, amqp.port);
@@ -28,7 +29,8 @@ judge_result_reporter::judge_result_reporter(amqp &amqp) : queue(amqp) {
 
 void judge_result_reporter::report(const string &message) {
     AmqpClient::BasicMessage::ptr_t msg = AmqpClient::BasicMessage::Create(message);
-    DLOG(INFO) << "Sending message to exchange:" << queue.exchange << ", routing_key=" << queue.routing_key << std::endl << message;
+    DLOG(INFO) << "Sending message to exchange:" << queue.exchange << ", routing_key=" << queue.routing_key << std::endl
+               << message;
     channel->BasicPublish(queue.exchange, queue.routing_key, msg, true);
     DLOG(INFO) << "Sending message succeeded";
 }

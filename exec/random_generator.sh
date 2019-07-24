@@ -171,6 +171,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --wall-time "$SCRIPTTIMELIMIT" \
         --file-limit "$SCRIPTFILELIMIT" \
         --out-meta random.meta \
+        -VONLINE_JUDGE=1 \
         --standard-output-file "$WORKDIR/input/testdata.in" \
         --standard-error-file random.err -- \
         /judge/run
@@ -216,6 +217,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
         --group "$RUNGROUP" \
         --wall-time "$TIMELIMIT" \
         --standard-error-file standard.err \
+        -VONLINE_JUDGE=1 \
         --out-meta standard.meta -- \
         /run/run testdata.in testdata.out /judge/run
 

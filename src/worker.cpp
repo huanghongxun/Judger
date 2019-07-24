@@ -3,6 +3,7 @@
 #include <boost/stacktrace.hpp>
 
 namespace judge {
+using namespace std;
 using namespace judge::server;
 
 static mutex server_mutex;

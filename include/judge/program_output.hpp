@@ -6,9 +6,10 @@
 #include "judge/judger.hpp"
 
 namespace judge {
-using namespace std;
-using namespace nlohmann;
 
+/**
+ * @brief 表示一道程序输出题
+ */
 struct program_output_question {
     /**
      * @brief 该题实际得分
@@ -25,29 +26,35 @@ struct program_output_question {
     /**
      * @brief 选手答案
      */
-    string student_answer;
+    std::string student_answer;
 
     /**
      * @brief 标准答案
      */
-    string standard_answer;
+    std::string standard_answer;
 };
 
+/**
+ * @brief 表示一个学生程序输出题提交
+ */
 struct program_output_submission : public submission {
     /**
-     * @brief 该选择题提交的所有选择题、标答、学生作答
+     * @brief 该程序输出题提交的所有程序输出题、标答、学生作答
      */
-    vector<program_output_question> questions;
+    std::vector<program_output_question> questions;
 };
 
+/**
+ * @brief 评测程序输出题的 Judger 类，程序输出题评测的逻辑都在这个类里
+ */
 struct program_output_judger : public judger {
-    string type() override;
+    std::string type() override;
 
-    bool verify(unique_ptr<submission> &submit) override;
+    bool verify(std::unique_ptr<submission> &submit) override;
 
-    bool distribute(concurrent_queue<message::client_task> &task_queue, unique_ptr<submission> &submit) override;
+    bool distribute(concurrent_queue<message::client_task> &task_queue, std::unique_ptr<submission> &submit) override;
 
-    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const string &execcpuset) override;
+    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const std::string &execcpuset) override;
 };
 
 }  // namespace judge

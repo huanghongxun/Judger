@@ -13,11 +13,13 @@
 using namespace std;
 
 namespace judge {
+namespace fs = std::filesystem;
+namespace ip = boost::interprocess;
 
-compilation_error::compilation_error(const string &what, const string &error_log)
+compilation_error::compilation_error(const string &what, const string &error_log) noexcept
     : runtime_error(what), error_log(error_log) {}
 
-executable_compilation_error::executable_compilation_error(const string &what, const string &error_log)
+executable_compilation_error::executable_compilation_error(const string &what, const string &error_log) noexcept
     : compilation_error(what, error_log) {}
 
 executable::executable(const string &id, const fs::path &workdir, asset_uptr &&asset, const string &md5sum)
@@ -51,9 +53,9 @@ void executable::fetch(const string &cpuset, const fs::path &, const fs::path &c
             throw executable_compilation_error("executable malformed", "Executable malformed");
         }
     }
-    filesystem::permissions(runpath,
-                            filesystem::perms::group_exec | filesystem::perms::others_exec | filesystem::perms::owner_exec,
-                            filesystem::perm_options::add);
+    fs::permissions(runpath,
+                            fs::perms::group_exec | fs::perms::others_exec | fs::perms::owner_exec,
+                            fs::perm_options::add);
     ofstream to_be_created(deploypath);
 }
 
@@ -66,7 +68,7 @@ string executable::get_compilation_log(const fs::path &) {
     return read_file_content(compilation_log_file, "No compilation information");
 }
 
-filesystem::path executable::get_run_path(const filesystem::path &) {
+fs::path executable::get_run_path(const fs::path &) noexcept {
     return dir / "compile";
 }
 
@@ -168,7 +170,7 @@ string source_code::get_compilation_log(const fs::path &workdir) {
     return read_file_content(compilation_log_file, "No compilation information");
 }
 
-fs::path source_code::get_run_path(const fs::path &path) {
+fs::path source_code::get_run_path(const fs::path &path) noexcept {
     // run 参见 compile.sh，path 为 $WORKDIR
     return path / "compile";
 }

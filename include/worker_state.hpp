@@ -8,4 +8,5 @@ enum class worker_state {
     CRASHED,
     STOPPED
 };
+
 }  // namespace judge

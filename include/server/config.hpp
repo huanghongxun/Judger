@@ -1,11 +1,8 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
-#include <string>
 
 namespace judge::server {
-using namespace std;
-using namespace nlohmann;
 
 /**
  * @brief 描述一个 AMQP 消息队列的配置数据结构
@@ -14,7 +11,7 @@ struct amqp {
     /**
      * @brief AMQP 消息队列的主机地址
      */
-    string hostname;
+    std::string hostname;
 
     /**
      * @brief AMQP 消息队列的主机端口
@@ -24,25 +21,25 @@ struct amqp {
     /**
      * @brief 通过该结构体发送的消息的 Exchange 名
      */
-    string exchange;
+    std::string exchange;
 
     /**
      * @brief Exchange 类型，可选 direct, topic, fanout
      */
-    string exchange_type;
+    std::string exchange_type;
 
     /**
      * @brief AMQP 消息队列的队列名
      */
-    string queue;
+    std::string queue;
 
     /**
      * @brief AMQP 消息队列的 Routing Key
      */
-    string routing_key;
+    std::string routing_key;
 };
 
-void from_json(const json &j, amqp &mq);
+void from_json(const nlohmann::json &j, amqp &mq);
 
 /**
  * @brief 描述一个 MySQL 数据库连接信息
@@ -51,46 +48,53 @@ struct database {
     /**
      * @brief 数据库服务器的地址
      */
-    string host;
+    std::string host;
 
     /**
      * @brief 数据库服务器的账号
      */
-    string user;
+    std::string user;
 
     /**
      * @brief 数据库服务器的密码
      */
-    string password;
+    std::string password;
 
     /**
      * @brief 使用连接到的数据库服务器的哪一个数据库
      */
-    string database;
+    std::string database;
 };
 
-void from_json(const json &j, database &db);
+void from_json(const nlohmann::json &j, database &db);
 
 /**
  * redis 的登录情况
  */
 struct redis {
-    string host;
+    /**
+     * @brief redis 服务器地址
+     */
+    std::string host;
+
+    /**
+     * @brief redis 服务器端口
+     */
     int port;
 
     /**
      * @brief 密码，若不为空，则使用该密码登录
      */
-    string password;
+    std::string password;
 
     /**
      * @brief 发布的通道名，允许服务端通过 subscribe 来监听 redis 的更改
      * 如果为空，那么 publish 操作都改成 set 操作
      */
-    string channel;
+    std::string channel;
 };
 
-void from_json(const json &j, redis &redis_config);
+void from_json(const nlohmann::json &j, redis &redis_config);
 
 /**
  * @brief 时间限制配置
@@ -122,16 +126,23 @@ struct time_limit_config {
     double random_generator;
 };
 
-void from_json(const json &j, time_limit_config &limit);
+void from_json(const nlohmann::json &j, time_limit_config &limit);
 
 struct system_config {
     time_limit_config time_limit;
 
-    size_t max_report_io_size;
+    /**
+     * @brief 返回的评测报告的最大长度
+     * 如果长度超限，那么应该想办法将报告的长度减小，比如不再返回测试数据内容
+     */
+    std::size_t max_report_io_size;
 
-    string file_api;
+    /**
+     * @brief 文件系统根路径
+     */
+    std::string file_api;
 };
 
-void from_json(const json &j, system_config &config);
+void from_json(const nlohmann::json &j, system_config &config);
 
 }  // namespace judge::server

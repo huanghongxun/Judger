@@ -185,7 +185,6 @@ static bool fetch_queue(configuration &sicily, programming_submission &submit) {
                 kase.run_script = "standard";
                 kase.is_random = false;
                 kase.score = 0;
-                kase.check_type = 1;
                 kase.testcase_id = i;
                 kase.depends_on = i;  // 当前的 kase 是第 i + 1 组测试点，依赖第 i 组测试点，最开始的测试数据将依赖编译
                 kase.depends_cond = judge_task::depends_condition::ACCEPTED;
@@ -199,7 +198,7 @@ static bool fetch_queue(configuration &sicily, programming_submission &submit) {
     }
 
     submit.submission = move(prog);
-    submit.config = judge_task_result(0, 0);
+    submit.config = {};
     submit.sub_type = "programming";
 
     return true;

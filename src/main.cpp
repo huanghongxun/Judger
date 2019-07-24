@@ -13,6 +13,9 @@
 #include "common/system.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
+#include "judge/choice.hpp"
+#include "judge/program_output.hpp"
+#include "judge/programming.hpp"
 #include "server/mcourse/mcourse.hpp"
 #include "server/moj/moj.hpp"
 #include "server/sicily/sicily.hpp"
@@ -281,6 +284,10 @@ int main(int argc, char* argv[]) {
             judge::register_judge_server(move(second_judger));
         }
     }
+
+    judge::register_judger(make_unique<judge::programming_judger>());
+    judge::register_judger(make_unique<judge::choice_judger>());
+    judge::register_judger(make_unique<judge::program_output_judger>());
 
     set<unsigned> cores;
     vector<thread> worker_threads;

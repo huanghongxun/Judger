@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# Ruby compile wrapper-script for 'compile.sh'.
+# See that script for syntax and more info.
+#
+# This script does not actually "compile" the source, but writes a
+# shell script that will function as the executable: when called, it
+# will execute the source with the correct interpreter syntax, thus
+# allowing this interpreted source to be used transparantly as if it
+# was compiled to a standalone binary.
+#
+# This script requires that ruby is installed in the chroot.
+
+DEST="$1" ; shift
+MAINSOURCE="${ENTRY_POINT:-$1}"
+
+# Report the entry point, so it can be saved, e.g. for later replay:
+if [ -z "$ENTRY_POINT" ]; then
+	echo "Info: detected entry_point: $MAINCLASS"
+fi
+
+# Check syntax (prints "Syntax OK" but filtering would obscure the exitcode):
+for i in "$@" ; do
+	ruby -c "$i"
+	EXITCODE=$?
+	[ "$EXITCODE" -ne 0 ] && exit $EXITCODE
+done
+
+# Write executing script:
+cat > "$DEST" <<EOF
+#!/bin/sh
+# Generated shell-script to execute ruby interpreter on source.
+# Detect dirname and change dir to prevent class not found errors.
+if [ "\${0%/*}" != "\$0" ]; then
+	cd "\${0%/*}"
+fi
+
+exec ruby "$MAINSOURCE" "\$@"
+EOF
+
+chmod a+x "$DEST"
+
+exit 0

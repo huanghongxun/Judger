@@ -1,6 +1,5 @@
 #pragma once
 
-#include <filesystem>
 #include "common/messages.hpp"
 #include "common/status.hpp"
 #include "config.hpp"
@@ -8,7 +7,6 @@
 #include "worker_state.hpp"
 
 namespace judge::server {
-using namespace std;
 
 /**
  * @brief 表示一个远程服务器
@@ -23,7 +21,7 @@ struct judge_server {
      * 
      * @return string 评测服务器的 id
      */
-    virtual string category() const = 0;
+    virtual std::string category() const = 0;
 
     /**
      * @brief 初始化评测服务器连接
@@ -31,24 +29,21 @@ struct judge_server {
      * 你可以在这里通过解析配置文件来建立消息队列、建立数据库连接
      * 配置文件的格式自定义，没有任何约定，但建议使用 JSON
      */
-    virtual void init(const filesystem::path &config_path) = 0;
+    virtual void init(const std::filesystem::path &config_path) = 0;
 
     /**
      * @brief 获取一个提交
      * @param submit 存储该提交的信息
-     * @return 返回是否获取到一个提交，如果没有能够获取到一个提交，则应该 sleep(100ms)
+     * @return 返回是否获取到一个提交，如果没有能够获取到一个提交，则应该 sleep(10ms)
      * 该函数可能立即返回不阻塞，此时获取到提交才返回 true；
      * 也可能阻塞到有提交为止，此时返回总是 true。
      */
-    virtual bool fetch_submission(unique_ptr<submission> &submit) = 0;
+    virtual bool fetch_submission(std::unique_ptr<submission> &submit) = 0;
 
     /**
      * @brief 将提交返回给服务器
-     * 该函数是阻塞的。评测系统不需要通过多线程来并发写服务器，因为 server 并不会因为
-     * 评测过程而阻塞，获取提交和返回评测结果都能很快完成，因此 server 是单线程的。
+     * 调用方必须确保该函数是原子性的，这样该函数不需要考虑 submission 的同步问题
      * @param submit 该提交的信息
-     * @param completed 该提交完成了多少组评测
-     * @param judge_task_results 评测结果
      */
     virtual void summarize(submission &submit) = 0;
 
@@ -63,6 +58,12 @@ struct judge_server {
      */
     virtual const executable_manager &get_executable_manager() const = 0;
 
+    /**
+     * @brief 报告当前 worker 的状态
+     * 提供给 Matrix 课程系统用于监控评测系统状态
+     * @param worker_id 已知 id 的 worker 的状态发生了改变
+     * @param state worker 的新状态
+     */
     virtual void report_worker_state(int worker_id, worker_state state);
 };
 

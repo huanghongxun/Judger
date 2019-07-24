@@ -2,15 +2,12 @@
 
 #include <map>
 #include <nlohmann/json.hpp>
-#include <string>
 #include <vector>
 
 /**
  * 这个头文件包含 Matrix Course 的所有测试报告的结构体和 JSON 序列化函数
  */
 namespace judge::server::mcourse {
-using namespace std;
-using namespace nlohmann;
 
 struct judge_request {
     enum submission_type {
@@ -28,9 +25,9 @@ struct judge_request {
     /**
      * @brief seaweedfs 需要的授权下载的 token
      * 但是目前课程系统取消了 token 的使用，因此这个没有用
-     * TODO: 未来下载文件时支持这类 token 的传递
+     * TODO: 未来下载文件时支持这类 token 的传递，可以通过扩展 remote_asset 类来实现
      */
-    string token;
+    std::string token;
 
     /**
      * @brief 提交类型
@@ -71,18 +68,18 @@ struct judge_request {
     nlohmann::json detail;
 };
 
-void from_json(const json &j, judge_request &report);
+void from_json(const nlohmann::json &j, judge_request &report);
 
 struct judge_report {
     /**
      * @brief submission id
      */
-    string sub_id;
+    std::string sub_id;
 
     /**
      * @brief problem id
      */
-    string prob_id;
+    std::string prob_id;
 
     /**
      * @brief grade
@@ -92,7 +89,7 @@ struct judge_report {
     /**
      * @brief report
      */
-    json report;
+    nlohmann::json report;
 
     bool is_complete;
 };
@@ -106,10 +103,10 @@ struct judge_report {
  * @endcode
  */
 struct error_report {
-    string message;
+    std::string message;
 };
 
-void to_json(json &j, const error_report &report);
+void to_json(nlohmann::json &j, const error_report &report);
 
 struct compile_check_report {
     /**
@@ -125,22 +122,22 @@ struct compile_check_report {
     /**
      * @brief pass 表示编译通过，否则存储编译日志
      */
-    string message;
+    std::string message;
 };
 
-void to_json(json &j, const compile_check_report &report);
+void to_json(nlohmann::json &j, const compile_check_report &report);
 
 struct check_case_report {
-    string stdin;
-    string result;
-    string stdout;
-    string message;
+    std::string stdin;
+    std::string result;
+    std::string stdout;
+    std::string message;
     int timeused;
     int memoryused;
-    string standard_stdout;
+    std::string standard_stdout;
 };
 
-void to_json(json &j, const check_case_report &report);
+void to_json(nlohmann::json &j, const check_case_report &report);
 
 struct standard_check_report {
     /**
@@ -151,10 +148,10 @@ struct standard_check_report {
     /**
      * @brief pass 表示编译通过，否则存储编译日志
      */
-    vector<check_case_report> cases;
+    std::vector<check_case_report> cases;
 };
 
-void to_json(json &j, const standard_check_report &report);
+void to_json(nlohmann::json &j, const standard_check_report &report);
 
 struct random_check_report {
     /**
@@ -165,18 +162,18 @@ struct random_check_report {
     /**
      * @brief pass 表示编译通过，否则存储编译日志
      */
-    vector<check_case_report> cases;
+    std::vector<check_case_report> cases;
 };
 
-void to_json(json &j, const random_check_report &report);
+void to_json(nlohmann::json &j, const random_check_report &report);
 
 struct memory_check_error_report {
-    json valgrindoutput;
-    string message;
-    string stdin;
+    nlohmann::json valgrindoutput;
+    std::string message;
+    std::string stdin;
 };
 
-void to_json(json &j, const memory_check_error_report &report);
+void to_json(nlohmann::json &j, const memory_check_error_report &report);
 
 struct memory_check_report {
     /**
@@ -187,10 +184,10 @@ struct memory_check_report {
     /**
      * @brief Valgrind 测试的输出
      */
-    vector<memory_check_error_report> report;
+    std::vector<memory_check_error_report> report;
 };
 
-void to_json(json &j, const memory_check_report &report);
+void to_json(nlohmann::json &j, const memory_check_report &report);
 
 struct static_check_report {
     /**
@@ -201,10 +198,10 @@ struct static_check_report {
     /**
      * @brief oclint 输出，而且是原文输出
      */
-    json report;
+    nlohmann::json report;
 };
 
-void to_json(json &j, const static_check_report &report);
+void to_json(nlohmann::json &j, const static_check_report &report);
 
 struct gtest_check_report {
     /**
@@ -220,19 +217,19 @@ struct gtest_check_report {
     /**
      * @brief 传入的题目配置中的 config."google tests info"
      */
-    json info;
+    nlohmann::json info;
 
     /**
      * @brief 若 Runtime Error 则在这里提示
      */
-    string error_message;
+    std::string error_message;
 
     /**
      * @brief 失败的测试组以及这些测试组的分数
      */
-    map<string, int> failed_cases;
+    std::map<std::string, int> failed_cases;
 };
 
-void to_json(json &j, const gtest_check_report &report);
+void to_json(nlohmann::json &j, const gtest_check_report &report);
 
 }  // namespace judge::server::mcourse

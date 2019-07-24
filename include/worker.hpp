@@ -20,7 +20,6 @@
  * 因此大部分情况下评测队列不会过长：只会拉取适量的评测，确保评测队列不会过长。
  */
 namespace judge {
-using namespace std;
 
 /**
  * @brief 注册服务端
@@ -28,20 +27,34 @@ using namespace std;
  * 评测系统如何拉取提交、返回评测结果的方式。
  * 可能的服务端比如有 Sicily 评测、Matrix 的 2.0、3.0 评测、GDOI 的评测。
  */
-void register_judge_server(unique_ptr<server::judge_server> &&judge_server);
-
-server::judge_server &get_judge_server_by_category(const string &category);
-
-void register_judger(unique_ptr<judger> &&judger);
-
-judger &get_judger_by_type(const string &type);
+void register_judge_server(std::unique_ptr<server::judge_server> &&judge_server);
 
 /**
- * @brief 启动评测客户端线程
- * 注意评测服务端客户端收发消息直接通过发送指针实现，因此客户端不能通过 fork
+ * @brief 根据 category 来获取服务端信息
+ * 这个函数可以并发调用。你必须确保 register_judge_server 在 worker 启动之前就被注册完成
+ * @return category 对应的评测服务器
+ */
+server::judge_server &get_judge_server_by_category(const std::string &category);
+
+/**
+ * @brief 注册评测器
+ * 评测器负责评测具体题型
+ */
+void register_judger(std::unique_ptr<judger> &&judger);
+
+/**
+ * @brief 根据 type 来获取评测器
+ * 这个函数可以并发调用。你必须确保 register_judger 在 worker 启动之前就被注册完成
+ * @return type 对应的评测器
+ */
+judger &get_judger_by_type(const std::string &type);
+
+/**
+ * @brief 启动评测 worker 线程
+ * 注意评测服务端客户端收发消息直接通过发送指针实现，因此 worker 不能通过 fork
  * 生成。
  * 
- * @param set 评测客户端运行的 cpuset（一般设置为和评测服务端同一个核心）
+ * @param set worker 运行的 cpuset（和 execcpuset 一致）
  * @param execcpuset 选手程序运行的 cpuset
  * @param task_queue 评测服务端发送评测信息的队列
  * @return 产生的线程
@@ -49,6 +62,6 @@ judger &get_judger_by_type(const string &type);
  * 选手代码、测试数据、随机数据生成器、标准程序、SPJ 等资源的
  * 下载均由客户端完成。服务端只完成提交的拉取和数据点的分发。
  */
-thread start_worker(int worker_id, const cpu_set_t &set, const string &execcpuset, concurrent_queue<message::client_task> &task_queue);
+std::thread start_worker(int worker_id, const cpu_set_t &set, const std::string &execcpuset, concurrent_queue<message::client_task> &task_queue);
 
 }  // namespace judge

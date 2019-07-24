@@ -16,19 +16,20 @@
 #include "common/utils.hpp"
 #include "config.hpp"
 #include "runguard.hpp"
-#include "worker.hpp"
 #include "server/judge_server.hpp"
+#include "worker.hpp"
 
 namespace judge {
+using namespace std;
 
 test_case_data::test_case_data() {}
 
 test_case_data::test_case_data(test_case_data &&other)
     : inputs(move(other.inputs)), outputs(move(other.outputs)) {}
 
-judge_task_result::judge_task_result() : score(0) {}
-judge_task_result::judge_task_result(size_t id, uint8_t type)
-    : id(id), type(type), score(0), run_time(0), memory_used(0) {}
+judge_task_result::judge_task_result() : judge_task_result(0) {}
+judge_task_result::judge_task_result(size_t id)
+    : id(id), score(0), run_time(0), memory_used(0) {}
 
 /**
  * @brief 执行程序评测任务
@@ -45,7 +46,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;  // 本提交的工作文件夹
     filesystem::path rundir = workdir / ("run-" + uuid);                                    // 本测试点的运行文件夹
 
-    judge_task_result result{client_task.id, client_task.type};
+    judge_task_result result{client_task.id};
     result.run_dir = rundir;
 
     server::judge_server &server = get_judge_server_by_category(submit.category);
@@ -227,7 +228,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
         filesystem::remove(datadir);
     }
 
-    auto metadata = client::read_runguard_result(rundir / "program.meta");
+    auto metadata = read_runguard_result(rundir / "program.meta");
     result.run_time = metadata.wall_time;  // TODO: 支持题目选择 cpu_time 或者 wall_time 进行时间
     result.memory_used = metadata.memory / 1024;
     return result;
@@ -262,13 +263,13 @@ static void compile(judge::program *program, const filesystem::path &workdir, co
 static judge_task_result compile(const message::client_task &client_task, programming_submission &submit, judge_task &task, const string &execcpuset) {
     filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;
 
-    judge_task_result result{client_task.id, client_task.type};
+    judge_task_result result{client_task.id};
 
     // 编译选手程序，submit.submission 都为非空，否则在 server.cpp 中的 fetch_submission 会阻止该提交的评测
     if (submit.submission) {
         filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
         compile(submit.submission.get(), workdir, execcpuset, result);
-        auto metadata = client::read_runguard_result(workdir / "compile" / "compile.meta");
+        auto metadata = read_runguard_result(workdir / "compile" / "compile.meta");
         result.run_time = metadata.wall_time;
         result.memory_used = metadata.memory / 1024;
         if (result.status != status::ACCEPTED) return result;
@@ -358,7 +359,6 @@ bool programming_judger::distribute(concurrent_queue<message::client_task> &task
     for (size_t i = 0; i < sub->results.size(); ++i) {
         sub->results[i].status = judge::status::PENDING;
         sub->results[i].id = i;
-        sub->results[i].type = sub->judge_tasks[i].check_type;
     }
 
     // 寻找没有依赖的评测点，并发送评测消息
@@ -366,8 +366,7 @@ bool programming_judger::distribute(concurrent_queue<message::client_task> &task
         if (sub->judge_tasks[i].depends_on < 0) {  // 不依赖任何任务的任务可以直接开始评测
             judge::message::client_task client_task = {
                 .submit = submit.get(),
-                .id = i,
-                .type = sub->judge_tasks[i].check_type};
+                .id = i};
             task_queue.push(client_task);
         }
     }
@@ -428,14 +427,12 @@ void programming_judger::process(concurrent_queue<message::client_task> &testcas
             if (satisfied) {
                 judge::message::client_task client_task = {
                     .submit = &submit,
-                    .id = i,
-                    .type = submit.judge_tasks[i].check_type};
+                    .id = i};
                 testcase_queue.push(client_task);
             } else {
                 judge_task_result next_result = result;
                 next_result.status = status::DEPENDENCY_NOT_SATISFIED;
                 next_result.id = i;
-                next_result.type = kase.check_type;
                 process(testcase_queue, submit, next_result);
             }
         }
@@ -466,7 +463,7 @@ void programming_judger::judge(const message::client_task &client_task, concurre
         else
             result = judge_impl(client_task, *submit, task, execcpuset);
     } catch (exception &ex) {
-        result = {client_task.id, client_task.type};
+        result = {client_task.id};
         result.status = status::SYSTEM_ERROR;
         result.error_log = ex.what();
     }

@@ -1,6 +1,7 @@
 #include "server/moj/feedback.hpp"
 
 namespace judge::server::moj {
+using namespace nlohmann;
 
 void to_json(json &j, const judge_report &report) {
     j = {{"sub_id", report.sub_id},

@@ -1,14 +1,11 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
 #include "server/judge_server.hpp"
 #include "server/submission_fetcher.hpp"
 #include "sql/dbng.hpp"
 #include "sql/mysql.hpp"
 
 namespace judge::server::mcourse {
-using namespace std;
-using namespace ormpp;
 
 struct configuration : public judge_server {
     local_executable_manager exec_mgr;
@@ -23,29 +20,29 @@ struct configuration : public judge_server {
     /**
      * @brief Matrix 数据库
      */
-    dbng<mysql> matrix_db;
+    ormpp::dbng<ormpp::mysql> matrix_db;
 
     database monitor_dbcfg;
 
     /**
      * @brief 监控系统数据库
      */
-    dbng<mysql> monitor_db;
+    ormpp::dbng<ormpp::mysql> monitor_db;
 
     amqp sub_queue;
 
-    string host;
+    std::string host;
 
-    unique_ptr<submission_fetcher> sub_fetcher;
+    std::unique_ptr<submission_fetcher> sub_fetcher;
 
     configuration();
 
-    string category() const override;
+    std::string category() const override;
 
     /**
      * @brief 初始化消息队列和数据库连接
      */
-    void init(const filesystem::path &config_path) override;
+    void init(const std::filesystem::path &config_path) override;
 
     const executable_manager &get_executable_manager() const override;
 
@@ -56,7 +53,7 @@ struct configuration : public judge_server {
      * 该函数可能立即返回不阻塞，此时获取到提交才返回 true；
      * 也可能阻塞到有提交为止，此时返回总是 true。
      */
-    bool fetch_submission(unique_ptr<submission> &submit) override;
+    bool fetch_submission(std::unique_ptr<submission> &submit) override;
 
     /**
      * @brief 将提交返回给服务器

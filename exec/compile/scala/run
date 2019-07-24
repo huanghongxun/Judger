@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Scala compile wrapper-script for 'compile.sh'.
+# See that script for syntax and more info.
+#
+# This script requires that scala is installed in the chroot.
+
+DEST="$1" ; shift
+MAINSOURCE="$1"
+
+scalac "$@"
+EXITCODE=$?
+[ "$EXITCODE" -ne 0 ] && exit $EXITCODE
+
+MAINCLASS="${ENTRY_POINT:-$(basename "$MAINSOURCE" .scala)}"
+
+# Report the entry point, so it can be saved, e.g. for later replay:
+if [ -z "$ENTRY_POINT" ]; then
+	echo "Info: detected entry_point: $MAINCLASS"
+fi
+
+cat > "$DEST" <<EOF
+#!/bin/sh
+# Generated shell-script to execute scala interpreter on source.
+# Detect dirname and change dir to prevent class not found errors.
+if [ "\${0%/*}" != "\$0" ]; then
+    cd "\${0%/*}"
+fi
+
+exec scala '$MAINCLASS' "\$@"
+EOF
+
+chmod a+x "$DEST"
+
+exit 0

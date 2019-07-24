@@ -1,14 +1,11 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
-#include <string>
 
 /**
  * 这个头文件包含 MOJ 的所有测试报告的结构体和 JSON 序列化函数
  */
 namespace judge::server::moj {
-using namespace std;
-using namespace nlohmann;
 
 struct judge_report {
     /**
@@ -29,7 +26,7 @@ struct judge_report {
     /**
      * @brief report
      */
-    json report;
+    nlohmann::json report;
 
     /**
      * @brief whether judgement is complete
@@ -37,7 +34,7 @@ struct judge_report {
     bool is_complete;
 };
 
-void to_json(json &j, const judge_report &report);
+void to_json(nlohmann::json &j, const judge_report &report);
 
 /**
  * @brief 错误检查报告
@@ -48,10 +45,10 @@ void to_json(json &j, const judge_report &report);
  * @endcode
  */
 struct error_report {
-    string message;
+    std::string message;
 };
 
-void to_json(json &j, const error_report &report);
+void to_json(nlohmann::json &j, const error_report &report);
 
 /**
  * @brief 评测出错时的测试组错误报告
@@ -67,7 +64,7 @@ struct check_error_report {
     error_report error;
 };
 
-void to_json(json &j, const check_error_report &report);
+void to_json(nlohmann::json &j, const check_error_report &report);
 
 /**
  * @brief 编译检查报告
@@ -92,8 +89,6 @@ void to_json(json &j, const check_error_report &report);
  * @endcode
  */
 struct compile_check_report {
-    static constexpr int TYPE = 0;
-
     /**
      * @brief MOJ 编译任务的得分
      */
@@ -112,10 +107,10 @@ struct compile_check_report {
     /**
      * @brief 保存编译信息
      */
-    string report;
+    std::string report;
 };
 
-void to_json(json &j, const compile_check_report &report);
+void to_json(nlohmann::json &j, const compile_check_report &report);
 
 /**
  * @brief 静态检查报告
@@ -178,8 +173,6 @@ void to_json(json &j, const compile_check_report &report);
  * @endcode
  */
 struct static_check_report {
-    static constexpr int TYPE = 4;
-
     /**
      * @brief MOJ 静态测试得分
      */
@@ -190,10 +183,10 @@ struct static_check_report {
      */
     double full_grade;
 
-    map<string, json> report;
+    std::map<std::string, nlohmann::json> report;
 };
 
-void to_json(json &j, const static_check_report &report);
+void to_json(nlohmann::json &j, const static_check_report &report);
 
 /**
  * @struct 随机测试点的评测结果
@@ -203,28 +196,28 @@ struct check_case_report {
      * @brief 评测结果
      * @see judge::status
      */
-    string result;
+    std::string result;
 
     /**
      * @brief 生成的输入测试数据的文件内容
      * 这个内容是通过随机测试数据生成器产生的
      */
-    string stdin;
+    std::string stdin;
 
     /**
      * @brief 生成的输出测试数据的文件内容
      * 这个内容是通过标准程序输入随机测试得到的输出结果
      */
-    string stdout;
+    std::string stdout;
 
     /**
      * @brief 选手程序的输出结果
      * 这个内容是通过选手程序输入随机测试得到的输出结果
      */
-    string subout;
+    std::string subout;
 };
 
-void to_json(json &j, const check_case_report &report);
+void to_json(nlohmann::json &j, const check_case_report &report);
 
 /**
  * @brief 随机测试反馈
@@ -258,7 +251,6 @@ void to_json(json &j, const check_case_report &report);
  * @endcode
  */
 struct random_check_report {
-
     /**
      * @brief MOJ 随机测试得分
      */
@@ -282,13 +274,12 @@ struct random_check_report {
     /**
      * @brief 所有随机测试的评测结果
      */
-    vector<check_case_report> report;
+    std::vector<check_case_report> report;
 };
 
-void to_json(json &j, const random_check_report &report);
+void to_json(nlohmann::json &j, const random_check_report &report);
 
 struct standard_check_report {
-
     /**
      * @brief MOJ 标准测试得分
      */
@@ -312,18 +303,18 @@ struct standard_check_report {
     /**
      * @brief 所有标准测试的评测结果（按顺序给出）
      */
-    vector<check_case_report> report;
+    std::vector<check_case_report> report;
 };
 
-void to_json(json &j, const standard_check_report &report);
+void to_json(nlohmann::json &j, const standard_check_report &report);
 
 struct memory_check_error_report {
-    json valgrindoutput;
-    string message;
-    string stdin;
+    nlohmann::json valgrindoutput;
+    std::string message;
+    std::string stdin;
 };
 
-void to_json(json &j, const memory_check_error_report &report);
+void to_json(nlohmann::json &j, const memory_check_error_report &report);
 
 /**
  * @brief 内存检查报告
@@ -405,7 +396,6 @@ void to_json(json &j, const memory_check_error_report &report);
  * @endcode
  */
 struct memory_check_report {
-
     /**
      * @brief MOJ 内存测试得分
      */
@@ -429,9 +419,9 @@ struct memory_check_report {
     /**
      * @brief Valgrind 测试的输出
      */
-    vector<memory_check_error_report> report;
+    std::vector<memory_check_error_report> report;
 };
 
-void to_json(json &j, const memory_check_report &report);
+void to_json(nlohmann::json &j, const memory_check_report &report);
 
 }  // namespace judge::server::moj
