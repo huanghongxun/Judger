@@ -499,8 +499,7 @@ static bool report_to_server(configuration &server, bool is_complete, const judg
         }
         return true;
     } catch (std::exception &ex) {
-        LOG(ERROR) << "Matrix Course Submission Reporter: unable to report to server: " << ex.what() << ", report: " << endl
-                   << report.report;
+        LOG(ERROR) << "Matrix Course Submission Reporter: unable to report to server: " << ex.what();
         return false;
     }
 }
@@ -601,6 +600,8 @@ static bool summarize_compile_check(boost::rational<int> &total_score, programmi
     int full_grade = (int)round(boost::rational_cast<double>(submit.judge_tasks[0].score));
     compile_check.cont = false;
     compile_check.message = submit.results[0].error_log;
+    if (!utf8_check_is_valid(compile_check.message))
+        compile_check.message = "Not UTF-8 encoding";
     if (submit.results[0].status == status::ACCEPTED) {
         compile_check.cont = true;
         compile_check.grade = full_grade;

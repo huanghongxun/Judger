@@ -1,0 +1,48 @@
+{
+    "compilers": {
+        "c++": {
+            "command": "g++ CODE_FILES -Werror -g -lgtest -lpthread -lgtest_main -std=c++11 -o OUTPUT_PROGRAM",
+            "version": "default"
+        }
+    },
+    "entry_point": "standard_main.exe",
+    "exec_flag": "--gtest_output=xml:/tmp/Result.xml",
+    "google tests info": {
+        "addTest": "Test the copy constructor as well as constructor with parameters",
+        "addOne/0": "Tests on setters and getters"
+    },
+    "grading": {
+        "compile check": 20,
+        "google tests": 80,
+        "google tests detail": {
+            "addTest": 40,
+            "addOne/0": 40
+        },
+        "memory check": 0,
+        "random tests": 0,
+        "standard tests": 0,
+        "static check": 0,
+        "style check": 0
+    },
+    "language": [
+        "c++"
+    ],
+    "limits": {
+        "memory": 32,
+        "time": 1000
+    },
+    "output_program": "main.exe",
+    "standard": {
+        "hidden_support": [
+            "UserTest.o"
+        ],
+        "support": [
+            "User.hpp"
+        ]
+    },
+    "standard_language": "c++",
+    "standard_score": 100,
+    "submission": [
+        "User.cpp"
+    ]
+}

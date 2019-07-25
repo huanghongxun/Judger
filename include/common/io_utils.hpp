@@ -19,6 +19,8 @@ std::string read_file_content(const std::filesystem::path &path);
  */
 std::string read_file_content(std::filesystem::path const &path, const std::string &def);
 
+bool utf8_check_is_valid(const std::string &string);
+
 /**
  * @brief 断言 subpath 一定不会出现返回上一层目录的情况
  * 这里用于确保计算目录时不会出现目录遍历攻击，由于评测系统
