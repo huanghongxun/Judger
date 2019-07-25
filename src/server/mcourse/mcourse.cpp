@@ -447,7 +447,7 @@ void from_json_choice(const json &config, const json &detail, judge_request::sub
 
     int id = 0;
     for (json::const_iterator qit = standard.begin(), ait = answer.begin();
-         qit != standard.end() && ait != standard.end();
+         qit != standard.end() && ait != answer.end();
          ++qit, ++ait, ++id) {
         choice_question q;
 
