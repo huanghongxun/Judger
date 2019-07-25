@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# C# compile wrapper-script for 'compile.sh'.
+# F# compile wrapper-script for 'compile.sh'.
 # See that script for syntax and more info.
 #
 # This script byte-compiles with the MSBuild toolchain and generates
