@@ -36,7 +36,7 @@ if len(sys.argv) != 5:
     print("Usage: {0} [stdin] [userout] [stdout] [feedback]".format(sys.argv[0]))
     sys.exit(2)
 
-xml_file = open('test_details.xml', 'r')
+xml_file = open('test_detail.xml', 'r')
 result_file = open(os.path.join(sys.argv[4], 'report.txt'), 'w')
 score_file = open(os.path.join(sys.argv[4], 'score.txt'), 'w')
 
@@ -47,7 +47,7 @@ disabled_cases = 0
 reports = []
 
 try:
-    error_cases = xml_result['testsuites']['@failures']
+    error_cases = int(xml_result['testsuites']['@failures'])
     disabled_cases = xml_result['testsuites']['@disabled']
     time = xml_result['testsuites']['@time']
     testsuites = xml_result['testsuites']['testsuite']
@@ -55,7 +55,7 @@ try:
         testsuites = [testsuites]
     for testsuite in testsuites:
         testcases = testsuite['testcase']
-        if not isinstance(testcase, list):
+        if not isinstance(testcases, list):
             testcases = [testcase]
         for testcase in testcases:
             suite = testsuite['@name']

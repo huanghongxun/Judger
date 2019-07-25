@@ -100,11 +100,6 @@ int main(int argc, char* argv[]) {
     CHECK(getenv("RUNGUARD"))  // RUNGUARD 环境变量将传给 exec/check/standard/run 评测脚本使用
         << "RUNGUARD environment variable should be specified. This env points out where the runguard executable locates in.";
 
-    if (getuid() != 0) {
-        cerr << "You should run this program in privileged mode" << endl;
-        return EXIT_FAILURE;
-    }
-
     put_error_codes();
 
     const unsigned cpus = std::thread::hardware_concurrency();
@@ -135,6 +130,7 @@ int main(int argc, char* argv[]) {
         ("run-user", po::value<string>()->required(), "set run user")
         ("run-group", po::value<string>()->required(), "set run group")
         ("cache-random-data", po::value<size_t>(), "set the maximum number of cached generated random data, default to 100.")
+        ("debug", "turn on the debug mode to disable checking whether it is in privileged mode, and not to delete submission directory to check the validity of result files.")
         ("help", "display this help text")
         ("version", "display version of this application");
     // clang-format on
@@ -165,6 +161,15 @@ int main(int argc, char* argv[]) {
     if (vm.count("version")) {
         cout << "judge-system 4.0" << endl;
         return EXIT_SUCCESS;
+    }
+
+    if (vm.count("debug")) {
+        judge::DEBUG = true;
+    }
+
+    if (getuid() != 0) {
+        cerr << "You should run this program in privileged mode" << endl;
+        if (!judge::DEBUG) return EXIT_FAILURE;
     }
 
     if (vm.count("exec-dir")) {
