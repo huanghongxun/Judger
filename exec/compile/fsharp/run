@@ -24,7 +24,7 @@ SOURCEDIR="${MAINSOURCE%/*}"
 # dotnet 编译器需要一个 HOME 环境变量
 mkdir /tmp/home
 export HOME=/tmp/home
-cat > ${SOURCEDIR}/${DEST}.csproj << EOF
+cat > ${SOURCEDIR}/${DEST}.fsproj << EOF
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -35,8 +35,8 @@ cat > ${SOURCEDIR}/${DEST}.csproj << EOF
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TargetFramework>
 EOF
-echo ${FRAMEWORK} >> ${SOURCEDIR}/${DEST}.csproj
-cat >> ${DEST}.csproj << EOF
+echo ${FRAMEWORK} >> ${SOURCEDIR}/${DEST}.fsproj
+cat >> ${DEST}.fsproj << EOF
 	</TargetFramework>
   </PropertyGroup>
 </Project>
