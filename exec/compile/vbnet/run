@@ -14,17 +14,10 @@ FRAMEWORK="netcoreapp2.2"
 
 DESTCLI="${DEST}.dll"
 
-SOURCEDIR="${MAINSOURCE%/*}"
-[ "$SOURCEDIR" = "$MAINSOURCE" ] && SOURCEDIR='.'
-
-# Byte-compile:
-# Add -d:ONLINE_JUDGE,DOMJUDGE below if you want to make it easier for teams to
-# do local debugging.
-
 # dotnet 编译器需要一个 HOME 环境变量
 mkdir /tmp/home
 export HOME=/tmp/home
-cat > ${SOURCEDIR}/${DEST}.vbproj << EOF
+cat > ${DEST}.vbproj << EOF
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -33,14 +26,12 @@ cat > ${SOURCEDIR}/${DEST}.vbproj << EOF
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <LangVersion>preview</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-EOF
-echo \<TargetFramework\>${FRAMEWORK}\</TargetFramework\> >> ${SOURCEDIR}/${DEST}.vbproj
-cat >> ${DEST}.vbproj << EOF
+    <TargetFramework>${FRAMEWORK}</TargetFramework>
   </PropertyGroup>
 </Project>
 EOF
 
-dotnet publish -c Release -o .
+dotnet publish -c Release -d:ONLINE_JUDGE -o .
 EXITCODE=$?
 [ "$EXITCODE" -ne 0 ] && exit $EXITCODE
 
