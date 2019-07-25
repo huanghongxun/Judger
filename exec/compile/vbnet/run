@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# C# compile wrapper-script for 'compile.sh'.
+# F# compile wrapper-script for 'compile.sh'.
 # See that script for syntax and more info.
 #
 # This script byte-compiles with the MSBuild toolchain and generates
@@ -17,7 +17,7 @@ DESTCLI="${DEST}.dll"
 # dotnet 编译器需要一个 HOME 环境变量
 mkdir /tmp/home
 export HOME=/tmp/home
-cat > ${DEST}.csproj << EOF
+cat > ${DEST}.vbproj << EOF
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
