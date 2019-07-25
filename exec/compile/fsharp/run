@@ -33,11 +33,9 @@ cat > ${SOURCEDIR}/${DEST}.fsproj << EOF
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <LangVersion>preview</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <TargetFramework>
 EOF
-echo ${FRAMEWORK} >> ${SOURCEDIR}/${DEST}.fsproj
+echo \<TargetFramework\>${FRAMEWORK}\</TargetFramework\> >> ${SOURCEDIR}/${DEST}.fsproj
 cat >> ${DEST}.fsproj << EOF
-	</TargetFramework>
   </PropertyGroup>
 </Project>
 EOF

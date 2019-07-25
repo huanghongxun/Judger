@@ -33,11 +33,9 @@ cat > ${SOURCEDIR}/${DEST}.csproj << EOF
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <LangVersion>preview</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <TargetFramework>
 EOF
-echo ${FRAMEWORK} >> ${SOURCEDIR}/${DEST}.csproj
+echo \<TargetFramework\>${FRAMEWORK}\</TargetFramework\> >> ${SOURCEDIR}/${DEST}.csproj
 cat >> ${DEST}.csproj << EOF
-	</TargetFramework>
   </PropertyGroup>
 </Project>
 EOF

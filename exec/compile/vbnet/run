@@ -33,11 +33,9 @@ cat > ${SOURCEDIR}/${DEST}.vbproj << EOF
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <LangVersion>preview</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <TargetFramework>
 EOF
-echo ${FRAMEWORK} >> ${SOURCEDIR}/${DEST}.vbproj
+echo \<TargetFramework\>${FRAMEWORK}\</TargetFramework\> >> ${SOURCEDIR}/${DEST}.vbproj
 cat >> ${DEST}.vbproj << EOF
-	</TargetFramework>
   </PropertyGroup>
 </Project>
 EOF
