@@ -53,10 +53,12 @@ post_data = {
 requests.post(url, data=json.dumps(post_data))
 
 while True:
-    cursor.execute("SELECT report FROM submission WHERE prob_id=1234 AND sub_id=12340 AND grade >= 0")
-    data = cursor.fetchall()
     
     time.sleep(1)
+
+    cursor = db.cursor()
+    cursor.execute("SELECT report FROM submission WHERE prob_id=1234 AND sub_id=12340 AND grade >= 0")
+    data = cursor.fetchall()
 
     if not data:
         continue

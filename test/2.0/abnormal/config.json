@@ -1,7 +1,7 @@
 {
     "compilers": {
         "c": {
-            "command": "gcc CODE_FILES -Werror -g -lm -o OUTPUT_PROGRAM",
+            "command": "gcc CODE_FILES -Werror -g -std=gnu99 -lm -o OUTPUT_PROGRAM",
             "version": "default"
         }
     },
@@ -9,16 +9,16 @@
     "exec_flag": "--gtest_output=xml:/tmp/Result.xml",
     "google tests info": {},
     "grading": {
-        "compile check": 20,
+        "compile check": 10,
         "google tests": 0,
         "google tests detail": {},
         "memory check": 20,
         "random tests": 0,
-        "standard tests": 40,
-        "static check": 20
+        "standard tests": 60,
+        "static check": 10
     },
     "language": [
-        "cpp"
+        "c"
     ],
     "limits": {
         "memory": 32,
@@ -26,26 +26,25 @@
     },
     "output_program": "main.exe",
     "random": {
-        "compile_command": "gcc SOURCE -w -o random",
+        "complie_command": "gcc SOURCE -w -o random",
         "run_times": 100
     },
     "standard": {
         "hidden_support": [],
+        "random_source": [
+            "random.c"
+        ],
         "standard_input": [
-            "input0",
-            "input1",
-            "input2"
+            "input0"
         ],
         "standard_output": [
-            "output0",
-            "output1",
-            "output2"
+            "output0"
         ],
         "support": []
     },
-    "standard_language": "cpp",
+    "standard_language": "c",
     "standard_score": 100,
     "submission": [
-        "main.cpp"
+        "main.c"
     ]
 }

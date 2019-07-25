@@ -131,7 +131,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
             if (number < 0) LOG(FATAL) << "Unknown test case";
             datadir = standard_data_dir / to_string(task.testcase_id);
             // FIXME: 我们假定父测试存在的时候数据必定存在，如果数据被清除掉可能会导致问题
-        } else if (task.testcase_id >= 0) { // 使用对应的标准测试数据
+        } else if (task.testcase_id >= 0) {  // 使用对应的标准测试数据
             datadir = standard_data_dir / to_string(task.testcase_id);
             ip::file_lock file_lock = lock_directory(standard_data_dir);
             ip::scoped_lock scoped_lock(file_lock);
@@ -144,10 +144,12 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
                 for (auto &asset : test_data.outputs)
                     asset->fetch(datadir / "output");
             }
-        } else { // 该数据点不需要测试数据
+        } else {  // 该数据点不需要测试数据
             datadir = standard_data_dir / to_string(task.testcase_id);
             // 创建一个空的数据文件夹提供给测试点使用
             filesystem::create_directories(datadir);
+            filesystem::create_directories(datadir / "input");
+            filesystem::create_directories(datadir / "output");
         }
     }
 

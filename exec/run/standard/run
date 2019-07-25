@@ -8,4 +8,5 @@
 TESTIN="$1"; shift
 PROGOUT="$1"; shift
 
-exec "$@" < "$TESTIN" > "$PROGOUT"
+"$@" < "$TESTIN" > "$PROGOUT"
+exit 0

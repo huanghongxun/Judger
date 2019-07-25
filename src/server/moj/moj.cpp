@@ -244,17 +244,19 @@ static void from_json_programming(const json &j, configuration &server, programm
         // 标准程序的下载地址：FILE_API/problem/<prob_id>/support/<filename>
         append(standard->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
 
-        auto input_url = standard_json.at("input").get<vector<string>>();
-        auto output_url = standard_json.at("output").get<vector<string>>();
-        for (size_t i = 0; i < input_url.size() && i < output_url.size(); ++i) {
-            test_case_data datacase;
-            // 标准输入的的下载地址：FILE_API/problem/<prob_id>/standard_input/<filename>
-            datacase.inputs.push_back(moj_url_to_remote_file(server, fmt::format("problem/{}/standard_input", submit.prob_id))(input_url[i]));
-            datacase.inputs[0]->name = "testdata.in";  // 我们要求输入数据文件名必须为 testdata.in
-            // 标准输出的的下载地址：FILE_API/problem/<prob_id>/standard_output/<filename>
-            datacase.outputs.push_back(moj_url_to_remote_file(server, fmt::format("problem/{}/standard_output", submit.prob_id))(output_url[i]));
-            datacase.outputs[0]->name = "testdata.out";  // 我们要求输出数据文件名必须为 testdata.out
-            submit.test_data.push_back(move(datacase));
+        if (files.count("output") && standard_json.count("output")) {
+            auto input_url = standard_json.at("input").get<vector<string>>();
+            auto output_url = standard_json.at("output").get<vector<string>>();
+            for (size_t i = 0; i < input_url.size() && i < output_url.size(); ++i) {
+                test_case_data datacase;
+                // 标准输入的的下载地址：FILE_API/problem/<prob_id>/standard_input/<filename>
+                datacase.inputs.push_back(moj_url_to_remote_file(server, fmt::format("problem/{}/standard_input", submit.prob_id))(input_url[i]));
+                datacase.inputs[0]->name = "testdata.in";  // 我们要求输入数据文件名必须为 testdata.in
+                // 标准输出的的下载地址：FILE_API/problem/<prob_id>/standard_output/<filename>
+                datacase.outputs.push_back(moj_url_to_remote_file(server, fmt::format("problem/{}/standard_output", submit.prob_id))(output_url[i]));
+                datacase.outputs[0]->name = "testdata.out";  // 我们要求输出数据文件名必须为 testdata.out
+                submit.test_data.push_back(move(datacase));
+            }
         }
 
         submit.standard = move(standard);
@@ -269,14 +271,14 @@ static void from_json_programming(const json &j, configuration &server, programm
         random.at("compile").get_to(random_ptr->compile_command);
         random.at("run_times").get_to(random_test_times);
 
-        if (files.count("random")) {
+        if (files.count("random") && random_test_times > 0) {
             const json &random_json = files.at("random");
             auto src_url = random_json.get<vector<string>>();
             // 随机数据生成器的下载地址：FILE_API/problem/<prob_id>/random_source/<filename>
             append(random_ptr->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/random_source", submit.prob_id)));
-        }
 
-        submit.random = move(random_ptr);
+            submit.random = move(random_ptr);
+        }
     }
 
     const json &grading = config.at("grading").at(language);
@@ -301,10 +303,10 @@ static void from_json_programming(const json &j, configuration &server, programm
         submit.judge_tasks.push_back(testcase);
     }
 
-    {  // 随机测试
+    int random_full_grade = grading.count("RandomCheck") ? grading.at("RandomCheck").get<int>() : 0;
+    if (random_test_times > 0 && random_full_grade > 0) {  // 随机测试
         judge_task testcase;
-        testcase.score = grading.count("RandomCheck") ? grading.at("RandomCheck").get<int>() : 0;
-        testcase.score /= max(random_test_times, 1);
+        testcase.score = random_full_grade / random_test_times;
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = RANDOM_CHECK_TYPE;
@@ -317,7 +319,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
 
-        for (int i = 0; i < random_test_times && testcase.score > 0; ++i) {
+        for (int i = 0; i < random_test_times; ++i) {
             testcase.testcase_id = -1;  // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
             // 将当前的随机测试点编号记录下来，给内存测试依赖
             random_checks.push_back(submit.judge_tasks.size());
@@ -325,10 +327,10 @@ static void from_json_programming(const json &j, configuration &server, programm
         }
     }
 
-    {  // 标准测试
+    int standard_full_grade = grading.count("StandardCheck") ? grading.at("StandardCheck").get<int>() : 0;
+    if (!submit.test_data.empty() && standard_full_grade > 0) {  // 标准测试
         judge_task testcase;
-        testcase.score = grading.count("StandardCheck") ? grading.at("StandardCheck").get<int>() : 0;
-        testcase.score /= submit.test_data.size();
+        testcase.score = standard_full_grade / submit.test_data.size();
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = STANDARD_CHECK_TYPE;
@@ -341,7 +343,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
 
-        for (size_t i = 0; i < submit.test_data.size() && testcase.score > 0; ++i) {
+        for (size_t i = 0; i < submit.test_data.size(); ++i) {
             testcase.testcase_id = i;
             // 将当前的标准测试点编号记录下来，给内存测试依赖
             standard_checks.push_back(submit.judge_tasks.size());
@@ -349,9 +351,10 @@ static void from_json_programming(const json &j, configuration &server, programm
         }
     }
 
-    {  // 静态测试
+    int static_full_grade = grading.count("StaticCheck") ? grading.at("StaticCheck").get<int>() : 0;
+    if (static_full_grade > 0) {  // 静态测试
         judge_task testcase;
-        testcase.score = grading.count("StaticCheck") ? grading.at("StaticCheck").get<int>() : 0;
+        testcase.score = static_full_grade;
         testcase.depends_on = 0;
         testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = STATIC_CHECK_TYPE;
@@ -364,13 +367,13 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
-        if (testcase.score > 0)
-            submit.judge_tasks.push_back(testcase);
+        submit.judge_tasks.push_back(testcase);
     }
 
-    {  // GTest 测试
+    int gtest_full_grade = grading.count("GTestCheck") ? grading.at("GTestCheck").get<int>() : 0;
+    if (gtest_full_grade > 0) {  // GTest 测试
         judge_task testcase;
-        testcase.score = grading.count("GTestCheck") ? grading.at("GTestCheck").get<int>() : 0;
+        testcase.score = gtest_full_grade;
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = GTEST_CHECK_TYPE;
@@ -383,8 +386,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
-        if (testcase.score > 0)
-            submit.judge_tasks.push_back(testcase);
+        submit.judge_tasks.push_back(testcase);
     }
 
     {  // 内存测试需要依赖标准测试或随机测试以便可以在标准或随机测试没有 AC 的情况下终止内存测试以加速评测速度
@@ -400,7 +402,6 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
         testcase.proc_limit = proc_limit;
 
-        size_t test_count;
         if (testcase.is_random) {
             if (!random_checks.empty()) {  // 如果存在随机测试，则依赖随机测试点的数据
                 testcase.score /= random_checks.size();
@@ -410,8 +411,7 @@ static void from_json_programming(const json &j, configuration &server, programm
                     testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
                     submit.judge_tasks.push_back(testcase);
                 }
-                test_count = random_checks.size();
-            } else {  // 否则只能生成 10 组随机测试数据
+            } else if (submit.random) {  // 否则只能生成 10 组随机测试数据
                 testcase.score /= 10;
                 for (size_t i = 0; i < 10; ++i) {
                     testcase.testcase_id = i;
@@ -419,9 +419,8 @@ static void from_json_programming(const json &j, configuration &server, programm
                     testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
                     submit.judge_tasks.push_back(testcase);
                 }
-                test_count = 10;
             }
-        } else {
+        } else if (!standard_checks.empty()) {
             testcase.score /= standard_checks.size();
             for (int &i : standard_checks) {
                 testcase.testcase_id = submit.judge_tasks[i].testcase_id;
@@ -429,9 +428,7 @@ static void from_json_programming(const json &j, configuration &server, programm
                 testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
                 submit.judge_tasks.push_back(testcase);
             }
-            test_count = standard_checks.size();
         }
-        testcase.score /= test_count;
     }
 
     submit.sub_type = "programming";
