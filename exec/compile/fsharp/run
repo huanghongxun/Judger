@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 
 # F# compile wrapper-script for 'compile.sh'.
 # See that script for syntax and more info.
@@ -27,11 +27,12 @@ cat > ${DEST}.fsproj << EOF
     <LangVersion>preview</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TargetFramework>${FRAMEWORK}</TargetFramework>
+    <DefineConstants>\$(DefineConstants);ONLINE_JUDGE</DefineConstants>
   </PropertyGroup>
 </Project>
 EOF
 
-dotnet publish -c Release -d:ONLINE_JUDGE -o .
+dotnet publish -c Release -o .
 EXITCODE=$?
 [ "$EXITCODE" -ne 0 ] && exit $EXITCODE
 
