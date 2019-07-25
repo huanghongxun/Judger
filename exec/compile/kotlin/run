@@ -70,20 +70,20 @@ MEMSTACK=65536
 # versions of the jvm, but might need increasing in some cases.
 MEMJVM=65536
 
-MEMRESERVED=$((MEMSTACK + MEMJVM))
+MEMRESERVED=\$((MEMSTACK + MEMJVM))
 
 # Calculate Java program memlimit as MEMLIMIT - max. JVM memory usage:
-MEMLIMITJAVA=$((MEMLIMIT - MEMRESERVED))
+MEMLIMITJAVA=\$((MEMLIMIT - MEMRESERVED))
 
-if [ $MEMLIMITJAVA -le 0 ]; then
-	echo "internal-error: total memory $MEMLIMIT KiB <= $MEMJVM + $MEMSTACK = $MEMRESERVED KiB reserved for JVM and stack leaves none for heap."
+if [ \$MEMLIMITJAVA -le 0 ]; then
+	echo "internal-error: total memory \$MEMLIMIT KiB <= \$MEMJVM + \$MEMSTACK = \$MEMRESERVED KiB reserved for JVM and stack leaves none for heap."
 	exit 1
 fi
 
-if [ -z "$MEMLIMIT" ]; then
-	exec kotlin -J-DONLINE_JUDGE -Dfile.encoding=UTF-8 -J-XX:+UseSerialGC -J-Xss${MEMSTACK}k '$MAINCLASS' "\$@"
+if [ -z "\$MEMLIMIT" ]; then
+	exec kotlin -J-DONLINE_JUDGE -Dfile.encoding=UTF-8 -J-XX:+UseSerialGC -J-Xss\${MEMSTACK}k '$MAINCLASS' "\$@"
 else
-	exec kotlin -J-DONLINE_JUDGE -Dfile.encoding=UTF-8 -J-XX:+UseSerialGC -J-Xss${MEMSTACK}k -J-Xms${MEMLIMITJAVA}k -J-Xmx${MEMLIMITJAVA}k '$MAINCLASS' "\$@"
+	exec kotlin -J-DONLINE_JUDGE -Dfile.encoding=UTF-8 -J-XX:+UseSerialGC -J-Xss\${MEMSTACK}k -J-Xms\${MEMLIMITJAVA}k -J-Xmx\${MEMLIMITJAVA}k '$MAINCLASS' "\$@"
 fi
 EOF
 

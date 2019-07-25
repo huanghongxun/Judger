@@ -30,10 +30,10 @@ fi
 
 MEMSTACK=65536
 MEMJVM=65536
-MEMRESERVED=$((MEMSTACK + MEMJVM))
-MEMLIMITJAVA = $((MEMLIMIT - MEMRESERVED))
+MEMRESERVED=\$((MEMSTACK + MEMJVM))
+MEMLIMITJAVA=\$((MEMLIMIT - MEMRESERVED))
 
-if [ -z "$MEMLIMIT" ]; then
+if [ -z "\$MEMLIMIT" ]; then
     exec java -DONLINE_JUDGE -Dfile.encoding=UTF-8 -XX:+UseSerialGC -Xss\${MEMSTACK}k '$MAINCLASS' "\$@"
 else
     exec java -DONLINE_JUDGE -Dfile.encoding=UTF-8 -XX:+UseSerialGC -Xss\${MEMSTACK}k -Xms\${MEMLIMITJAVA}k -Xmx\${MEMLIMITJAVA}k '$MAINCLASS' "\$@"
