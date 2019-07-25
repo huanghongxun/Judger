@@ -385,7 +385,7 @@ static void summarize(programming_submission &submit) {
 
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
     try {
-        filesystem::remove_all(workdir);
+        if (!judge::DEBUG) filesystem::remove_all(workdir);
     } catch (exception &e) {
         LOG(ERROR) << "Unable to delete directory " << workdir << ":" << e.what();
     }

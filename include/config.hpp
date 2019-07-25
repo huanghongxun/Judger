@@ -121,4 +121,11 @@ extern std::filesystem::path RUN_DIR;
  */
 extern std::filesystem::path CHROOT_DIR;
 
+/**
+ * @brief 是否开启 DEBUG 模式
+ * 如果开启 DEBUG 模式，评测系统将不再检查程序是否在特权模式下执行，
+ * 并且不会删除产生的提交目录，以便手动检查测试产生的文件内容是否符合预期。
+ */
+extern bool DEBUG;
+
 }  // namespace judge

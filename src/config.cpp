@@ -14,5 +14,6 @@ filesystem::path DATA_DIR;
 bool USE_DATA_DIR = false;
 filesystem::path RUN_DIR;
 filesystem::path CHROOT_DIR;
+bool DEBUG = false;
 
 }  // namespace judge
