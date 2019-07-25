@@ -71,7 +71,10 @@
         "execute.h": "c",
         "cpp_redis": "cpp",
         "any": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "csetjmp": "cpp",
+        "cfenv": "cpp",
+        "scoped_allocator": "cpp"
     },
     "cmake.configureOnOpen": false
 }

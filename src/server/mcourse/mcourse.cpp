@@ -190,17 +190,16 @@ void from_json_programming(const json &config, const json &detail, judge_request
     // 对于老师提交，我们通过将 submission 和 standard 设置完全一样来进行测试
     // 这样标准测试可以正常测试数据，随机测试也可以因为 RANDOM_GEN_ERROR 返回错误
 
-    config.at("standard_language").get_to(standard->language);
+    standard->language = get_value<string>(config, "standard_language");
     if (standard->language == "c++")
         standard->language = "cpp";
 
     // 对于学生提交，我们从 detail 中获得当前学生提交的编程语言
     if (sub_type == judge_request::submission_type::student) {
         if (detail.count("language")) {
-            detail.at("language").get_to(submission->language);
+            submission->language = get_value<string>(detail, "language");
         } else {
-            vector<string> language;
-            config.at("language").get_to(language);
+            auto language = get_value<vector<string>>(config, "language");
             if (language.empty()) throw invalid_argument("submission.config.language is empty");
             submission->language = language[0];
         }
@@ -211,14 +210,10 @@ void from_json_programming(const json &config, const json &detail, judge_request
         submission->language = standard->language;
     }
 
-    int memory_limit;
-    double time_limit;
+    int memory_limit = get_value<int>(config, "limits", "memory") << 10;
+    double time_limit = get_value<int>(config, "limits", "time") / 1000;
     int proc_limit = 10;
     int file_limit = 1 << 18;  // 256M
-    config.at("limits").at("memory").get_to(memory_limit);
-    memory_limit <<= 10;
-    config.at("limits").at("time").get_to(time_limit);
-    time_limit /= 1000;
 
     auto &standard_json = config.at("standard");
 
@@ -268,13 +263,18 @@ void from_json_programming(const json &config, const json &detail, judge_request
     int random_test_times = 0;
 
     const json &grading = config.at("grading");
-    if (config.count("random") && (grading.count("random tests") ? grading.at("random tests").get<int>() : 0) > 0) {  // 随机数据生成器
+    if (config.count("random") && get_value_def(grading, 0, "random tests") > 0) {  // 随机数据生成器
         auto random_ptr = make_unique<source_code>(server.exec_mgr);
 
         auto &random_json = config.at("random");
-        random_json.at("run_times").get_to(random_test_times);
-        // 因为课程系统评测的编译命令貌似都是写死的，我们这里忽略掉提供的编译参数
-        auto compile_command = random_json.at("compile_command").get<string>();
+        random_test_times = get_value<int>(random_json, "run_times");
+
+        string compile_command;
+        if (random_json.count("complie_command"))
+            compile_command = random_json.at("complie_command").get<string>();
+        else
+            compile_command = random_json.at("compile_command").get<string>();
+
         if (boost::algorithm::starts_with(compile_command, "gcc") ||
             boost::algorithm::starts_with(compile_command, "g++") ||
             boost::algorithm::starts_with(compile_command, "clang"))
@@ -295,7 +295,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
 
     {  // 编译测试
         judge_task testcase;
-        testcase.score = grading.count("compile check") ? grading.at("compile check").get<int>() : 0;
+        testcase.score = get_value_def(grading, 0, "compile check");
         testcase.depends_on = -1;
         testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
         testcase.check_type = COMPILE_CHECK_TYPE;
@@ -309,7 +309,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         submit.judge_tasks.push_back(testcase);
     }
 
-    int random_full_grade = grading.count("random tests") ? grading.at("random tests").get<int>() : 0;
+    int random_full_grade = get_value_def(grading, 0, "random tests");
     if (random_full_grade > 0 && random_test_times > 0) {  // 随机测试
         judge_task testcase;
         testcase.score = random_full_grade / random_test_times;
@@ -333,7 +333,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         }
     }
 
-    int standard_full_grade = grading.count("standard tests") ? grading.at("standard tests").get<int>() : 0;
+    int standard_full_grade = get_value_def(grading, 0, "standard tests");
     if (!submit.test_data.empty() && standard_full_grade > 0) {  // 标准测试
         judge_task testcase;
         testcase.score = standard_full_grade / submit.test_data.size();
@@ -357,7 +357,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         }
     }
 
-    int static_full_grade = grading.count("static check") ? grading.at("static check").get<int>() : 0;
+    int static_full_grade = get_value_def(grading, 0, "static check");
     if (static_full_grade > 0) {  // 静态测试
         judge_task testcase;
         testcase.score = static_full_grade;
@@ -376,7 +376,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         submit.judge_tasks.push_back(testcase);
     }
 
-    int gtest_full_grade = grading.count("google tests") ? grading.at("google tests").get<int>() : 0;
+    int gtest_full_grade = get_value_def(grading, 0, "google tests");
     if (gtest_full_grade > 0) {  // GTest 测试
         judge_task testcase;
         testcase.score = gtest_full_grade;
@@ -395,7 +395,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         submit.judge_tasks.push_back(testcase);
     }
 
-    int memory_full_grade = grading.count("memory check") ? grading.at("memory check").get<int>() : 0;
+    int memory_full_grade = get_value_def(grading, 0, "memory check");
     if (memory_full_grade > 0) {  // 内存测试需要依赖标准测试或随机测试以便可以在标准或随机测试没有 AC 的情况下终止内存测试以加速评测速度
         judge_task testcase;
         testcase.score = memory_full_grade;

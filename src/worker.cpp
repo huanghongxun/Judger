@@ -87,8 +87,6 @@ static bool fetch_submission_nolock(concurrent_queue<message::client_task> &task
  * @param task_queue 评测服务端发送评测信息的队列
  * @return true 如果获取到了提交
  * 限制拉取提交的总数
- * TODO: 将拉取了的提交保存到本地持久化以便评测系统挂掉后重启可以 rejudge（我们已经通过 RabbitMQ 的 ack 解决了这个问题）
- * TODO: 主动 fetch 未评测的数据
  */
 static bool fetch_submission(concurrent_queue<message::client_task> &task_queue) {
     lock_guard<mutex> guard(server_mutex);

@@ -1,0 +1,38 @@
+{
+    "sub_type": "programming",
+    "category": "brandnew",
+    "prob_id": "1234",
+    "sub_id": "12345",
+    "results": [
+        {
+            /* 
+            Pending,
+            Running,
+            Accepted, 此时 score 必为 1
+            Partial Correct, 此时 score 为得分
+            Compilation Error, 此时 score 必为 0
+            Executable Compilation Error, 这个是标准程序、随机程序编译失败导致的，
+            Dependency Not Satisfied,
+            Wrong Answer, 此时 score 必为 0
+            Runtime Error,
+            Time Limit Exceeded,
+            Memory Limit Exceeded,
+            Output Limit Exceeded,
+            Presentation Error,
+            Restrict Function,
+            Out of Contest Time,
+            Compiling,
+            Segmentation Fault,
+            Floating Point Error,
+            Random Gen Error,
+            Compare Error,
+            System Error
+            */
+            "status": "Accepted",
+            "score": "1", // 范围在 0~1 内，表示成分数，比如 1/5, 2/9
+            "run_time": 0.678, // seconds
+            "memory_used": 262144, // bytes
+            "error_log": "may be truncated"
+        }
+    ]
+}

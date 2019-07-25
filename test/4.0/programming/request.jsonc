@@ -1,20 +1,20 @@
 {
+    "sub_type": "programming", // programming, output, choice, program_blank_filling
     "category": "exam",
-    "prob_id": 1234,
-    "sub_id": 12345,
-    "last_update": 0, // 最后更新的时间戳
-    "test_cases": [
+    "prob_id": "1234",
+    "sub_id": "W12345",
+    "updated_at": 0, // 最后更新的时间戳
+    "judge_tasks": [
         {
             "check_script": "compile",
             "run_script": "unused",
             "compare_script": "unused",
-            "score": 20, // 编译测试占 20 分
             "is_random": false, // 编译测试不使用随机测试数据
             "testcase_id": -1, // 编译测试不使用标准测试数据
             "depends_on": -1, // 没有依赖的测试点
-            "depends_cond": "ACCEPTED",
+            "depends_cond": "ACCEPTED", // ACCEPTED, NOT_TIME_LIMIT, PARTIAL_CORRECT
             "memory_limit": 262144, // 256M
-            "time_limit": 10.0, // 编译限时 10s
+            "time_limit": 10000, // 编译限时 10s
             "file_limit": -1, // unlimited
             "proc_limit": -1, // unlimited
         },
@@ -22,7 +22,6 @@
             "check_script": "standard", // 标准测试模式
             "run_script": "standard",
             "compare_script": "", // 空表示使用当前题目自带的比较程序
-            "score": 20,
             "is_random": false, // 标准测试
             "testcase_id": 0, // 使用第 0 号标准测试数据
             "depends_on": 0, // 依赖编译测试
@@ -36,7 +35,6 @@
             "check_script": "standard", // 标准测试模式
             "run_script": "standard",
             "compare_script": "diff-ign-space", // 表示使用配置系统中的比较脚本 diff-ign-space
-            "score": 20,
             "is_random": true, // 随机测试
             "testcase_id": -1, // 随机测试不使用标准测试数据
             "depends_on": 0, // 依赖编译测试
@@ -50,7 +48,6 @@
             "check_script": "memory", // valgrind 内存测试
             "run_script": "standard",
             "compare_script": null, // 内存测试不需要比较脚本
-            "score": 10,
             "is_random": false,
             "testcase_id": -1, // 依赖测试点的 testcase_id 不需要填写
             "depends_on": 1, // 依赖第 1 号测试点（这里是标准测试，测试数据将使用 0 号标准测试数据）
@@ -64,7 +61,6 @@
             "check_script": "memory", // valgrind 内存测试
             "run_script": "standard",
             "compare_script": null, // 内存测试不需要比较脚本
-            "score": 10,
             "is_random": true,
             "testcase_id": -1,
             "depends_on": 2, // 依赖第 2 号测试点（这里是随机测试，测试数据将使用随机测试相应的测试数据）
@@ -78,7 +74,6 @@
             "check_script": "static", // oclint 静态测试
             "run_script": null, // 静态测试不需要运行脚本
             "compare_script": null, // 静态测试不需要比较脚本
-            "score": 20,
             "is_random": false,
             "testcase_id": -1, // 静态测试不需要测试数据
             "depends_on": -1, // 静态测试不需要依赖编译测试
@@ -123,7 +118,7 @@
             ]
         }
     ],
-    "submission": {
+    "submission": { // 对于测试标准程序正确性的需求，将 submission 和 standard 设置为完全一样的内容就可以了，随机测试时可能报 RANDOM_GEN_ERROR
         "type": "source_code",
         "language": "cpp",
         "entry_point": null, // 对于 Java，entry_point 是主类名，不提供时默认为 Main；对于 Python，entry_point 是主文件名，不提供时默认为第一个文件

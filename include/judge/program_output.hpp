@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
+#include "common/json_utils.hpp"
 #include <string>
 #include <vector>
 #include "judge/judger.hpp"

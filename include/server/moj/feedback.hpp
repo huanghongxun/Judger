@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
+#include "common/json_utils.hpp"
 
 /**
  * 这个头文件包含 MOJ 的所有测试报告的结构体和 JSON 序列化函数

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
+#include "common/json_utils.hpp"
 
 namespace judge::server {
 

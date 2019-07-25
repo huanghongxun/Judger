@@ -51,4 +51,13 @@ constexpr std::enable_if_t<is_tuple<std::decay_t<T>>::value> for_each(T&& t, F&&
     for_each(std::forward<T>(t), std::forward<F>(f), std::make_index_sequence<SIZE>{});
 }
 
+template <typename F>
+constexpr void for_each_variadic(F&&) {}
+
+template <typename F, typename A, typename... Args>
+constexpr void for_each_variadic(F&& f, A&& a, Args&&... args) {
+    f(std::forward<A>(a));
+    for_each_variadic(f, std::forward<Args>(args)...);
+}
+
 }  // namespace iguana

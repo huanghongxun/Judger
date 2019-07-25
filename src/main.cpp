@@ -16,6 +16,7 @@
 #include "judge/choice.hpp"
 #include "judge/program_output.hpp"
 #include "judge/programming.hpp"
+#include "server/forth/forth.hpp"
 #include "server/mcourse/mcourse.hpp"
 #include "server/moj/moj.hpp"
 #include "server/sicily/sicily.hpp"
@@ -263,7 +264,15 @@ int main(int argc, char* argv[]) {
     }
 
     if (vm.count("enable")) {
-        // TODO: not implemented
+        auto forth_servers = vm.at("enable").as<vector<string>>();
+        for (auto& forth_server : forth_servers) {
+            CHECK(filesystem::is_regular_file(forth_server))
+                << "Configuration file " << forth_server << " does not exist";
+
+            auto forth_judger = make_unique<judge::server::forth::configuration>();
+            forth_judger->init(forth_server);
+            judge::register_judge_server(move(forth_judger));
+        }
     }
 
     if (vm.count("enable-3")) {
@@ -351,7 +360,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // TODO: termination recovery
     for (auto& th : worker_threads)
         th.join();
     return 0;

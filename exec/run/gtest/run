@@ -7,5 +7,9 @@
 TESTIN="$1"; shift
 PROGOUT="$1"; shift
 
-"$@" --gtest_output=xml
+if [ -f "$TESTIN" ]; then
+    "$@" --gtest_output=xml < "$TESTIN" > "$PROGOUT"
+else
+    "$@" --gtest_output=xml > "$PROGOUT"
+fi
 exit 0

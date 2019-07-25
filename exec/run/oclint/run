@@ -7,4 +7,8 @@
 TESTIN="$1"; shift
 PROGOUT="$1"
 
-exec oclint "$@" < "$TESTIN" > "$PROGOUT"
+if [ -f "$TESTIN" ]; then
+    exec oclint "$@" < "$TESTIN" > "$PROGOUT"
+else
+    exec oclint "$@" > "$PROGOUT"
+fi
