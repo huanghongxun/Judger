@@ -7,6 +7,19 @@
 namespace nlohmann {
 
 template <typename... Keys>
+bool exists(const json &j, Keys &&...keys) {
+    const json *ref = j.is_null() ? nullptr : &j;
+    iguana::for_each_variadic([&ref](auto &key) mutable {
+        if (ref && ref->count(key))
+            ref = &ref->at(key);
+        else
+            ref = nullptr;
+    },
+                              keys...);
+    return ref && !ref->is_null();
+}
+
+template <typename... Keys>
 json access_optional(const json &j, Keys &&... keys) {
     const json *ref = j.is_null() ? nullptr : &j;
     iguana::for_each_variadic([&ref](auto &key) mutable {

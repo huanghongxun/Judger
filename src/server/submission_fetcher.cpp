@@ -31,7 +31,8 @@ void judge_result_reporter::report(const string &message) {
     AmqpClient::BasicMessage::ptr_t msg = AmqpClient::BasicMessage::Create(message);
     DLOG(INFO) << "Sending message to exchange:" << queue.exchange << ", routing_key=" << queue.routing_key << std::endl
                << message;
-    channel->BasicPublish(queue.exchange, queue.routing_key, msg, true);
+    
+    channel->BasicPublish(queue.exchange, queue.routing_key, msg);
     DLOG(INFO) << "Sending message succeeded";
 }
 

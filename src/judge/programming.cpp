@@ -331,6 +331,10 @@ bool programming_judger::verify(submission &submit) const {
         if (judge_task.check_script == "compile") {
             if (!has_compile_case) {
                 has_compile_case = true;
+                if (judge_task.depends_on >= 0) {
+                    LOG(WARNING) << "Submission from [" << sub->category << "-" << sub->prob_id << "-" << sub->sub_id << "] has non-independent compilation task.";
+                    return false;
+                }
             } else {
                 LOG(WARNING) << "Submission from [" << sub->category << "-" << sub->prob_id << "-" << sub->sub_id << "] has multiple compilation subtasks.";
                 return false;

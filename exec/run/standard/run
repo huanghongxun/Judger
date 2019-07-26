@@ -9,8 +9,7 @@ TESTIN="$1"; shift
 PROGOUT="$1"; shift
 
 if [ -f "$TESTIN" ]; then
-    "$@" < "$TESTIN" > "$PROGOUT"
+    exec "$@" < "$TESTIN" > "$PROGOUT"
 else
-    "$@" > "$PROGOUT"
+    exec "$@" > "$PROGOUT"
 fi
-exit 0

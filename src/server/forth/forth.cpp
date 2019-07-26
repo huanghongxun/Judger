@@ -60,11 +60,11 @@ void from_json(const json &j, judge_task &value) {
     j.at("is_random").get_to(value.is_random);
     j.at("testcase_id").get_to(value.testcase_id);
     j.at("depends_on").get_to(value.depends_on);
-    j.at("depends_cond").get_to(value.depends_cond);
-    j.at("memory_limit").get_to(value.memory_limit);
+    assign_optional(j, value.depends_cond, "depends_cond");
+    assign_optional(j, value.memory_limit, "memory_limit");
     j.at("time_limit").get_to(value.time_limit), value.time_limit /= 1000;
-    j.at("file_limit").get_to(value.file_limit);
-    j.at("proc_limit").get_to(value.proc_limit);
+    assign_optional(j, value.file_limit, "file_limit");
+    assign_optional(j, value.proc_limit, "proc_limit");
 }
 
 void from_json(const json &j, asset_uptr &asset) {
@@ -114,10 +114,10 @@ void from_json(const json &j, programming_submission &submit, executable_manager
         from_json(test_data, data);
         submit.test_data.push_back(move(data));
     }
-    if (j.count("submission")) from_json(j.at("submission"), submit.submission, exec_mgr);
-    if (j.count("standard")) from_json(j.at("standard"), submit.standard, exec_mgr);
-    if (j.count("compare")) from_json(j.at("compare"), submit.compare, exec_mgr);
-    if (j.count("random")) from_json(j.at("random"), submit.random, exec_mgr);
+    if (exists(j, "submission")) from_json(j.at("submission"), submit.submission, exec_mgr);
+    if (exists(j, "standard")) from_json(j.at("standard"), submit.standard, exec_mgr);
+    if (exists(j, "compare")) from_json(j.at("compare"), submit.compare, exec_mgr);
+    if (exists(j, "random")) from_json(j.at("random"), submit.random, exec_mgr);
 }
 
 void from_json(const json &j, unique_ptr<submission> &submit, executable_manager &exec_mgr) {
@@ -150,7 +150,7 @@ void to_json(json &j, const judge_task_result &result) {
     try {
         report = json::parse(result.report);
     } catch (json::exception &e) {
-        report = e.what();
+        report = "";
     }
 
     j = {{"status", status_string.at(result.status)},
