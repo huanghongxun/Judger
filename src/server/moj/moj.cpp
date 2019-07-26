@@ -244,7 +244,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         // 标准程序的下载地址：FILE_API/problem/<prob_id>/support/<filename>
         append(standard->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
 
-        if (files.count("output") && standard_json.count("output")) {
+        if (standard_json.count("output") && standard_json.count("output")) {
             auto input_url = standard_json.at("input").get<vector<string>>();
             auto output_url = standard_json.at("output").get<vector<string>>();
             for (size_t i = 0; i < input_url.size() && i < output_url.size(); ++i) {

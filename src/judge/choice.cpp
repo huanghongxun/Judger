@@ -1,5 +1,6 @@
 #include "judge/choice.hpp"
 #include <glog/logging.h>
+#include "server/judge_server.hpp"
 
 namespace judge {
 using namespace std;

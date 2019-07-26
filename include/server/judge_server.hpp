@@ -1,9 +1,10 @@
 #pragma once
 
+#include <filesystem>
 #include "common/messages.hpp"
 #include "common/status.hpp"
 #include "config.hpp"
-#include <filesystem>
+#include "program.hpp"
 #include "worker_state.hpp"
 
 namespace judge::server {

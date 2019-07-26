@@ -75,7 +75,7 @@ static filesystem::path get_data_path(const filesystem::path &testdata, const st
 static bool fetch_queue(configuration &sicily, programming_submission &submit) {
     submit.category = sicily.category();
 
-    string time, sourcecode;
+    string time, sourcecode, language;
 
     auto rows = sicily.db.query<std::tuple<string, string, string, string, string, string, string, string, string>>(
         "SELECT qid, queue.sid, uid, pid, language, time, cid, cpid, sourcecode FROM queue, status WHERE queue.sid=status.sid AND hold=0 AND server_id=? ORDER BY qid LIMIT 1",
@@ -85,7 +85,7 @@ static bool fetch_queue(configuration &sicily, programming_submission &submit) {
         return false;
     }
 
-    tie(submit.queue_id, submit.sub_id, submit.user_id, submit.prob_id, submit.language, time, submit.contest_id, submit.contest_prob_id, sourcecode) = rows[0];
+    tie(submit.queue_id, submit.sub_id, submit.user_id, submit.prob_id, language, time, submit.contest_id, submit.contest_prob_id, sourcecode) = rows[0];
 
     struct tm mytm;
 
@@ -98,7 +98,7 @@ static bool fetch_queue(configuration &sicily, programming_submission &submit) {
     }
 
     unique_ptr<source_code> prog = make_unique<source_code>(sicily.exec_mgr);
-    prog->language = submit.language;
+    prog->language = language;
     prog->source_files.push_back(make_unique<text_asset>("source.cpp", sourcecode));
 
     {

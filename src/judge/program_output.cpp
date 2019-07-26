@@ -1,6 +1,7 @@
 #include "judge/program_output.hpp"
 #include <glog/logging.h>
 #include <boost/algorithm/string.hpp>
+#include "server/judge_server.hpp"
 
 namespace judge {
 using namespace std;
