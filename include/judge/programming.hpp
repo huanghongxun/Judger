@@ -57,7 +57,7 @@ struct test_case_data {
  * @brief 表示一个测试点
  */
 struct judge_task {
-    enum class depends_condition {
+    enum class dependency_condition {
         ACCEPTED,         // 要求依赖的测试点通过后才能执行本测试
         PARTIAL_CORRECT,  // 要求依赖的测试点不为 0 分时才能执行本测试
         NON_TIME_LIMIT    // 仅在依赖的测试点超出时间限制后才不继续测试
@@ -134,7 +134,7 @@ struct judge_task {
      * @brief 测试点依赖条件，要求依赖的测试点满足要求时才执行之后的测试点
      * 
      */
-    depends_condition depends_cond = depends_condition::ACCEPTED;
+    dependency_condition depends_cond = dependency_condition::ACCEPTED;
 
     /**
      * @brief 内存限制，限制应用程序实际最多能申请多少内存空间

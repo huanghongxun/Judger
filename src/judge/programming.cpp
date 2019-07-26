@@ -414,14 +414,14 @@ void programming_judger::process(concurrent_queue<message::client_task> &testcas
         if (kase.depends_on == (int)result.id) {
             bool satisfied;
             switch (kase.depends_cond) {
-                case judge_task::depends_condition::ACCEPTED:
+                case judge_task::dependency_condition::ACCEPTED:
                     satisfied = result.status == status::ACCEPTED;
                     break;
-                case judge_task::depends_condition::PARTIAL_CORRECT:
+                case judge_task::dependency_condition::PARTIAL_CORRECT:
                     satisfied = result.status == status::PARTIAL_CORRECT ||
                                 result.status == status::ACCEPTED;
                     break;
-                case judge_task::depends_condition::NON_TIME_LIMIT:
+                case judge_task::dependency_condition::NON_TIME_LIMIT:
                     satisfied = result.status != status::SYSTEM_ERROR &&
                                 result.status != status::COMPARE_ERROR &&
                                 result.status != status::COMPILATION_ERROR &&

@@ -45,7 +45,7 @@ protected:
         {  // 标准测试
             judge_task testcase;
             testcase.depends_on = 0;  // 依赖编译任务
-            testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+            testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
             testcase.check_script = "standard";
             testcase.run_script = "standard";
             testcase.compare_script = "diff-all";

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "server/judge_server.hpp"
-#include "server/submission_fetcher.hpp"
+#include "server/rabbitmq.hpp"
 #include "sql/dbng.hpp"
 #include "sql/mysql.hpp"
 
@@ -34,7 +34,7 @@ struct configuration : public judge_server {
     std::string host;
     int port;
 
-    std::unique_ptr<submission_fetcher> sub_fetcher;
+    std::unique_ptr<mq_publisher> sub_fetcher;
 
     configuration();
 

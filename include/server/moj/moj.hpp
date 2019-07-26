@@ -2,7 +2,7 @@
 
 #include "server/judge_server.hpp"
 #include "server/redis.hpp"
-#include "server/submission_fetcher.hpp"
+#include "server/rabbitmq.hpp"
 #include "sql/dbng.hpp"
 #include "sql/mysql.hpp"
 
@@ -35,14 +35,14 @@ struct configuration : public judge_server {
      */
     amqp choice_queue;
 
-    std::unique_ptr<submission_fetcher> choice_fetcher;
+    std::unique_ptr<mq_publisher> choice_fetcher;
 
     /**
      * @brief 拉取编程题评测的消息队列
      */
     amqp programming_queue;
 
-    std::unique_ptr<submission_fetcher> programming_fetcher;
+    std::unique_ptr<mq_publisher> programming_fetcher;
 
     configuration();
 

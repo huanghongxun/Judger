@@ -71,7 +71,7 @@ void configuration::init(const filesystem::path &config_path) {
     config.at("host").get_to(host);
     config.at("port").get_to(port);
 
-    sub_fetcher = make_unique<submission_fetcher>(sub_queue);
+    sub_fetcher = make_unique<mq_publisher>(sub_queue);
 
     monitor_db.execute("INSERT INTO judge_node_config (host, port, thread_number, is_working, load_factor) VALUES (?, ?, 0, true, 0) ON DUPLICATE KEY UPDATE host=?, port=?, load_factor=0, thread_number=0",
                        host, port, host, port);
@@ -297,7 +297,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         judge_task testcase;
         testcase.score = get_value_def(grading, 0, "compile check");
         testcase.depends_on = -1;
-        testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+        testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = COMPILE_CHECK_TYPE;
         testcase.check_script = "compile";
         testcase.is_random = false;
@@ -314,7 +314,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         judge_task testcase;
         testcase.score = random_full_grade / random_test_times;
         testcase.depends_on = 0;  // 依赖编译任务
-        testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+        testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = RANDOM_CHECK_TYPE;
         testcase.check_script = "standard";
         testcase.run_script = "standard";
@@ -338,7 +338,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         judge_task testcase;
         testcase.score = standard_full_grade / submit.test_data.size();
         testcase.depends_on = 0;  // 依赖编译任务
-        testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+        testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = STANDARD_CHECK_TYPE;
         testcase.check_script = "standard";
         testcase.run_script = "standard";
@@ -362,7 +362,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         judge_task testcase;
         testcase.score = static_full_grade;
         testcase.depends_on = 0;
-        testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+        testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = STATIC_CHECK_TYPE;
         testcase.check_script = "static";
         testcase.run_script = "standard";
@@ -381,7 +381,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         judge_task testcase;
         testcase.score = gtest_full_grade;
         testcase.depends_on = 0;  // 依赖编译任务
-        testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+        testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = GTEST_CHECK_TYPE;
         testcase.check_script = "standard";
         testcase.run_script = "gtest";
@@ -415,7 +415,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
                 for (int &i : random_checks) {
                     testcase.testcase_id = submit.judge_tasks[i].testcase_id;
                     testcase.depends_on = i;
-                    testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+                    testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
                     submit.judge_tasks.push_back(testcase);
                 }
             } else if (submit.random) {  // 否则只能生成 10 组随机测试数据
@@ -423,7 +423,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
                 for (size_t i = 0; i < 10; ++i) {
                     testcase.testcase_id = i;
                     testcase.depends_on = 0;  // 依赖编译任务
-                    testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+                    testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
                     submit.judge_tasks.push_back(testcase);
                 }
             }
@@ -432,7 +432,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
             for (int &i : standard_checks) {
                 testcase.testcase_id = submit.judge_tasks[i].testcase_id;
                 testcase.depends_on = i;
-                testcase.depends_cond = judge_task::depends_condition::ACCEPTED;
+                testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
                 submit.judge_tasks.push_back(testcase);
             }
         }

@@ -187,7 +187,7 @@ static bool fetch_queue(configuration &sicily, programming_submission &submit) {
                 kase.score = 0;
                 kase.testcase_id = i;
                 kase.depends_on = i;  // 当前的 kase 是第 i + 1 组测试点，依赖第 i 组测试点，最开始的测试数据将依赖编译
-                kase.depends_cond = judge_task::depends_condition::ACCEPTED;
+                kase.depends_cond = judge_task::dependency_condition::ACCEPTED;
                 kase.time_limit = time_limit;
                 kase.memory_limit = memory_limit;
                 kase.file_limit = file_limit;

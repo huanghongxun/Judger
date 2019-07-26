@@ -40,16 +40,16 @@ const unordered_map<status, const char *> status_string = boost::assign::map_lis
     (status::SYSTEM_ERROR, "System Error");
 // clang-format on
 
-void from_json(const json &j, judge_task::depends_condition &value) {
+void from_json(const json &j, judge_task::dependency_condition &value) {
     string str = j.get<string>();
     if (str == "ACCEPTED")
-        value = judge_task::depends_condition::ACCEPTED;
+        value = judge_task::dependency_condition::ACCEPTED;
     else if (str == "NOT_TIME_LIMIT")
-        value = judge_task::depends_condition::NON_TIME_LIMIT;
+        value = judge_task::dependency_condition::NON_TIME_LIMIT;
     else if (str == "PARTIAL_CORRECT")
-        value = judge_task::depends_condition::PARTIAL_CORRECT;
+        value = judge_task::dependency_condition::PARTIAL_CORRECT;
     else
-        throw std::invalid_argument("Unrecognized depends_condition " + str);
+        throw std::invalid_argument("Unrecognized dependency_condition " + str);
 }
 
 void from_json(const json &j, judge_task &value) {
@@ -187,9 +187,9 @@ void configuration::init(const filesystem::path &config_path) {
 
     config.at("category").get_to(category_name);
     config.at("submissionQueue").get_to(sub_queue);
-    sub_fetcher = make_unique<submission_fetcher>(sub_queue);
+    sub_fetcher = make_unique<mq_publisher>(sub_queue);
     config.at("reportQueue").get_to(report_queue);
-    judge_reporter = make_unique<judge_result_reporter>(report_queue);
+    judge_reporter = make_unique<mq_consumer>(report_queue);
 }
 
 string configuration::category() const {
