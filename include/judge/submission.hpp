@@ -50,7 +50,7 @@ struct submission {
      * @brief 题目最后更新时间（从 1970 年 1 月 1 日开始的时间戳）
      * 根据最后更新时间来确定是否需要重新编译随机数据生成器、标程、生成随机测试数据
      */
-    int updated_at;
+    time_t updated_at;
 
     /**
      * @brief 队列 id

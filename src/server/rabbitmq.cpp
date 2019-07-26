@@ -19,7 +19,15 @@ void rabbitmq::connect() {
 }
 
 bool rabbitmq::fetch(AmqpClient::Envelope::ptr_t &envelope, unsigned int timeout) {
-    return channel->BasicConsumeMessage(envelope, timeout);
+    int retry = 5;
+    while (retry-- > 0)
+        try {
+            return channel->BasicConsumeMessage(envelope, timeout);
+        } catch (std::exception &e) {
+            if (retry <= 0) throw e;
+            sleep(2);
+            connect();
+        }
 }
 
 void rabbitmq::ack(const AmqpClient::Envelope::ptr_t &envelope) {

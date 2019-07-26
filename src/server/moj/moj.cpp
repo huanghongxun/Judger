@@ -183,6 +183,7 @@ static void from_json_programming(const json &j, configuration &server, programm
     j.at("prob_id").get_to(prob_id);  // type int
     submit.sub_id = to_string(sub_id);
     submit.prob_id = to_string(prob_id);
+    assign_optional(j, submit.updated_at, "last_update");
 
     const json &config = j.at("config");
 

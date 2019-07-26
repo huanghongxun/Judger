@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <map>
 #include "common/concurrent_queue.hpp"
+#include "common/io_utils.hpp"
 #include "common/messages.hpp"
 #include "common/status.hpp"
 #include "judge/judger.hpp"
@@ -277,6 +278,8 @@ struct programming_submission : public submission {
      * @brief 已经完成了多少个测试点的评测
      */
     std::size_t finished = 0;
+
+    scoped_file_lock lock;
 };
 
 /**
@@ -292,7 +295,6 @@ struct programming_judger : public judger {
     void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const std::string &execcpuset) const override;
 
 private:
-
     /**
      * @brief 完成评测结果的统计，如果统计的是编译任务，则会分发具体的评测任务
      * 在评测完成后，通过调用 process 函数来完成数据点的统计，如果发现评测完了一个提交，则立刻返回。

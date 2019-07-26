@@ -1,4 +1,9 @@
 #include "common/io_utils.hpp"
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <utime.h>
 #include <algorithm>
 #include <fstream>
 
@@ -58,6 +63,57 @@ int count_directories_in_directory(const fs::path &dir) {
     if (!fs::is_directory(dir))
         return -1;
     return count_if(fs::directory_iterator(dir), {}, (bool (*)(const fs::path &))fs::is_directory);
+}
+
+scoped_file_lock::scoped_file_lock() {
+    valid = false;
+}
+
+scoped_file_lock::scoped_file_lock(const fs::path &path, bool shared) {
+    fd = open(path.c_str(), O_CREAT | O_RDWR);
+    flock(fd, shared ? LOCK_SH : LOCK_EX);
+    valid = true;
+}
+
+scoped_file_lock::scoped_file_lock(scoped_file_lock &&lock) {
+    *this = move(lock);
+}
+
+scoped_file_lock::~scoped_file_lock() {
+    if (!valid) return;
+    flock(fd, LOCK_UN);
+    close(fd);
+}
+
+scoped_file_lock &scoped_file_lock::operator=(scoped_file_lock &&lock) {
+    swap(fd, lock.fd);
+    swap(valid, lock.valid);
+    return *this;
+}
+
+scoped_file_lock lock_directory(const fs::path &dir, bool shared) {
+    fs::create_directories(dir);
+    fs::path lock_file = dir / ".lock";
+    if (fs::is_directory(lock_file))
+        fs::remove_all(lock_file);
+    return scoped_file_lock(lock_file.c_str(), shared);
+}
+
+time_t last_write_time(const fs::path &path) {
+    struct stat attr;
+    if (stat(path.c_str(), &attr) != 0)
+        throw system_error(errno, system_category(), "error when reading modification time of path " + path.string());
+    return attr.st_mtim.tv_sec;
+}
+
+void last_write_time(const fs::path &path, time_t timestamp) {
+    struct utimbuf buf;
+    struct stat attr;
+    stat(path.c_str(), &attr);
+    buf.actime = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    buf.modtime = timestamp;
+    if (utime(path.c_str(), &buf) == -1)
+        throw system_error(errno, system_category(), "error when setting modification time of path " + path.string());
 }
 
 }  // namespace judge

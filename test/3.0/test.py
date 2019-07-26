@@ -63,7 +63,7 @@ def main():
     sub = r.pubsub()
     sub.subscribe('test')
     for message in sub.listen():
-        if message.type == 'subscribe':
+        if message["type"] == 'subscribe':
             continue
         print(message)
         break

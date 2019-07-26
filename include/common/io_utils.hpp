@@ -37,4 +37,30 @@ std::string assert_safe_path(const std::string &subpath);
  */
 int count_directories_in_directory(const std::filesystem::path &dir);
 
+struct scoped_file_lock {
+    scoped_file_lock();
+    scoped_file_lock(const std::filesystem::path &path, bool shared);
+    scoped_file_lock(scoped_file_lock &&);
+    ~scoped_file_lock();
+
+    scoped_file_lock &operator=(scoped_file_lock &&);
+
+private:
+    int fd;
+    bool valid;
+};
+
+/**
+ * @brief 锁文件夹
+ * 通过创建文件夹，并对文件夹根目录下的 .lock 文件加锁实现
+ * @param dir 要被加锁的文件夹
+ * @param shared 是否是共享锁，真为共享锁（读锁），假为独占锁（写锁）
+ * @return 文件锁
+ */
+scoped_file_lock lock_directory(const std::filesystem::path &dir, bool shared);
+
+time_t last_write_time(const std::filesystem::path &path);
+
+void last_write_time(const std::filesystem::path &path, time_t time);
+
 }  // namespace judge

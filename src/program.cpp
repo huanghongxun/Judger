@@ -6,7 +6,6 @@
 #include <mutex>
 #include <stdexcept>
 #include "common/exceptions.hpp"
-#include "common/interprocess.hpp"
 #include "common/io_utils.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
@@ -14,7 +13,6 @@ using namespace std;
 
 namespace judge {
 namespace fs = std::filesystem;
-namespace ip = boost::interprocess;
 
 compilation_error::compilation_error(const string &what, const string &error_log) noexcept
     : runtime_error(what), error_log(error_log) {}
@@ -26,9 +24,9 @@ executable::executable(const string &id, const fs::path &workdir, asset_uptr &&a
     : dir(workdir / "executable" / id), runpath(dir / "compile" / "run"), id(assert_safe_path(id)), md5sum(md5sum), md5path(dir / "md5sum"), deploypath(dir / ".deployed"), buildpath(dir / "compile" / "build"), asset(move(asset)) {
 }
 
+// TODO: local executable 的自动更新
 void executable::fetch(const string &cpuset, const fs::path &, const fs::path &chrootdir) {
-    ip::file_lock file_lock = lock_directory(dir);
-    ip::scoped_lock guard(file_lock);
+    scoped_file_lock lock = lock_directory(dir, false);
     if (!fs::is_directory(dir) ||
         !fs::is_regular_file(deploypath) ||
         (!md5sum.empty() && !fs::is_regular_file(md5path)) ||

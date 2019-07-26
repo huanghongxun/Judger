@@ -6,5 +6,5 @@ cd $(dirname $0)
 
 sudo docker-compose up -d
 sudo bash ../../exec/create_cgroups.sh domjudge-run
-sleep 2
+sleep 4
 python upload.py

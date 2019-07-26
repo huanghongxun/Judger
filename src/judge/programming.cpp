@@ -1,6 +1,5 @@
 #include "judge/programming.hpp"
 #include <glog/logging.h>
-#include <unistd.h>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/lexical_cast.hpp>
@@ -10,8 +9,6 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <fstream>
-#include "common/interprocess.hpp"
-#include "common/io_utils.hpp"
 #include "common/stl_utils.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
@@ -20,7 +17,6 @@
 
 namespace judge {
 using namespace std;
-namespace ip = boost::interprocess;
 
 test_case_data::test_case_data() {}
 
@@ -73,8 +69,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
     judge_task *father = nullptr;
     if (depends_on >= 0) father = &submit.judge_tasks[depends_on];
 
-    // 获得输入输出数据
-    // TODO: 根据 submission 的 last_update 更新数据
+    // 获得输入输出数据，提交发生更新时，将直接清理整个文件夹内所有内容
     if (task.is_random) {
         // 生成随机测试数据
         filesystem::path random_data_dir = cachedir / "random_data";
@@ -85,8 +80,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
             datadir = random_data_dir / to_string(number);
         } else {
             // 随机目录的写入必须加锁
-            ip::file_lock file_lock = lock_directory(random_data_dir);
-            ip::scoped_lock scoped_lock(file_lock);
+            scoped_file_lock lock = lock_directory(random_data_dir, false);
             int number = count_directories_in_directory(random_data_dir);
             if (number < MAX_RANDOM_DATA_NUM) {
                 filesystem::create_directories(random_data_dir / to_string(number));
@@ -131,8 +125,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
             // FIXME: 我们假定父测试存在的时候数据必定存在，如果数据被清除掉可能会导致问题
         } else if (task.testcase_id >= 0) {  // 使用对应的标准测试数据
             datadir = standard_data_dir / to_string(task.testcase_id);
-            ip::file_lock file_lock = lock_directory(standard_data_dir);
-            ip::scoped_lock scoped_lock(file_lock);
+            scoped_file_lock lock = lock_directory(standard_data_dir, false);
             auto &test_data = submit.test_data[task.testcase_id];
             if (!filesystem::exists(datadir)) {
                 filesystem::create_directories(datadir / "input");
@@ -143,7 +136,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
                     asset->fetch(datadir / "output");
             }
         } else {  // 该数据点不需要测试数据
-            datadir = standard_data_dir / to_string(task.testcase_id);
+            datadir = standard_data_dir / "-1";
             // 创建一个空的数据文件夹提供给测试点使用
             filesystem::create_directories(datadir);
             filesystem::create_directories(datadir / "input");
@@ -322,25 +315,39 @@ string programming_judger::type() const {
  */
 static void verify_timeliness(programming_submission &submit) {
     filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;
+    filesystem::create_directories(cachedir);
 
-    struct stat attr;
-    stat(cachedir.c_str(), &attr);
-    time_t modified_time = attr.st_mtim.tv_sec;
+    filesystem::path time_file = cachedir / ".time";
+    if (!filesystem::exists(time_file)) {
+        ofstream fout(time_file);
+    }
+
+    time_t modified_time = judge::last_write_time(time_file);
     if (submit.updated_at > modified_time) {
-        ip::file_lock file_lock = lock_directory(cachedir);
-        ip::scoped_lock scoped_lock(file_lock);
+        scoped_file_lock lock = lock_directory(cachedir, false);
 
         // 再次检查文件夹更新时间，因为如果有两个提交同时竞争该文件夹锁，某个提交获得了
         // 锁并完成文件夹清理后，另一个提交就会拿到文件夹锁，此时不再需要清理文件夹
-        stat(cachedir.c_str(), &attr);
-        if (submit.updated_at > attr.st_mtim.tv_sec) {
+        modified_time = judge::last_write_time(time_file);
+        if (submit.updated_at > modified_time) {
             // 清理文件夹，因为如果删除该文件夹前必须释放锁，如果有两个提交一起竞争
             // 该文件夹，会导致删除该文件夹两次，可能导致已经下载的部分文件丢失。
             for (auto &subitem : filesystem::directory_iterator(cachedir)) {
-                filesystem::remove_all(subitem.path());
+                try {
+                    filesystem::remove_all(subitem.path());
+                } catch (std::exception &e) {
+                    LOG(ERROR) << "Unable to delete file " << subitem.path() << " " << e.what();
+                }
             }
         }
     }
+
+    if (!filesystem::exists(time_file)) {
+        ofstream fout(time_file);
+    }
+
+    submit.lock = scoped_file_lock(cachedir, true);
+    judge::last_write_time(time_file, submit.updated_at);
 }
 
 bool programming_judger::verify(submission &submit) const {
@@ -388,13 +395,14 @@ bool programming_judger::verify(submission &submit) const {
         return false;
     }
 
-    verify_timeliness(submit);
+    verify_timeliness(*sub);
 
     return true;
 }
 
 bool programming_judger::distribute(concurrent_queue<message::client_task> &task_queue, submission &submit) const {
     auto &sub = dynamic_cast<programming_submission &>(submit);
+
     // 初始化当前提交的所有评测任务状态为 PENDING
     sub.results.resize(sub.judge_tasks.size());
     for (size_t i = 0; i < sub.results.size(); ++i) {
