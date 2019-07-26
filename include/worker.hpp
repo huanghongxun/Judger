@@ -30,24 +30,10 @@ namespace judge {
 void register_judge_server(std::unique_ptr<server::judge_server> &&judge_server);
 
 /**
- * @brief 根据 category 来获取服务端信息
- * 这个函数可以并发调用。你必须确保 register_judge_server 在 worker 启动之前就被注册完成
- * @return category 对应的评测服务器
- */
-server::judge_server &get_judge_server_by_category(const std::string &category);
-
-/**
  * @brief 注册评测器
  * 评测器负责评测具体题型
  */
 void register_judger(std::unique_ptr<judger> &&judger);
-
-/**
- * @brief 根据 type 来获取评测器
- * 这个函数可以并发调用。你必须确保 register_judger 在 worker 启动之前就被注册完成
- * @return type 对应的评测器
- */
-judger &get_judger_by_type(const std::string &type);
 
 /**
  * @brief 启动评测 worker 线程

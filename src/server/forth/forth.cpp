@@ -146,11 +146,19 @@ struct judge_report {
 };
 
 void to_json(json &j, const judge_task_result &result) {
+    json report;
+    try {
+        report = json::parse(result.report);
+    } catch (json::exception &e) {
+        report = e.what();
+    }
+
     j = {{"status", status_string.at(result.status)},
-         {"score", fmt::format("{}/{}", result.score.numerator(), result.score.denominator())},
+         {"score", fmt::format("{}/{}", result.score.numerator(), max(result.score.denominator(), 1))},
          {"run_time", (int)result.run_time * 1000},
          {"memory_used", result.memory_used >> 10},
-         {"error_log", result.error_log}};
+         {"error_log", result.error_log},
+         {"report", report}};
 }
 
 void to_json(json &j, const judge_report &report) {

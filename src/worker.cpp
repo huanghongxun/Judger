@@ -26,12 +26,6 @@ void register_judge_server(unique_ptr<judge_server> &&judge_server) {
     judge_servers.insert({category, move(judge_server)});
 }
 
-judge_server &get_judge_server_by_category(const string &category) {
-    // 由于 judge_servers 只会在 server 启动时注册，因此之后都不会修改
-    // 因此不需要担心并发问题
-    return *judge_servers.at(category).get();
-}
-
 static map<string, unique_ptr<judger>> judgers;
 
 void register_judger(unique_ptr<judger> &&judger) {
@@ -40,7 +34,12 @@ void register_judger(unique_ptr<judger> &&judger) {
     judgers.insert({type, move(judger)});
 }
 
-judger &get_judger_by_type(const string &type) {
+/**
+ * @brief 根据 type 来获取评测器
+ * 这个函数可以并发调用。你必须确保 register_judger 在 worker 启动之前就被注册完成
+ * @return type 对应的评测器
+ */
+static judger &get_judger_by_type(const string &type) {
     // 由于 judgers 只会在 server 启动时注册，因此之后都不会修改
     // 因此不需要担心并发问题
     return *judgers.at(type).get();
@@ -58,13 +57,14 @@ static bool fetch_submission_nolock(concurrent_queue<message::client_task> &task
         unique_ptr<judge::submission> submission;
         try {
             if (server->fetch_submission(submission)) {
+                submission->judge_server = server.get();
                 if (!judgers.count(submission->sub_type))
                     throw runtime_error("Unrecognized submission type " + submission->sub_type);
-                if (judgers[submission->sub_type]->verify(submission)) {
+                if (judgers[submission->sub_type]->verify(*submission)) {
                     unsigned judge_id = global_judge_id++;
                     submission->judge_id = judge_id;
                     submissions[judge_id] = move(submission);
-                    judgers[submissions[judge_id]->sub_type]->distribute(task_queue, submissions[judge_id]);
+                    judgers[submissions[judge_id]->sub_type]->distribute(task_queue, *submissions[judge_id]);
                     success = true;
                 } else {
                     report_failure(submission);

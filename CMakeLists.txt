@@ -60,13 +60,13 @@ if (BUILD_UNIT_TEST)
   ################################################################################
   include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/googletest/googletest/include")
   include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/googlemock/googlemock/include")
-  include_directories("${CMAKE_CURRENT_SOURCE_DIR}/test/unit-test/")
+  include_directories("${CMAKE_CURRENT_SOURCE_DIR}/unit-test/")
   ################################################################################
 
   # Unit test source files
   ################################################################################
-  file(GLOB_RECURSE TEST_SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/test/unit-test/*Test.cpp")
-  file(GLOB TEST_MAIN "${CMAKE_CURRENT_SOURCE_DIR}/test/unit-test/main.cpp")
+  file(GLOB_RECURSE TEST_SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/unit-test/*Test.cpp")
+  file(GLOB TEST_MAIN "${CMAKE_CURRENT_SOURCE_DIR}/unit-test/main.cpp")
   ################################################################################
 
   set(GTEST_TARGET "unit_test")
@@ -80,6 +80,11 @@ if (BUILD_UNIT_TEST)
     gmock
     SimpleAmqpClient
     fmt
+    mysqlclient
+    curl
+    cpp_redis
+    boost_stacktrace_addr2line
+    dl
     ${Boost_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     )

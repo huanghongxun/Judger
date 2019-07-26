@@ -104,6 +104,7 @@ struct judge_task {
 
     /**
      * @brief 本测试点总分
+     * 在评测 4.0 接口中不使用
      */
     boost::rational<int> score;
 
@@ -113,13 +114,13 @@ struct judge_task {
      * 或者从现有的随机测试数据中随机选取一个测试。
      * 如果是标准测试，那么评测客户端将根据测试点编号评测。
      */
-    bool is_random;
+    bool is_random = false;
 
     /**
      * @brief 标准测试数据 id，在 submission.test_cases 中进行索引
      * 若为随机测试，此项在评测完成后将会被修改成随机测试使用的数据点
      */
-    int testcase_id;
+    int testcase_id = -1;
 
     /**
      * @brief 本测试点依赖哪个测试点，负数表示不依赖任何测试点
@@ -127,13 +128,13 @@ struct judge_task {
      * 可以实现标准/随机测试点未通过的情况下不测试对应的内存测试的功能。
      * 可以实现所有的测试点均需依赖编译测试的功能。
      */
-    int depends_on;
+    int depends_on = -1;
 
     /**
      * @brief 测试点依赖条件，要求依赖的测试点满足要求时才执行之后的测试点
      * 
      */
-    depends_condition depends_cond;
+    depends_condition depends_cond = depends_condition::ACCEPTED;
 
     /**
      * @brief 内存限制，限制应用程序实际最多能申请多少内存空间
@@ -197,6 +198,12 @@ struct judge_task_result {
     std::string error_log;
 
     /**
+     * @brief 报告信息
+     * 对于 Google Test，Oclint，这里将保存测试结果的详细信息
+     */
+    std::string report;
+
+    /**
      * @brief 指向当前评测的运行路径
      * 
      * RUN_DIR // 选手程序的运行目录，包含选手程序输出结果
@@ -226,12 +233,6 @@ struct judge_task_result {
  * @brief 一个选手代码提交
  */
 struct programming_submission : public submission {
-    /**
-     * @brief 选手代码的提交语言
-     * @note ["bash", "c", "cpp", "go", "haskell", "java", "make", "pas", "python2", "python3", "rust", "swift"]
-     */
-    std::string language;
-
     /**
      * @brief 本题的评测任务
      * 
@@ -282,16 +283,15 @@ struct programming_submission : public submission {
  * @brief 评测编程题的 Judger 类，编程题评测的逻辑都在这个类里
  */
 struct programming_judger : public judger {
-    std::string type() override;
+    std::string type() const override;
 
-    bool verify(std::unique_ptr<submission> &submit) override;
+    bool verify(submission &submit) const override;
 
-    bool distribute(concurrent_queue<message::client_task> &task_queue, std::unique_ptr<submission> &submit) override;
+    bool distribute(concurrent_queue<message::client_task> &task_queue, submission &submit) const override;
 
-    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const std::string &execcpuset) override;
+    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const std::string &execcpuset) const override;
 
 private:
-    std::mutex mut;
 
     /**
      * @brief 完成评测结果的统计，如果统计的是编译任务，则会分发具体的评测任务
@@ -300,7 +300,7 @@ private:
      * 
      * @param result 评测结果
      */
-    void process(concurrent_queue<message::client_task> &testcase_queue, programming_submission &submit, const judge_task_result &result);
+    void process(concurrent_queue<message::client_task> &testcase_queue, programming_submission &submit, const judge_task_result &result) const;
 };
 
 }  // namespace judge

@@ -16,7 +16,7 @@
             "memory_limit": 262144, // 256M
             "time_limit": 10000, // 编译限时 10s
             "file_limit": -1, // unlimited
-            "proc_limit": -1, // unlimited
+            "proc_limit": -1 // unlimited
         },
         {
             "check_script": "standard", // 标准测试模式
@@ -29,7 +29,7 @@
             "memory_limit": 262144, // 256M
             "time_limit": 1.0, // 1s
             "file_limit": 524288, // 512M
-            "proc_limit": -1, // unlimited
+            "proc_limit": -1 // unlimited
         },
         {
             "check_script": "standard", // 标准测试模式
@@ -42,7 +42,7 @@
             "memory_limit": 262144, // 256M
             "time_limit": 1.0, // 1s
             "file_limit": 524288, // 512M
-            "proc_limit": -1, // unlimited
+            "proc_limit": -1 // unlimited
         },
         {
             "check_script": "memory", // valgrind 内存测试
@@ -55,7 +55,7 @@
             "memory_limit": 524288, // 512M
             "time_limit": 20.0, // 20s
             "file_limit": 524288, // 512M
-            "proc_limit": -1, // unlimited
+            "proc_limit": -1 // unlimited
         },
         {
             "check_script": "memory", // valgrind 内存测试
@@ -68,7 +68,7 @@
             "memory_limit": 524288, // 512M
             "time_limit": 20.0, // 20s
             "file_limit": 524288, // 512M
-            "proc_limit": -1, // unlimited
+            "proc_limit": -1 // unlimited
         },
         {
             "check_script": "static", // oclint 静态测试
@@ -81,7 +81,7 @@
             "memory_limit": 262144, // 256M
             "time_limit": 10.0, // 10s
             "file_limit": 524288, // 512M
-            "proc_limit": -1, // unlimited
+            "proc_limit": -1 // unlimited
         }
     ],
     "test_data": [

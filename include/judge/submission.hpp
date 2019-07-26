@@ -2,9 +2,14 @@
 
 #include <any>
 #include <ctime>
+#include <mutex>
 #include <string>
 
 namespace judge {
+
+namespace server {
+struct judge_server;
+}
 
 /**
  * @brief 一个选手提交，可能是编程题、选择题、完善程序题、程序输出题
@@ -19,6 +24,8 @@ struct submission {
      * 如：moj, mcourse, sicily 来区分评测结果应该发送给哪个服务器
      */
     std::string category;
+
+    server::judge_server *judge_server;
 
     /**
      * @brief 选手提交类型
@@ -97,6 +104,8 @@ struct submission {
      * @brief 给 judge_server 保存题目配置的地方
      */
     std::any config;
+
+    std::mutex mut;
 };
 
 }  // namespace judge

@@ -17,7 +17,6 @@
 #include "config.hpp"
 #include "runguard.hpp"
 #include "server/judge_server.hpp"
-#include "worker.hpp"
 
 namespace judge {
 using namespace std;
@@ -49,8 +48,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
     judge_task_result result{client_task.id};
     result.run_dir = rundir;
 
-    server::judge_server &server = get_judge_server_by_category(submit.category);
-    auto &exec_mgr = server.get_executable_manager();
+    auto &exec_mgr = submit.judge_server->get_executable_manager();
 
     // <check-script> <std.in> <std.out> <timelimit> <chrootdir> <workdir> <run-id> <run-script> <compare-script>
     auto check_script = exec_mgr.get_check_script(task.check_script);
@@ -177,6 +175,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
                                compare_script->get_run_path(cachedir / "compare"),
                                boost::algorithm::join(submit.submission->source_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"),
                                boost::algorithm::join(submit.submission->assist_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"));
+    result.report = read_file_content(rundir / "feedback" / "report.txt", "{}");
     result.error_log = read_file_content(rundir / "system.out", "No detailed information");
     switch (ret) {
         case E_INTERNAL_ERROR:
@@ -310,12 +309,12 @@ static judge_task_result compile(const message::client_task &client_task, progra
     return result;
 }
 
-string programming_judger::type() {
+string programming_judger::type() const {
     return "programming";
 }
 
-bool programming_judger::verify(unique_ptr<submission> &submit) {
-    auto sub = dynamic_cast<programming_submission *>(submit.get());
+bool programming_judger::verify(submission &submit) const {
+    auto sub = dynamic_cast<programming_submission *>(&submit);
     if (!sub) return false;
     LOG(INFO) << "Judging submission [" << sub->category << "-" << sub->prob_id << "-" << sub->sub_id << "]";
 
@@ -358,20 +357,20 @@ bool programming_judger::verify(unique_ptr<submission> &submit) {
     return true;
 }
 
-bool programming_judger::distribute(concurrent_queue<message::client_task> &task_queue, unique_ptr<submission> &submit) {
-    auto sub = dynamic_cast<programming_submission *>(submit.get());
+bool programming_judger::distribute(concurrent_queue<message::client_task> &task_queue, submission &submit) const {
+    auto &sub = dynamic_cast<programming_submission &>(submit);
     // 初始化当前提交的所有评测任务状态为 PENDING
-    sub->results.resize(sub->judge_tasks.size());
-    for (size_t i = 0; i < sub->results.size(); ++i) {
-        sub->results[i].status = judge::status::PENDING;
-        sub->results[i].id = i;
+    sub.results.resize(sub.judge_tasks.size());
+    for (size_t i = 0; i < sub.results.size(); ++i) {
+        sub.results[i].status = judge::status::PENDING;
+        sub.results[i].id = i;
     }
 
     // 寻找没有依赖的评测点，并发送评测消息
-    for (size_t i = 0; i < sub->judge_tasks.size(); ++i) {
-        if (sub->judge_tasks[i].depends_on < 0) {  // 不依赖任何任务的任务可以直接开始评测
+    for (size_t i = 0; i < sub.judge_tasks.size(); ++i) {
+        if (sub.judge_tasks[i].depends_on < 0) {  // 不依赖任何任务的任务可以直接开始评测
             judge::message::client_task client_task = {
-                .submit = submit.get(),
+                .submit = &submit,
                 .id = i};
             task_queue.push(client_task);
         }
@@ -380,8 +379,7 @@ bool programming_judger::distribute(concurrent_queue<message::client_task> &task
 }
 
 static void summarize(programming_submission &submit) {
-    auto &judge_server = get_judge_server_by_category(submit.category);
-    judge_server.summarize(submit);
+    submit.judge_server->summarize(submit);
 
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
     try {
@@ -396,7 +394,7 @@ static void summarize(programming_submission &submit) {
  * 
  * @param task_result client 返回的评测结果
  */
-void programming_judger::process(concurrent_queue<message::client_task> &testcase_queue, programming_submission &submit, const judge_task_result &result) {
+void programming_judger::process(concurrent_queue<message::client_task> &testcase_queue, programming_submission &submit, const judge_task_result &result) const {
     // 记录测试信息
     submit.results[result.id] = result;
 
@@ -459,7 +457,7 @@ void programming_judger::process(concurrent_queue<message::client_task> &testcas
     }
 }
 
-void programming_judger::judge(const message::client_task &client_task, concurrent_queue<message::client_task> &task_queue, const string &execcpuset) {
+void programming_judger::judge(const message::client_task &client_task, concurrent_queue<message::client_task> &task_queue, const string &execcpuset) const {
     auto submit = dynamic_cast<programming_submission *>(client_task.submit);
     judge_task &task = submit->judge_tasks[client_task.id];
     judge_task_result result;
@@ -475,7 +473,7 @@ void programming_judger::judge(const message::client_task &client_task, concurre
         result.error_log = ex.what();
     }
 
-    lock_guard<mutex> guard(mut);
+    lock_guard<mutex> guard(submit->mut);
     process(task_queue, *submit, result);
 }
 

@@ -36,17 +36,15 @@ if len(sys.argv) != 5:
     print("Usage: {0} [stdin] [userout] [stdout] [feedback]".format(sys.argv[0]))
     sys.exit(2)
 
-xml_file = open('test_detail.xml', 'r')
 result_file = open(os.path.join(sys.argv[4], 'report.txt'), 'w')
 score_file = open(os.path.join(sys.argv[4], 'score.txt'), 'w')
 
-xml_result = xmltodict.parse(xml_file.read())
-
-pass_cases = 0
-disabled_cases = 0
-reports = []
-
 try:
+    xml_file = open('test_detail.xml', 'r')
+    xml_result = xmltodict.parse(xml_file.read())
+    pass_cases = 0
+    disabled_cases = 0
+    reports = []
     error_cases = int(xml_result['testsuites']['@failures'])
     disabled_cases = xml_result['testsuites']['@disabled']
     time = xml_result['testsuites']['@time']
@@ -89,6 +87,8 @@ try:
     else:
         score_file.write('{0} {1}'.format(pass_cases, total_cases))
         sys.exit(54)
-except KeyError as e:
+except (IOError, OSError) as e:
+    sys.exit(43)
+except Exception as e:
     sys.stderr.write('Internal error: {0} is not found during parsing memory check result\n'.format(e.args[0]))
     sys.exit(1)

@@ -74,7 +74,9 @@
         "future": "cpp",
         "csetjmp": "cpp",
         "cfenv": "cpp",
-        "scoped_allocator": "cpp"
+        "scoped_allocator": "cpp",
+        "cuchar": "cpp",
+        "shared_mutex": "cpp"
     },
     "cmake.configureOnOpen": false
 }

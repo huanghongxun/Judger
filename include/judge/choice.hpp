@@ -57,13 +57,13 @@ struct choice_submission : public submission {
  * @brief 评测选择题的 Judger 类，选择题评测的逻辑都在这个类里
  */
 struct choice_judger : public judger {
-    std::string type() override;
+    std::string type() const override;
 
-    bool verify(std::unique_ptr<submission> &submit) override;
+    bool verify(submission &submit) const override;
 
-    bool distribute(concurrent_queue<message::client_task> &task_queue, std::unique_ptr<submission> &submit) override;
+    bool distribute(concurrent_queue<message::client_task> &task_queue, submission &submit) const override;
 
-    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const std::string &execcpuset) override;
+    void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const std::string &execcpuset) const override;
 };
 
 }  // namespace judge

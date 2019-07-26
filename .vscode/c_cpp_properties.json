@@ -11,7 +11,8 @@
                 "${workspaceFolder}/ext/SimpleAmqpClient/src",
                 "${workspaceFolder}/build/ext/glog",
                 "${workspaceFolder}/include",
-                "${workspaceFolder}/runguard/include"
+                "${workspaceFolder}/runguard/include",
+                "${workspaceFolder}/unit-test"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc-9",

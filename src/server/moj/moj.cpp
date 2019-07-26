@@ -733,8 +733,7 @@ static bool summarize_static_check(boost::rational<int> &total_score, programmin
             exists = true;
 
             try {
-                string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
-                json report = json::parse(report_text);
+                json report = json::parse(task_result.report);
                 if (report.count("violation"))
                     oclint_violations.push_back(report.at("violation"));
             } catch (std::exception &e) {  // 非法 json 文件
@@ -795,11 +794,10 @@ static bool summarize_memory_check(boost::rational<int> &total_score, programmin
                 ++memory_check.pass_cases;
             } else if (task_result.status == status::WRONG_ANSWER) {
                 memory_check_error_report kase;
-                string valgrindoutput = read_file_content(task_result.run_dir / "feedback" / "report.txt");
                 try {
-                    kase.valgrindoutput = json::parse(valgrindoutput).at("error");
+                    kase.valgrindoutput = json::parse(task_result.report).at("error");
                 } catch (std::exception &e) {  // 非法 json 文件
-                    kase.message = boost::diagnostic_information(e) + "\n" + valgrindoutput;
+                    kase.message = boost::diagnostic_information(e) + "\n" + task_result.report;
                 }
                 kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
                 memory_check.report.push_back(kase);
@@ -863,11 +861,9 @@ static bool summarize_gtest_check(boost::rational<int> &total_score, programming
             if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
-            // 这里将 report.txt 的 json 格式进行转换，偷懒就直接对 json 操作了
-            // report.txt 的格式参见 exec/compare/gtest/run
-            string report_text = read_file_content(task_result.run_dir / "feedback" / "report.txt", "{}");
             try {
-                gtest_check_json = json::parse(report_text);
+                // report 的格式参见 exec/compare/gtest/run
+                gtest_check_json = json::parse(task_result.report);
                 gtest_check_json["result"] = status_string.at(task_result.status);
                 json googletest = gtest_check_json.count("report") ? gtest_check_json["report"] : json{};
                 gtest_check_json["report"] = {{"googletest", googletest},
@@ -876,7 +872,7 @@ static bool summarize_gtest_check(boost::rational<int> &total_score, programming
                                                 {"message", "Program finished running."}}}};
             } catch (std::exception &e) {  // 非法 json 文件
                 task_result.status = status::SYSTEM_ERROR;
-                task_result.error_log = boost::diagnostic_information(e) + "\n" + report_text;
+                task_result.error_log = boost::diagnostic_information(e) + "\n" + task_result.report;
                 gtest_check_json = get_error_report(task_result);
                 break;
             }

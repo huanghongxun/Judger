@@ -204,6 +204,7 @@ struct source_code : program {
      * @brief 该程序使用的语言
      * @note 不能为空，这涉及判题时使用的编译器与执行器
      * 因此对于 source_code，其会自行查找 get_run_script 和 get_compile_script
+     * @note ["bash", "c", "cpp", "go", "haskell", "java", "make", "pas", "python2", "python3", "rust", "swift"]
      */
     std::string language;
 

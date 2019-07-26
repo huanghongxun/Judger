@@ -1,7 +1,6 @@
 #include "judge/program_output.hpp"
 #include <glog/logging.h>
 #include <boost/algorithm/string.hpp>
-#include "worker.hpp"
 
 namespace judge {
 using namespace std;
@@ -38,36 +37,35 @@ static double calc_similarity(const string &standard, const string &student) {
     return 1.0 - calc_edit_distance(standard, student) * 1.0 / max(standard.size(), student.size());
 }
 
-string program_output_judger::type() {
+string program_output_judger::type() const {
     return "output";
 }
 
-bool program_output_judger::verify(unique_ptr<submission> &submit) {
-    auto sub = dynamic_cast<program_output_submission *>(submit.get());
+bool program_output_judger::verify(submission &submit) const {
+    auto sub = dynamic_cast<program_output_submission *>(&submit);
     if (!sub) return false;
     LOG(INFO) << "Judging program output submission [" << sub->category << "-" << sub->prob_id << "-" << sub->sub_id << "]";
 
     return true;
 }
 
-bool program_output_judger::distribute(concurrent_queue<message::client_task> &task_queue, unique_ptr<submission> &submit) {
+bool program_output_judger::distribute(concurrent_queue<message::client_task> &task_queue, submission &submit) const {
     // 我们只需要发一个评测请求就行了，以便让 client 能调用我们的 judge 函数
     // 或者我们在 verify 的时候就评测完选择题然后返回 false 也行。
     judge::message::client_task client_task = {
-        .submit = submit.get(),
+        .submit = &submit,
         .id = 0};
     task_queue.push(client_task);
     return true;
 }
 
-void program_output_judger::judge(const message::client_task &task, concurrent_queue<message::client_task> &, const string &) {
+void program_output_judger::judge(const message::client_task &task, concurrent_queue<message::client_task> &, const string &) const {
     auto submit = dynamic_cast<program_output_submission *>(task.submit);
 
     for (auto &q : submit->questions)
         q.grade = q.full_grade * calc_similarity(string_preprocess(q.standard_answer), string_preprocess(q.student_answer));
 
-    auto &judge_server = get_judge_server_by_category(submit->category);
-    judge_server.summarize(*submit);
+    submit->judge_server->summarize(*submit);
     fire_judge_finished(*submit);
 }
 
