@@ -20,6 +20,7 @@
 
 namespace judge {
 using namespace std;
+namespace ip = boost::interprocess;
 
 test_case_data::test_case_data() {}
 
@@ -39,7 +40,6 @@ judge_task_result::judge_task_result(size_t id)
  * @param result_queue 评测结果队列
  */
 static judge_task_result judge_impl(const message::client_task &client_task, programming_submission &submit, judge_task &task, const string &execcpuset) {
-    namespace ip = boost::interprocess;
     string uuid = boost::lexical_cast<string>(boost::uuids::random_generator()());
     filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;               // 题目的缓存文件夹
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;  // 本提交的工作文件夹
@@ -313,6 +313,36 @@ string programming_judger::type() const {
     return "programming";
 }
 
+/**
+ * @brief 确认题目的缓存文件夹是最新的，如果不是，阻塞到旧题目评测完成之后再分发评测。
+ * 因为 fetch_submission 在评测队列空缺时被调用，此时该 worker 已经没有可以评测的
+ * 评测任务才会尝试拉取提交，因此该 worker 阻塞不会影响已经在评测的提交的评测状态。
+ * 也就是说阻塞是安全的。
+ * @param submit 要检查对应题目是否是最新的提交
+ */
+static void verify_timeliness(programming_submission &submit) {
+    filesystem::path cachedir = CACHE_DIR / submit.category / submit.prob_id;
+
+    struct stat attr;
+    stat(cachedir.c_str(), &attr);
+    time_t modified_time = attr.st_mtim.tv_sec;
+    if (submit.updated_at > modified_time) {
+        ip::file_lock file_lock = lock_directory(cachedir);
+        ip::scoped_lock scoped_lock(file_lock);
+
+        // 再次检查文件夹更新时间，因为如果有两个提交同时竞争该文件夹锁，某个提交获得了
+        // 锁并完成文件夹清理后，另一个提交就会拿到文件夹锁，此时不再需要清理文件夹
+        stat(cachedir.c_str(), &attr);
+        if (submit.updated_at > attr.st_mtim.tv_sec) {
+            // 清理文件夹，因为如果删除该文件夹前必须释放锁，如果有两个提交一起竞争
+            // 该文件夹，会导致删除该文件夹两次，可能导致已经下载的部分文件丢失。
+            for (auto &subitem : filesystem::directory_iterator(cachedir)) {
+                filesystem::remove_all(subitem.path());
+            }
+        }
+    }
+}
+
 bool programming_judger::verify(submission &submit) const {
     auto sub = dynamic_cast<programming_submission *>(&submit);
     if (!sub) return false;
@@ -357,6 +387,8 @@ bool programming_judger::verify(submission &submit) const {
         LOG(WARNING) << "Submission from [" << sub->category << "-" << sub->prob_id << "-" << sub->sub_id << "] does not have entry test task.";
         return false;
     }
+
+    verify_timeliness(submit);
 
     return true;
 }

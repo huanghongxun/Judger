@@ -35,14 +35,14 @@ struct configuration : public judge_server {
      */
     amqp choice_queue;
 
-    std::unique_ptr<mq_publisher> choice_fetcher;
+    std::unique_ptr<rabbitmq> choice_fetcher;
 
     /**
      * @brief 拉取编程题评测的消息队列
      */
     amqp programming_queue;
 
-    std::unique_ptr<mq_publisher> programming_fetcher;
+    std::unique_ptr<rabbitmq> programming_fetcher;
 
     configuration();
 

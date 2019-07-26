@@ -71,7 +71,7 @@ void configuration::init(const filesystem::path &config_path) {
     config.at("host").get_to(host);
     config.at("port").get_to(port);
 
-    sub_fetcher = make_unique<mq_publisher>(sub_queue);
+    sub_fetcher = make_unique<rabbitmq>(sub_queue, false);
 
     monitor_db.execute("INSERT INTO judge_node_config (host, port, thread_number, is_working, load_factor) VALUES (?, ?, 0, true, 0) ON DUPLICATE KEY UPDATE host=?, port=?, load_factor=0, thread_number=0",
                        host, port, host, port);

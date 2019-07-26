@@ -58,7 +58,7 @@ void from_json(const json &j, judge_task &value) {
     j.at("run_script").get_to(value.run_script);
     j.at("compare_script").get_to(value.compare_script);
     j.at("is_random").get_to(value.is_random);
-    j.at("testcase_id").get_to(value.testcase_id);
+    assign_optional(j, value.testcase_id, "testcase_id");
     j.at("depends_on").get_to(value.depends_on);
     assign_optional(j, value.depends_cond, "depends_cond");
     assign_optional(j, value.memory_limit, "memory_limit");
@@ -187,9 +187,9 @@ void configuration::init(const filesystem::path &config_path) {
 
     config.at("category").get_to(category_name);
     config.at("submissionQueue").get_to(sub_queue);
-    sub_fetcher = make_unique<mq_publisher>(sub_queue);
+    sub_fetcher = make_unique<rabbitmq>(sub_queue, false);
     config.at("reportQueue").get_to(report_queue);
-    judge_reporter = make_unique<mq_consumer>(report_queue);
+    judge_reporter = make_unique<rabbitmq>(report_queue, true);
 }
 
 string configuration::category() const {

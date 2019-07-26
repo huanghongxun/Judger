@@ -34,7 +34,7 @@ struct configuration : public judge_server {
     std::string host;
     int port;
 
-    std::unique_ptr<mq_publisher> sub_fetcher;
+    std::unique_ptr<rabbitmq> sub_fetcher;
 
     configuration();
 

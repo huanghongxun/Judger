@@ -15,10 +15,10 @@ struct configuration : public judge_server {
     local_executable_manager exec_mgr;
 
     amqp sub_queue;
-    std::unique_ptr<mq_publisher> sub_fetcher;
+    std::unique_ptr<rabbitmq> sub_fetcher;
 
     amqp report_queue;
-    std::unique_ptr<mq_consumer> judge_reporter;
+    std::unique_ptr<rabbitmq> judge_reporter;
 
     std::string category_name;
 

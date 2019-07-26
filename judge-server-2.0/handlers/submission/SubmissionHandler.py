@@ -70,7 +70,7 @@ class SubmissionHandler(tornado.web.RequestHandler):
     def genRelative(self, record, body):
         body.pop("token")
         body["problemType"] = int(record["ptype_id"])
-        body["updated_at"] = record["updated_at"]
+        body["updated_at"] = record["updated_at"].timestamp()
         for key in ["config", "detail"]:
             if record[key] is not None:
                 body[key] = json.loads(record[key])

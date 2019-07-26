@@ -67,8 +67,8 @@ void configuration::init(const filesystem::path &config_path) {
     config.at("programmingSubmissionQueue").get_to(programming_queue);
     config.at("systemConfig").get_to(system);
 
-    programming_fetcher = make_unique<mq_publisher>(programming_queue);
-    choice_fetcher = make_unique<mq_publisher>(choice_queue);
+    programming_fetcher = make_unique<rabbitmq>(programming_queue, false);
+    choice_fetcher = make_unique<rabbitmq>(choice_queue, false);
 }
 
 string configuration::category() const {

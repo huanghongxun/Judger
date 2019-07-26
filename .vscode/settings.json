@@ -78,5 +78,6 @@
         "cuchar": "cpp",
         "shared_mutex": "cpp"
     },
-    "cmake.configureOnOpen": false
+    "cmake.configureOnOpen": false,
+    "python.pythonPath": "/usr/bin/python3"
 }

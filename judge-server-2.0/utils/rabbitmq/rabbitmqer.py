@@ -42,7 +42,7 @@ class RabbitMQer(object):
         self.channel.queue_bind(exchange=self.exchange, queue=self.queue_name)
 
     def sendMessage(self, json_obj):
-        body = json.dumps(json_obj, ensure_ascii=False, default=str)
+        body = json.dumps(json_obj, ensure_ascii=False)
         if self.last_connect_time + self.timeout < time.time():
             self.connect()
         try:
