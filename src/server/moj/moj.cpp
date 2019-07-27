@@ -397,6 +397,8 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.check_script = "standard";
         testcase.run_script = "valgrind";
         testcase.compare_script = "valgrind";
+        if (submit.submission)
+            submit.submission->compile_command.push_back("-g");
         testcase.is_random = submit.judge_tasks.empty();
         testcase.time_limit = server.system.time_limit.valgrind;
         testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;

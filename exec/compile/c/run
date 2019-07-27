@@ -10,5 +10,5 @@
 
 DEST="$1"; shift
 
-gcc-9 -x c -DONLINE_JUDGE -fopenmp -march=native -std=c17 -Wall -Wextra -O2 -o "$DEST" "$@" -lm -lpthread
+gcc-9 -DONLINE_JUDGE -fopenmp -march=native -std=c17 -Wall -Wextra -O2 -o "$DEST" "$@" -lm -lpthread
 exit $?
