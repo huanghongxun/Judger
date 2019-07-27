@@ -10,6 +10,10 @@ using namespace std::filesystem;
 using namespace judge;
 using namespace nlohmann;
 
+static path code_files("unit-test/gtest/test-code");
+static path execdir("exec");
+static path cachedir("/tmp");
+
 class GTestCheckerTest : public ::testing::Test {
 protected:
     static void SetUpTestCase() {
@@ -52,16 +56,6 @@ protected:
             prog.judge_tasks.push_back(testcase);
         }
     }
-
-    virtual void SetUp() override {
-        code_files = path("unit-test/gtest/test-code");
-        execdir = path("exec");
-        cachedir = path("/tmp");
-    }
-
-    path code_files;
-    path execdir;
-    path cachedir;
 };
 
 #define CHECK_NORMAL_KEY(result)                          \

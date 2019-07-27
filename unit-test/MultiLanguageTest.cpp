@@ -9,6 +9,9 @@ using namespace std;
 using namespace std::filesystem;
 using namespace judge;
 
+static path execdir("exec");
+static path cachedir("/tmp");
+
 class MultiLanguageTest : public ::testing::Test {
 protected:
     static void SetUpTestCase() {
@@ -54,14 +57,6 @@ protected:
             prog.judge_tasks.push_back(testcase);
         }
     }
-
-    virtual void SetUp() override {
-        execdir = path{"exec"};
-        cachedir = path{"/tmp"};
-    }
-
-    path execdir;
-    path cachedir;
 };
 
 TEST_F(MultiLanguageTest, CTest) {

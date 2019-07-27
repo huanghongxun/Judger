@@ -38,7 +38,7 @@
             "program": "${workspaceFolder}/bin/judge-system",
             "args": [
                 "--enable-3=config-moj.json",
-                "--worker=1",
+                "--auto-workers",
                 "--exec-dir=${workspaceFolder}/exec",
                 "--cache-dir=/tmp",
                 "--run-dir=/tmp",

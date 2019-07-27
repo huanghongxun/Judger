@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
         ("monitor-port", po::value<unsigned>(), "set the port the monitor server listens to, default to 80")
         ("workers", po::value<unsigned>(), "set number of single thread judge workers to be kept")
         ("worker", po::value<vector<cpuset>>(), "run a judge worker which cpuset is given")
-        ("auto-workers", po::value<vector<cpuset>>(), "start workers with number of hardware concurrency")
+        ("auto-workers", "start workers with number of hardware concurrency")
         ("exec-dir", po::value<string>()->required(), "set the default predefined executables for falling back")
         ("cache-dir", po::value<string>()->required(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
         ("data-dir", po::value<string>(), "set the directory to store test data to be judged, for ramdisk to speed up IO performance of user program.")

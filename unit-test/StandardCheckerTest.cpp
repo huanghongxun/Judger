@@ -8,8 +8,8 @@ using namespace std;
 using namespace std::filesystem;
 using namespace judge;
 
-path execdir("exec");
-path cachedir("/tmp");
+static path execdir("exec");
+static path cachedir("/tmp");
 
 class StandardCheckerTest : public ::testing::Test {
 protected:
