@@ -233,10 +233,10 @@ TEST_F(StandardCheckerTest, FloatingPointErrorTest) {
     programming_submission prog;
     prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, R"(#include <iostream>
+using namespace std;
 int main() {
-    int a;
-    std::cin >> a;
-    std::cout << a / (a - a);
+    int a = time(NULL) * 1, b = time(NULL) - a;
+    printf("%d\n", a / b);
     return 0;
 })");
     programming_judger judger;
