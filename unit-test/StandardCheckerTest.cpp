@@ -56,7 +56,7 @@ protected:
             testcase.check_script = "standard";
             testcase.run_script = "standard";
             testcase.compare_script = "diff-all";
-            testcase.time_limit = 0.1;
+            testcase.time_limit = 1;
             testcase.memory_limit = 32768;
             testcase.file_limit = 32768;
             testcase.proc_limit = 3;
@@ -68,6 +68,26 @@ protected:
         }
     }
 };
+
+TEST_F(StandardCheckerTest, CompilationTimeLimitTest) {
+    concurrent_queue<message::client_task> task_queue;
+    local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
+    programming_submission prog;
+    prog.judge_server = &mock_judge_server;
+    prepare(prog, exec_mgr, R"(#include </dev/random>
+int main() {
+    return 0;
+})");
+    programming_judger judger;
+
+    push_submission(judger, task_queue, prog);
+    worker_loop(judger, task_queue);
+
+    EXPECT_EQ(prog.results[0].status, status::COMPILATION_ERROR);
+    EXPECT_EQ(prog.results[1].status, status::DEPENDENCY_NOT_SATISFIED);
+    EXPECT_EQ(prog.results[2].status, status::DEPENDENCY_NOT_SATISFIED);
+}
 
 TEST_F(StandardCheckerTest, AcceptedTest) {
     concurrent_queue<message::client_task> task_queue;

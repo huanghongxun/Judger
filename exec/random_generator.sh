@@ -155,6 +155,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         /judge/run
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/random 中，因此删除挂载点即可。
+chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
 force_umount "$RUNDIR/merged/judge"
 
 echo "Checking random generator run status"
@@ -185,6 +186,7 @@ cat random.err
 chmod -R a+rwx "$WORKDIR/input"
 
 $GAINROOT mount -t aufs none -odirs="$WORKDIR/output"=rw:"$STD_PROG"=ro:"$WORKDIR/input"=ro "$RUNDIR/merged/judge"
+chroot_start "$CHROOTDIR" "$RUNDIR/merged"
 
 # 调用 runguard 来执行标准程序
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \

@@ -234,7 +234,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
     return result;
 }
 
-static void compile(judge::program *program, const filesystem::path &workdir, const string &execcpuset, judge_task_result &task_result) {
+static void compile(judge::program *program, const filesystem::path &workdir, const string &execcpuset, judge_task_result &task_result, bool executable) {
     try {
         // 将程序存放在 workdir 下，program->fetch 会自行组织 workdir 内的文件存储结构
         // 并编译程序，编译需要的运行环境就是全局的 CHROOT_DIR，这样可以获得比较完整的环境
@@ -244,7 +244,7 @@ static void compile(judge::program *program, const filesystem::path &workdir, co
         task_result.status = status::EXECUTABLE_COMPILATION_ERROR;
         task_result.error_log = string(ex.what()) + "\n" + program->get_compilation_log(workdir);
     } catch (compilation_error &ex) {
-        task_result.status = status::COMPILATION_ERROR;
+        task_result.status = executable ? status::EXECUTABLE_COMPILATION_ERROR : status::COMPILATION_ERROR;
         task_result.error_log = string(ex.what()) + "\n" + program->get_compilation_log(workdir);
     } catch (exception &ex) {
         task_result.status = status::SYSTEM_ERROR;
@@ -268,7 +268,7 @@ static judge_task_result compile(const message::client_task &client_task, progra
     // 编译选手程序，submit.submission 都为非空，否则在 server.cpp 中的 fetch_submission 会阻止该提交的评测
     if (submit.submission) {
         filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
-        compile(submit.submission.get(), workdir, execcpuset, result);
+        compile(submit.submission.get(), workdir, execcpuset, result, false);
         auto metadata = read_runguard_result(workdir / "compile" / "compile.meta");
         result.run_time = metadata.wall_time;
         result.memory_used = metadata.memory / 1024;
@@ -278,7 +278,7 @@ static judge_task_result compile(const message::client_task &client_task, progra
     // 编译随机数据生成器
     if (submit.random) {
         filesystem::path randomdir = cachedir / "random";
-        compile(submit.random.get(), randomdir, execcpuset, result);
+        compile(submit.random.get(), randomdir, execcpuset, result, true);
         if (result.status == status::COMPILATION_ERROR)
             result.status = status::EXECUTABLE_COMPILATION_ERROR;
         if (result.status != status::ACCEPTED) return result;
@@ -287,7 +287,7 @@ static judge_task_result compile(const message::client_task &client_task, progra
     // 编译标准程序
     if (submit.standard) {
         filesystem::path standarddir = cachedir / "standard";
-        compile(submit.standard.get(), standarddir, execcpuset, result);
+        compile(submit.standard.get(), standarddir, execcpuset, result, true);
         if (result.status == status::COMPILATION_ERROR)
             result.status = status::EXECUTABLE_COMPILATION_ERROR;
         if (result.status != status::ACCEPTED) return result;
@@ -296,7 +296,7 @@ static judge_task_result compile(const message::client_task &client_task, progra
     // 编译比较器
     if (submit.compare) {
         filesystem::path comparedir = cachedir / "compare";
-        compile(submit.compare.get(), comparedir, execcpuset, result);
+        compile(submit.compare.get(), comparedir, execcpuset, result, true);
         if (result.status == status::COMPILATION_ERROR)
             result.status = status::EXECUTABLE_COMPILATION_ERROR;
         if (result.status != status::ACCEPTED) return result;
@@ -449,6 +449,8 @@ void programming_judger::process(concurrent_queue<message::client_task> &testcas
                << ", status: " << get_display_message(result.status) << ", runtime: " << result.run_time
                << ", memory: " << result.memory_used << ", run_dir: " << result.run_dir
                << ", data_dir: " << result.data_dir << "]";
+    if (result.status == status::SYSTEM_ERROR)
+        LOG(ERROR) << "Testcase [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "-" << result.id << "]: error: " << result.error_log;
 
     for (size_t i = 0; i < submit.judge_tasks.size(); ++i) {
         judge_task &kase = submit.judge_tasks[i];
