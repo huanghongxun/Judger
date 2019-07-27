@@ -209,13 +209,12 @@ TEST_F(StandardCheckerTest, MemoryLimitExceededTest) {
     programming_submission prog;
     prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, R"(#include <iostream>
+int dp[5000][5000];
 int main () {
-    int a = 0;
-    std::cin >> a;
-    std::cout << a;
-    char *arr = new char[1000 * 1000 * 1000];
-    arr[2] = '1';
-    return 0;
+    for (int i = 1; i < 5000; ++i)
+        for (int j = 1; j < 5000; ++j)
+            dp[i][j] = dp[i - 1][j] + dp[i][j - 1] - dp[i - 1][j - 1];
+    std::cout << dp[4999][4999];
 })");
     programming_judger judger;
 
@@ -223,8 +222,8 @@ int main () {
     worker_loop(judger, task_queue);
 
     EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::RUNTIME_ERROR);
-    EXPECT_EQ(prog.results[2].status, status::RUNTIME_ERROR);
+    EXPECT_EQ(prog.results[1].status, status::MEMORY_LIMIT_EXCEEDED);
+    EXPECT_EQ(prog.results[2].status, status::MEMORY_LIMIT_EXCEEDED);
 }
 
 TEST_F(StandardCheckerTest, FloatingPointErrorTest) {

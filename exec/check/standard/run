@@ -172,6 +172,12 @@ if grep '^time-result: .*timelimit' program.meta >/dev/null 2>&1; then
     cleanexit ${E_TIME_LIMIT:-1}
 fi
 
+if grep '^memory-result: oom' program.meta >/dev/null 2>&1; then
+    echo "Memory Limit Exceeded"
+    echo "$resource_usage"
+    cleanexit ${E_MEM_LIMIT:-1}
+fi
+
 if grep -E '^output-truncated: ([a-z]+,)*stdout(,[a-z]+)*' program.meta >/dev/null 2>&1; then
     echo "Output Limit Exceeded"
     echo "$resource_usage"

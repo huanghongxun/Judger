@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <sys/times.h>
 #include <sys/types.h>
+#include <sys/eventfd.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <boost/algorithm/string/join.hpp>
@@ -37,6 +38,7 @@ int walllimit = 0, cpulimit = 0;
 
 ofstream metafile;
 int child_pid = -1;
+int efd = -1;
 static volatile sig_atomic_t received_SIGCHLD = 0;
 static volatile sig_atomic_t received_signal = -1;
 
@@ -121,6 +123,26 @@ void summarize_cgroup(const runguard_options& opt, int exitcode,
         int64_t cpu_time = ctrl.get_value_int64("cpuacct.usage");  // in ns
         cpudiff = (double)cpu_time / 1e9;
     }
+
+    bool is_oom = false;
+    {
+        ifstream fin("/sys/fs/cgroup/memory" + opt.cgroupname + "/memory.oom_control");
+        while (fin.good()) {
+            string token;
+            fin >> token;
+            if (token == "oom_kill")
+                fin >> is_oom;
+        }
+    }
+
+    // 另一种实现读取是否发生 OOM 的方法：
+    // uint64_t u;
+    // assert(is_oom == (read(efd, &u, sizeof(uint64_t)) == sizeof(uint64_t)));
+
+    if (is_oom)
+        append_meta("memory-result", "oom");
+    else
+        append_meta("memory-result", "");
 
     // 杀死 cgroup 内所有的进程，以确保父进程结束后不会有
     // so our timing is correct: no child processes can survive longer than
@@ -379,6 +401,16 @@ int runit(struct runguard_options opt) {
             if (fclose(fp) != 0) error(errno, "closing file '{}'", oom_path);
         }
     }
+
+    // 另一种实现读取是否发生 OOM 的方法：
+    // if ((efd = eventfd(0, EFD_NONBLOCK)) < 0) error(errno, "requesting event fd");
+    // int cfd = open(("/sys/fs/cgroup/memory" + opt.cgroupname + "/cgroup.event_control").c_str(), O_WRONLY);
+    // if (cfd < 0) error(errno, "opening cgroup.event_control");
+    // int ofd = open(("/sys/fs/cgroup/memory" + opt.cgroupname + "/memory.oom_control").c_str(), O_RDONLY);
+    // if (ofd < 0) error(errno, "opening memory.oom_control");
+    // string oom = fmt::format("{} {}", efd, ofd);
+    // if (write(cfd, oom.data(), oom.size()) < 0) error(errno, "writing cgroup.event_control");
+    // if (close(cfd) < 0) error(errno, "closing cgroup.event_control");
 
     switch (child_pid = fork()) {
         case -1:
