@@ -18,4 +18,6 @@ void push_submission(const judger &j, concurrent_queue<message::client_task> &ta
 
 void worker_loop(const judger &j, concurrent_queue<message::client_task> &task_queue);
 
+void setup_test_environment();
+
 }  // namespace judge

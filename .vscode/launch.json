@@ -66,6 +66,29 @@
             ]
         },
         {
+            "name": "(gdb) unit-test",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/unit_test",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/",
+            "environment": [
+                { "name": "GLOG_alsologtostderr", "value": "1"},
+                { "name": "GLOG_colorlogtostderr", "value": "1"}
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb-sudo",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb and add better child debugging",
+                    "text": "-enable-pretty-printing -gdb-set detach-on-fork off",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "(gdb) test-2.0",
             "type": "cppdbg",
             "request": "launch",

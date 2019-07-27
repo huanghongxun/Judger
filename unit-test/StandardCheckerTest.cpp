@@ -1,5 +1,7 @@
+#include "env.hpp"
 #include "gtest/gtest.h"
 #include "judge/programming.hpp"
+#include "test/mock_judge_server.hpp"
 #include "test/worker.hpp"
 
 using namespace std;
@@ -12,12 +14,17 @@ path cachedir("/tmp");
 class StandardCheckerTest : public ::testing::Test {
 protected:
     static void SetUpTestCase() {
+        setup_test_environment();
     }
 
     static void TearDownTestCase() {
     }
 
     void prepare(programming_submission &prog, executable_manager &exec_mgr, const string &source) {
+        prog.category = "mock";
+        prog.prob_id = "1234";
+        prog.sub_id = "12340";
+        prog.updated_at = chrono::system_clock::to_time_t(chrono::system_clock::now());
         prog.submission = make_unique<source_code>(exec_mgr);
         prog.submission->language = "cpp";
         prog.submission->source_files.push_back(make_unique<text_asset>("main.cpp", source));
@@ -65,15 +72,14 @@ protected:
 TEST_F(StandardCheckerTest, AcceptedTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
-    prepare(prog, exec_mgr, R"(
-#include <iostream>
-using namespace std;
-
+    prog.judge_server = &mock_judge_server;
+    prepare(prog, exec_mgr, R"(#include <iostream>
 int main() {
     int a;
-    cin >> a;
-    cout << a;
+    std::cin >> a;
+    std::cout << a;
     return 0;
 })");
     programming_judger judger;
@@ -89,15 +95,14 @@ int main() {
 TEST_F(StandardCheckerTest, WrongAnswerTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
-    prepare(prog, exec_mgr, R"(
-#include <iostream>
-using namespace std;
-
+    prog.judge_server = &mock_judge_server;
+    prepare(prog, exec_mgr, R"(#include <iostream>
 int main () {
     int a;
-    cin >> a;
-    cout << a + 1;
+    std::cin >> a;
+    std::cout << a + 1;
     return 0;
 })");
     programming_judger judger;
@@ -113,15 +118,14 @@ int main () {
 TEST_F(StandardCheckerTest, PresentationErrorTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
-    prepare(prog, exec_mgr, R"(
-#include <iostream>
-using namespace std;
-
+    prog.judge_server = &mock_judge_server;
+    prepare(prog, exec_mgr, R"(#include <iostream>
 int main () {
     int a;
-    cin >> a;
-    cout << a << endl;
+    std::cin >> a;
+    std::cout << a << std::endl;
     return 0;
 })");
     programming_judger judger;
@@ -137,7 +141,9 @@ int main () {
 TEST_F(StandardCheckerTest, CompilationErrorTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
+    prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, R"(
 int main() {
     cin >> a;
@@ -157,7 +163,9 @@ int main() {
 TEST_F(StandardCheckerTest, TimeLimitExceededTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
+    prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, R"(
 int main () {
     int a;
@@ -177,16 +185,16 @@ int main () {
 TEST_F(StandardCheckerTest, MemoryLimitExceededTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
-    prepare(prog, exec_mgr, R"(
-#include <iostream>
-using namespace std;
-
+    prog.judge_server = &mock_judge_server;
+    prepare(prog, exec_mgr, R"(#include <iostream>
 int main () {
     int a = 0;
-    double t[1000][1000][1000];
-    cin >> a;
-    cout << a;
+    std::cin >> a;
+    std::cout << a;
+    char *arr = new char[1000 * 1000 * 1000];
+    arr[2] = '1';
     return 0;
 })");
     programming_judger judger;
@@ -202,15 +210,14 @@ int main () {
 TEST_F(StandardCheckerTest, FloatingPointErrorTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
-    prepare(prog, exec_mgr, R"(
-#include <iostream>
-using namespace std;
-
+    prog.judge_server = &mock_judge_server;
+    prepare(prog, exec_mgr, R"(#include <iostream>
 int main() {
     int a;
-    cin >> a;
-    cout << a / (a - a);
+    std::cin >> a;
+    std::cout << a / (a - a);
     return 0;
 })");
     programming_judger judger;
@@ -226,15 +233,14 @@ int main() {
 TEST_F(StandardCheckerTest, SegmentationFaultTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
-    prepare(prog, exec_mgr, R"(
-#include <iostream>
-using namespace std;
-
+    prog.judge_server = &mock_judge_server;
+    prepare(prog, exec_mgr, R"(#include <iostream>
 int main() {
     int *a = nullptr;
-    cin >> a;
-    cout << a;
+    std::cin >> *a;
+    std::cout << *a;
     return 0;
 })");
     programming_judger judger;
@@ -250,11 +256,12 @@ int main() {
 TEST_F(StandardCheckerTest, RuntimeErrorTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
-    prepare(prog, exec_mgr, R"(
-#include <exception>
+    prog.judge_server = &mock_judge_server;
+    prepare(prog, exec_mgr, R"(#include <stdexcept>
 int main() {
-    throw std::exception("???");
+    throw std::invalid_argument("???");
     return 0;
 })");
     programming_judger judger;
@@ -270,9 +277,10 @@ int main() {
 TEST_F(StandardCheckerTest, RestrictFunctionTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
-    prepare(prog, exec_mgr, R"(
-#include <cstdlib>
+    prog.judge_server = &mock_judge_server;
+    prepare(prog, exec_mgr, R"(#include <cstdlib>
 int main() {
     system("cat -");
     return 0;

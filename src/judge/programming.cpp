@@ -1,5 +1,6 @@
 #include "judge/programming.hpp"
 #include <glog/logging.h>
+#include <signal.h>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/lexical_cast.hpp>
@@ -90,7 +91,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
                 datadir = random_data_dir / to_string(number);
                 task.testcase_id = number;  // 标记当前测试点使用了哪个随机测试
                 // random_generator.sh <random_gen> <std_program> <timelimit> <chrootdir> <datadir> <run>
-                int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), task.time_limit, CHROOT_DIR, datadir, run_script->get_run_path());
+                int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), task.time_limit, CHROOT_DIR, datadir, run_script->get_run_path(), task.run_args);
                 switch (ret) {
                     case E_SUCCESS: {
                         // 随机数据已经准备好
@@ -167,7 +168,8 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
                                run_script->get_run_path(),
                                compare_script->get_run_path(cachedir / "compare"),
                                boost::algorithm::join(submit.submission->source_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"),
-                               boost::algorithm::join(submit.submission->assist_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"));
+                               boost::algorithm::join(submit.submission->assist_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"),
+                               task.run_args);
     result.report = read_file_content(rundir / "feedback" / "report.txt", "{}");
     result.error_log = read_file_content(rundir / "system.out", "No detailed information");
     switch (ret) {
@@ -339,11 +341,11 @@ static void verify_timeliness(programming_submission &submit) {
                     LOG(ERROR) << "Unable to delete file " << subitem.path() << " " << e.what();
                 }
             }
-        }
-    }
 
-    if (!filesystem::exists(time_file)) {
-        ofstream fout(time_file);
+            {
+                ofstream fout(time_file);
+            }
+        }
     }
 
     submit.lock = scoped_file_lock(cachedir, true);
@@ -444,7 +446,7 @@ void programming_judger::process(concurrent_queue<message::client_task> &testcas
 
     DLOG(INFO) << "Testcase [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "-" << result.id
                << ", type: " << (int)submit.judge_tasks[result.id].check_type
-               << ", status: " << (int)result.status << ", runtime: " << result.run_time
+               << ", status: " << get_display_message(result.status) << ", runtime: " << result.run_time
                << ", memory: " << result.memory_used << ", run_dir: " << result.run_dir
                << ", data_dir: " << result.data_dir << "]";
 

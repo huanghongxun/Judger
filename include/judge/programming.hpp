@@ -160,6 +160,11 @@ struct judge_task {
      * @note ，小于 0 的数表示不限制进程数
      */
     int proc_limit = -1;
+
+    /**
+     * @brief 运行命令，传递给选手程序使用
+     */
+    std::vector<std::string> run_args;
 };
 
 struct judge_task_result {

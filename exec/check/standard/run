@@ -160,24 +160,6 @@ if [ ! -s program.meta ]; then
 fi
 read_metadata program.meta
 
-if grep -E '^internal-error: .+$' program.meta >/dev/null 2>&1; then
-    echo "Internal Error"
-    echo "$resource_usage"
-    cleanexit ${E_INTERNAL_ERROR:-1}
-fi
-
-if grep '^time-result: .*timelimit' program.meta >/dev/null 2>&1; then
-    echo "Time Limit Exceeded"
-    echo "$resource_usage"
-    cleanexit ${E_TIME_LIMIT:-1}
-fi
-
-if grep -E '^output-truncated: ([a-z]+,)*stdout(,[a-z]+)*' program.meta >/dev/null 2>&1; then
-    echo "Output Limit Exceeded"
-    echo "$resource_usage"
-    cleanexit ${E_OUTPUT_LIMIT:-1}
-fi
-
 if [ ! -z $signal ]; then
     case $signal in
         11) # SIGSEGV
@@ -196,6 +178,24 @@ if [ ! -z $signal ]; then
             cleanexit ${E_RUNTIME_ERROR:-1}
             ;;
     esac
+fi
+
+if grep -E '^internal-error: .+$' program.meta >/dev/null 2>&1; then
+    echo "Internal Error"
+    echo "$resource_usage"
+    cleanexit ${E_INTERNAL_ERROR:-1}
+fi
+
+if grep '^time-result: .*timelimit' program.meta >/dev/null 2>&1; then
+    echo "Time Limit Exceeded"
+    echo "$resource_usage"
+    cleanexit ${E_TIME_LIMIT:-1}
+fi
+
+if grep -E '^output-truncated: ([a-z]+,)*stdout(,[a-z]+)*' program.meta >/dev/null 2>&1; then
+    echo "Output Limit Exceeded"
+    echo "$resource_usage"
+    cleanexit ${E_OUTPUT_LIMIT:-1}
 fi
 
 # FIXME: C 语言程序可能会因为没有写 return 0; 导致非零

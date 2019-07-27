@@ -73,7 +73,7 @@ if (BUILD_UNIT_TEST)
   add_executable(${GTEST_TARGET} ${TEST_SOURCE_FILES} ${TEST_MAIN} ${SOURCE_FILES})
   set_target_properties(${GTEST_TARGET}
     PROPERTIES
-    CXX_STANDARD 14)
+    CXX_STANDARD 17)
   target_link_libraries(${GTEST_TARGET}
     # TODO: add depended libraries
     glog

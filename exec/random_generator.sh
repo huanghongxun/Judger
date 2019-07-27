@@ -197,7 +197,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
         --standard-error-file standard.err \
         -VONLINE_JUDGE=1 \
         --out-meta standard.meta -- \
-        /run/run testdata.in testdata.out /judge/run
+        /run/run testdata.in testdata.out /judge/run "$@"
 
 chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
 force_umount "$RUNDIR/merged/judge"

@@ -42,23 +42,24 @@ score_file = open(os.path.join(sys.argv[4], 'score.txt'), 'w')
 try:
     xml_file = open('test_detail.xml', 'r')
     xml_result = xmltodict.parse(xml_file.read())
-    pass_cases = 0
-    disabled_cases = 0
     reports = []
+    pass_cases = 0
     error_cases = int(xml_result['testsuites']['@failures'])
-    disabled_cases = xml_result['testsuites']['@disabled']
+    disabled_cases = 0
     time = xml_result['testsuites']['@time']
-    testsuites = xml_result['testsuites']['testsuite']
+    testsuites = xml_result['testsuites'].get('testsuite', [])
     if not isinstance(testsuites, list):
         testsuites = [testsuites]
     for testsuite in testsuites:
+        if 'testcase' not in testsuite:
+            continue
         testcases = testsuite['testcase']
         if not isinstance(testcases, list):
-            testcases = [testcase]
+            testcases = [testcases]
         for testcase in testcases:
             suite = testsuite['@name']
             case = testcase['@name']
-            if testcase.get('status', 'run') == 'notrun':
+            if testcase.get('@status', 'run') == 'notrun':
                 disabled_cases += 1
                 continue
             if 'failure' not in testcase or not testcase['failure']:
@@ -90,5 +91,5 @@ try:
 except (IOError, OSError) as e:
     sys.exit(43)
 except Exception as e:
-    sys.stderr.write('Internal error: {0} is not found during parsing memory check result\n'.format(e.args[0]))
+    sys.stderr.write('Internal error: {0} is not found during parsing gtest check result\n'.format(e.args[0]))
     sys.exit(1)

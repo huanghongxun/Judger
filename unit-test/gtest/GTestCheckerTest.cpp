@@ -1,26 +1,29 @@
+#include <nlohmann/json.hpp>
+#include "env.hpp"
 #include "gtest/gtest.h"
 #include "judge/programming.hpp"
+#include "test/mock_judge_server.hpp"
 #include "test/worker.hpp"
-#include <nlohmann/json.hpp>
 
 using namespace std;
 using namespace std::filesystem;
 using namespace judge;
 using namespace nlohmann;
 
-path code_files("unit-test/gtest/test-code");
-path execdir("exec");
-path cachedir("/tmp");
-
 class GTestCheckerTest : public ::testing::Test {
 protected:
     static void SetUpTestCase() {
+        setup_test_environment();
     }
 
     static void TearDownTestCase() {
     }
 
     void prepare(programming_submission &prog, executable_manager &exec_mgr, const path &source) {
+        prog.category = "mock";
+        prog.prob_id = "1234";
+        prog.sub_id = "12340";
+        prog.updated_at = chrono::system_clock::to_time_t(chrono::system_clock::now());
         prog.submission = make_unique<source_code>(exec_mgr);
         prog.submission->language = "cpp";
         prog.submission->source_files.push_back(make_unique<local_asset>("test.cpp", source / "test.cpp"));
@@ -49,8 +52,17 @@ protected:
             prog.judge_tasks.push_back(testcase);
         }
     }
-};
 
+    virtual void SetUp() override {
+        code_files = path("unit-test/gtest/test-code");
+        execdir = path("exec");
+        cachedir = path("/tmp");
+    }
+
+    path code_files;
+    path execdir;
+    path cachedir;
+};
 
 #define CHECK_NORMAL_KEY(result)                          \
     do {                                                  \
@@ -79,9 +91,11 @@ protected:
 TEST_F(GTestCheckerTest, AbnormalTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
+    prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, code_files / "abnormal");
-    prog.submission->compile_command.push_back("--gtest_filter=AdderTest.addTest");
+    prog.judge_tasks[1].run_args.push_back("--gtest_filter=AdderTest.addTest");
     programming_judger judger;
 
     push_submission(judger, task_queue, prog);
@@ -94,7 +108,9 @@ TEST_F(GTestCheckerTest, AbnormalTest) {
 TEST_F(GTestCheckerTest, FailureTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
+    prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, code_files / "failure");
     programming_judger judger;
 
@@ -108,15 +124,17 @@ TEST_F(GTestCheckerTest, FailureTest) {
     json report = json::parse(prog.results[1].report);
     CHECK_NORMAL_KEY(report);
     EXPECT_EQ(1, report["pass_cases"].get<int>());
-    EXPECT_EQ(10, report["total_cases"].get<int>());
-    EXPECT_EQ(9, report["disabled_cases"].get<int>());
-    EXPECT_EQ(9, report["error_cases"].get<int>());
+    EXPECT_EQ(19, report["total_cases"].get<int>());
+    EXPECT_EQ(1, report["disabled_cases"].get<int>());
+    EXPECT_EQ(18, report["error_cases"].get<int>());
 }
 
 TEST_F(GTestCheckerTest, PassTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
+    prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, code_files / "pass");
     programming_judger judger;
 
@@ -138,9 +156,11 @@ TEST_F(GTestCheckerTest, PassTest) {
 TEST_F(GTestCheckerTest, PassTestWithDisabledTests) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
+    prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, code_files / "pass");
-    prog.submission->compile_command.push_back("--gtest_also_run_disabled_tests");
+    prog.judge_tasks[1].run_args.push_back("--gtest_also_run_disabled_tests");
     programming_judger judger;
 
     push_submission(judger, task_queue, prog);
@@ -161,9 +181,11 @@ TEST_F(GTestCheckerTest, PassTestWithDisabledTests) {
 TEST_F(GTestCheckerTest, FilteredPassTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
+    prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, code_files / "pass");
-    prog.submission->compile_command.push_back("--gtest_filter=AdderTest.addTest");
+    prog.judge_tasks[1].run_args.push_back("--gtest_filter=AdderTest.addTest");
     programming_judger judger;
 
     push_submission(judger, task_queue, prog);
@@ -184,9 +206,11 @@ TEST_F(GTestCheckerTest, FilteredPassTest) {
 TEST_F(GTestCheckerTest, NoCaseTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
+    prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, code_files / "pass");
-    prog.submission->compile_command.push_back("--gtest_filter= ");
+    prog.judge_tasks[1].run_args.push_back("--gtest_filter= ");
     programming_judger judger;
 
     push_submission(judger, task_queue, prog);
@@ -207,14 +231,16 @@ TEST_F(GTestCheckerTest, NoCaseTest) {
 TEST_F(GTestCheckerTest, TimeLimitTest) {
     concurrent_queue<message::client_task> task_queue;
     local_executable_manager exec_mgr(cachedir, execdir);
+    judge::server::mock::configuration mock_judge_server;
     programming_submission prog;
+    prog.judge_server = &mock_judge_server;
     prepare(prog, exec_mgr, code_files / "failure");
-    prog.submission->compile_command.push_back("--gtest_also_run_disabled_tests");
+    prog.judge_tasks[1].run_args.push_back("--gtest_also_run_disabled_tests");
     programming_judger judger;
 
     push_submission(judger, task_queue, prog);
     worker_loop(judger, task_queue);
 
     EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::WRONG_ANSWER);
+    EXPECT_EQ(prog.results[1].status, status::TIME_LIMIT_EXCEEDED);
 }

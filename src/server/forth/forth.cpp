@@ -15,31 +15,6 @@ namespace judge {
 using namespace std;
 using namespace nlohmann;
 
-// clang-format off
-const unordered_map<status, const char *> status_string = boost::assign::map_list_of
-    (status::PENDING, "Pending")
-    (status::RUNNING, "Running")
-    (status::ACCEPTED, "Accepted")
-    (status::PARTIAL_CORRECT, "Partial Correct")
-    (status::COMPILATION_ERROR, "Compilation Error")
-    (status::EXECUTABLE_COMPILATION_ERROR, "Executable Compilation Error")
-    (status::DEPENDENCY_NOT_SATISFIED, "Dependency Not Satisfied")
-    (status::WRONG_ANSWER, "Wrong Answer")
-    (status::RUNTIME_ERROR, "Runtime Error")
-    (status::TIME_LIMIT_EXCEEDED, "Time Limit Exceeded")
-    (status::MEMORY_LIMIT_EXCEEDED, "Memory Limit Exceeded")
-    (status::OUTPUT_LIMIT_EXCEEDED, "Output Limit Exceeded")
-    (status::PRESENTATION_ERROR, "Presentation Error")
-    (status::RESTRICT_FUNCTION, "Restrict Function")
-    (status::OUT_OF_CONTEST_TIME, "Out of Contest Time")
-    (status::COMPILING, "Compiling")
-    (status::SEGMENTATION_FAULT, "Segmentation Fault")
-    (status::FLOATING_POINT_ERROR, "Floating Point Error")
-    (status::RANDOM_GEN_ERROR, "Random Gen Error")
-    (status::COMPARE_ERROR, "Compare Error")
-    (status::SYSTEM_ERROR, "System Error");
-// clang-format on
-
 void from_json(const json &j, judge_task::dependency_condition &value) {
     string str = j.get<string>();
     if (str == "ACCEPTED")
@@ -65,6 +40,7 @@ void from_json(const json &j, judge_task &value) {
     j.at("time_limit").get_to(value.time_limit), value.time_limit /= 1000;
     assign_optional(j, value.file_limit, "file_limit");
     assign_optional(j, value.proc_limit, "proc_limit");
+    assign_optional(j, value.run_args, "run_args");
 }
 
 void from_json(const json &j, asset_uptr &asset) {
@@ -153,7 +129,7 @@ void to_json(json &j, const judge_task_result &result) {
         report = "";
     }
 
-    j = {{"status", status_string.at(result.status)},
+    j = {{"status", get_display_message(result.status)},
          {"score", fmt::format("{}/{}", result.score.numerator(), max(result.score.denominator(), 1))},
          {"run_time", (int)result.run_time * 1000},
          {"memory_used", result.memory_used >> 10},
