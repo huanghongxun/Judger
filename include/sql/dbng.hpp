@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -27,7 +28,8 @@ public:
 
     //restriction, all the args are string, the first is the where condition, rest are append conditions
     template <typename T, typename... Args>
-    constexpr std::vector<T> query(const char *sql, Args&&... args) {
+    constexpr std::vector<T> query(const char* sql, Args&&... args) {
+        std::scoped_lock lock(mut);
         std::vector<T> result;
         db_.template query<T>(result, sql, std::forward<Args>(args)...);
         return result;
@@ -35,33 +37,40 @@ public:
 
     //restriction, all the args are string, the first is the where condition, rest are append conditions
     template <typename... Args>
-    constexpr int execute(const char *sql, Args&&... args) {
+    constexpr int execute(const char* sql, Args&&... args) {
+        std::scoped_lock lock(mut);
         std::vector<std::tuple<>> result;
         return db_.template query<std::tuple<>>(result, sql, std::forward<Args>(args)...);
     }
 
     //transaction
     bool begin() {
+        std::scoped_lock lock(mut);
         return db_.begin();
     }
 
     bool commit() {
+        std::scoped_lock lock(mut);
         return db_.commit();
     }
 
     bool rollback() {
+        std::scoped_lock lock(mut);
         return db_.rollback();
     }
 
     bool ping() {
+        std::scoped_lock lock(mut);
         return db_.ping();
     }
 
     bool has_error() {
+        std::scoped_lock lock(mut);
         return db_.has_error();
     }
 
     std::string get_last_error() const {
+        std::scoped_lock lock(mut);
         return db_.get_last_error();
     }
 
@@ -157,6 +166,8 @@ public:
 private:
     DB db_;
     std::chrono::system_clock::time_point latest_tm_ = std::chrono::system_clock::now();
+
+    std::mutex mut;
 };
 
 }  // namespace ormpp
