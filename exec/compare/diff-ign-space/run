@@ -6,15 +6,13 @@
 # 本运行脚本通过 diff 命令比较程序输出和标准输出
 # 在存在多余空格和空行时也会判为 Accepted
 
-. "$JUDGE_UTILS/utils.sh"
-
 TESTIN="$1"
 PROGRAM="$2"
 TESTOUT="$3"
 
 diff --strip-trailing-cr --ignore-trailing-space --ignore-space-change --ignore-blank-lines "$PROGRAM" "$TESTOUT"
 EXITCODE=$?
-[[ $EXITCODE -gt 1 ]] && exit $RESULT_ERROR
-[[ $EXITCODE -ne 0 ]] && exit $RESULT_WA
+[[ $EXITCODE -gt 1 ]] && exit 1
+[[ $EXITCODE -ne 0 ]] && exit 43
 
-exit $RESULT_AC # Accepted
+exit 42 # Accepted

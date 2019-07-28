@@ -50,22 +50,19 @@ touch program.meta program.err
 touch compare.meta compare.err
 
 mkdir -m 0777 -p run # 运行的临时文件都在这里
-mkdir -m 0777 -p feedback
 mkdir -m 0755 -p work
 mkdir -m 0777 -p work/judge
-mkdir -m 0755 -p work/judge_utils
 mkdir -m 0755 -p work/compare
 mkdir -m 0755 -p work/testin
 mkdir -m 0755 -p work/testout
 mkdir -m 0777 -p work/run
-mkdir -m 0777 -p work/feedback
+mkdir -m 0777 -p ofs
+mkdir -m 0777 -p ofs/merged
+mkdir -m 0777 -p ofs/judge
 mkdir -m 0755 -p merged
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
-$GAINROOT mount -t aufs none -odirs=work=rw:"$CHROOTDIR"=ro merged
-$GAINROOT mount -t aufs none -odirs=run=rw:"$WORKDIR/compile"=ro:"$TESTIN"=ro merged/judge
-$GAINROOT mount --bind -o ro "$TESTIN" merged/testin
-$GAINROOT mount --bind -o ro "$JUDGE_UTILS" merged/judge_utils
-$GAINROOT mount --bind -o ro "$COMPARE_SCRIPT" merged/compare
+$GAINROOT mount -t overlay overlay -olowerdir="$CHROOTDIR",upperdir=work,workdir=ofs/merged merged
+$GAINROOT mount -t overlay overlay -olowerdir="$WORKDIR/compile":"$TESTIN",upperdir=run,workdir=ofs/judge merged/judge
 $GAINROOT mount --bind -o ro "$RUN_SCRIPT" merged/run
 
 chroot_start "$CHROOTDIR" merged
@@ -85,8 +82,11 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
 
 # 比较选手程序输出
 echo "Comparing output"
-$GAINROOT mount --bind feedback merged/feedback
+rm -rf work/feedback || /bin/true
+mkdir -m 0777 -p work/feedback
+$GAINROOT mount --bind -o ro "$TESTIN" merged/testin
 $GAINROOT mount --bind -o ro "$TESTOUT" merged/testout
+$GAINROOT mount --bind -o ro "$COMPARE_SCRIPT" merged/compare
 
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --root merged \
@@ -101,22 +101,21 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
     --standard-error-file compare.err \
     --out-meta compare.meta \
     -VONLINE_JUDGE=1 \
-    -VJUDGE_UTILS=/judge_utils -- \
     /compare/run /testin/testdata.in program.out /testout/testdata.out /feedback
 
 chroot_stop "$CHROOTDIR" merged
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/run-$uuid 中，因此删除挂载点即可。
 force_umount merged/judge
-force_umount merged/judge_utils
 force_umount merged/compare
 force_umount merged/testin
 force_umount merged/testout
 force_umount merged/run
-force_umount merged/feedback
 force_umount merged
+mv work/feedback feedback
 rm -rf merged
 rm -rf work
+rm -rf ofs
 # RUNDIR 还剩下 compare.meta, compare.out, compare.err, program.meta, program.err, system.out 供评测客户端检查
 # RUNDIR 由评测客户端删除
 

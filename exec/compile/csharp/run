@@ -32,7 +32,7 @@ cat > ${DEST}.csproj << EOF
 </Project>
 EOF
 
-dotnet publish -c Release -o .
+dotnet publish --no-restore -c Release -o .
 EXITCODE=$?
 [ "$EXITCODE" -ne 0 ] && exit $EXITCODE
 
