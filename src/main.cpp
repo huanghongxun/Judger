@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
 
     judge::put_error_codes();
 
-    const unsigned cpus = std::thread::hardware_concurrency();
+    unsigned cpus = std::thread::hardware_concurrency();
 
     namespace po = boost::program_options;
     po::options_description desc("judge-system options");
@@ -101,6 +101,7 @@ int main(int argc, char* argv[]) {
         ("monitor-port", po::value<unsigned>(), "set the port the monitor server listens to, default to 80")
         ("workers", po::value<unsigned>(), "set number of single thread judge workers to be kept")
         ("worker", po::value<vector<cpuset>>(), "run a judge worker which cpuset is given")
+        ("cores", po::value<unsigned>()->required(), "tell the judge-system that how many physical core are there")
         ("auto-workers", "start workers with number of hardware concurrency")
         ("exec-dir", po::value<string>()->required(), "set the default predefined executables for falling back")
         ("cache-dir", po::value<string>()->required(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
@@ -154,6 +155,15 @@ int main(int argc, char* argv[]) {
     if (getuid() != 0) {
         cerr << "You should run this program in privileged mode" << endl;
         if (!judge::DEBUG) return EXIT_FAILURE;
+    }
+
+    if (vm.count("cores")) {
+        unsigned cores = vm.at("cores").as<unsigned>();
+        if (cores > cpus) {
+            cerr << "Manually declared number of physical processors cannot be larger than logical processors" << endl;
+            return EXIT_FAILURE;
+        }
+        cpus = cores;
     }
 
     if (vm.count("exec-dir")) {

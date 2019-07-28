@@ -45,9 +45,11 @@ struct scoped_file_lock {
 
     scoped_file_lock &operator=(scoped_file_lock &&);
 
+    std::filesystem::path file() const;
 private:
     int fd;
     bool valid;
+    std::filesystem::path lock_file;
 };
 
 /**

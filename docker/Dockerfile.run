@@ -1,6 +1,6 @@
 FROM ubuntu:18.04
 
-RUN apt update && apt install libcgroup-dev libcurl4-openssl-dev curl make xz-utils python3 libboost-all-dev cmake libgtest-dev gcc-8 g++-8 libmysqlclient-dev
+RUN apt update && apt install -y libcgroup-dev libcurl4-openssl-dev curl make xz-utils python3 libboost-all-dev cmake libgtest-dev gcc-8 g++-8 libmysqlclient-dev
 
 WORKDIR /opt/chroot
 COPY exec/chroot_make.sh ./

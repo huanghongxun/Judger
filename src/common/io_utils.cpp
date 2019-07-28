@@ -69,7 +69,7 @@ scoped_file_lock::scoped_file_lock() {
     valid = false;
 }
 
-scoped_file_lock::scoped_file_lock(const fs::path &path, bool shared) {
+scoped_file_lock::scoped_file_lock(const fs::path &path, bool shared) : lock_file(path) {
     fd = open(path.c_str(), O_CREAT | O_RDWR);
     flock(fd, shared ? LOCK_SH : LOCK_EX);
     valid = true;
@@ -90,13 +90,16 @@ scoped_file_lock &scoped_file_lock::operator=(scoped_file_lock &&lock) {
     swap(valid, lock.valid);
     return *this;
 }
+std::filesystem::path scoped_file_lock::file() const {
+    return lock_file;
+}
 
 scoped_file_lock lock_directory(const fs::path &dir, bool shared) {
     fs::create_directories(dir);
     fs::path lock_file = dir / ".lock";
     if (fs::is_directory(lock_file))
         fs::remove_all(lock_file);
-    return scoped_file_lock(lock_file.c_str(), shared);
+    return scoped_file_lock(lock_file, shared);
 }
 
 time_t last_write_time(const fs::path &path) {

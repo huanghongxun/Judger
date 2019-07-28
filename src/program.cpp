@@ -31,8 +31,9 @@ void executable::fetch(const string &cpuset, const fs::path &, const fs::path &c
         !fs::is_regular_file(deploypath) ||
         (!md5sum.empty() && !fs::is_regular_file(md5path)) ||
         (!md5sum.empty() && read_file_content(md5path) != md5sum)) {
-        fs::remove_all(dir);
-        fs::create_directories(dir);
+        for (auto &item : fs::directory_iterator(dir))
+            if (item.path() != lock.file())
+                fs::remove_all(item.path());
 
         asset->fetch(dir / "compile");
 
@@ -50,10 +51,11 @@ void executable::fetch(const string &cpuset, const fs::path &, const fs::path &c
         if (!fs::exists(runpath)) {
             throw executable_compilation_error("executable malformed", "Executable malformed");
         }
+
+        fs::permissions(runpath,
+                        fs::perms::group_exec | fs::perms::others_exec | fs::perms::owner_exec,
+                        fs::perm_options::add);
     }
-    fs::permissions(runpath,
-                            fs::perms::group_exec | fs::perms::others_exec | fs::perms::owner_exec,
-                            fs::perm_options::add);
     ofstream to_be_created(deploypath);
 }
 
