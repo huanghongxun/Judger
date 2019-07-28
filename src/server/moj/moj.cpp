@@ -214,7 +214,7 @@ static void from_json_programming(const json &j, configuration &server, programm
 
     int memory_limit;
     double time_limit;
-    int proc_limit = 10;
+    int proc_limit = -1;
     int file_limit = 32768;  // 32M
 
     const json &limits = config.at("limits").at(language);

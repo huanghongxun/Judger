@@ -50,9 +50,9 @@ protected:
             testcase.run_script = "standard";
             testcase.compare_script = "diff-ign-space";
             testcase.time_limit = 1;
-            testcase.memory_limit = 32768;
-            testcase.file_limit = 32768;
-            testcase.proc_limit = 3;
+            testcase.memory_limit = 262144;
+            testcase.file_limit = 262144;
+            testcase.proc_limit = -1;
             testcase.testcase_id = 0;
             prog.judge_tasks.push_back(testcase);
         }

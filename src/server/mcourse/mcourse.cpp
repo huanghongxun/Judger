@@ -212,7 +212,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
 
     int memory_limit = get_value<int>(config, "limits", "memory") << 10;
     double time_limit = get_value<int>(config, "limits", "time") / 1000;
-    int proc_limit = 10;
+    int proc_limit = -1;
     int file_limit = 1 << 18;  // 256M
 
     auto &standard_json = config.at("standard");
