@@ -284,7 +284,17 @@ struct programming_submission : public submission {
      */
     std::size_t finished = 0;
 
-    scoped_file_lock lock;
+    /**
+     * @brief 题目读锁，提交销毁后会自动释放锁
+     * 正在评测的提交需要使用读锁锁住题目文件夹以避免题目更新时导致数据错误。
+    scoped_file_lock problem_lock;
+
+    /**
+     * @brief 提交写锁，提交销毁后会自动释放锁
+     * 可能会出现连续两个同 sub_id 的提交，因此我们必须锁住提交文件夹来
+     * 防止两个提交的文件发生冲突（rejudge 会导致多个同 sub_id 的提交）
+     */
+    scoped_file_lock submission_lock;
 };
 
 /**
