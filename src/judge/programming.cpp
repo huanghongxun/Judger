@@ -122,8 +122,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
         if (father && !father->is_random && father->testcase_id >= 0) {  // 如果父测试也是标准测试，那么使用同一个测试数据组
             int number = father->testcase_id;
             if (number < 0) LOG(FATAL) << "Unknown test case";
-            datadir = standard_data_dir / to_string(task.testcase_id);
-            // FIXME: 我们假定父测试存在的时候数据必定存在，如果数据被清除掉可能会导致问题
+            datadir = standard_data_dir / to_string(number);
         } else if (task.testcase_id >= 0) {  // 使用对应的标准测试数据
             datadir = standard_data_dir / to_string(task.testcase_id);
             scoped_file_lock lock = lock_directory(standard_data_dir, false);
@@ -144,9 +143,6 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
             filesystem::create_directories(datadir / "output");
         }
     }
-
-    // result 记录的 data_dir 保存实际使用的测试数据
-    result.data_dir = datadir;
 
     if (USE_DATA_DIR) {  // 如果要拷贝测试数据，我们随机 UUID 并创建文件夹拷贝数据
         filesystem::path newdir = DATA_DIR / uuid;
@@ -229,6 +225,8 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
     }
 
     auto metadata = read_runguard_result(rundir / "program.meta");
+    result.run_dir = rundir;
+    result.data_dir = datadir;
     result.run_time = metadata.wall_time;  // TODO: 支持题目选择 cpu_time 或者 wall_time 进行时间
     result.memory_used = metadata.memory / 1024;
     return result;
