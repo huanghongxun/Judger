@@ -287,6 +287,7 @@ struct programming_submission : public submission {
     /**
      * @brief 题目读锁，提交销毁后会自动释放锁
      * 正在评测的提交需要使用读锁锁住题目文件夹以避免题目更新时导致数据错误。
+     */
     scoped_file_lock problem_lock;
 
     /**
