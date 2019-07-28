@@ -346,7 +346,7 @@ static void verify_timeliness(programming_submission &submit) {
         }
     }
 
-    submit.lock = scoped_file_lock(cachedir, true);
+    submit.problem_lock = scoped_file_lock(cachedir, true);
     judge::last_write_time(time_file, submit.updated_at);
 }
 
@@ -396,6 +396,9 @@ bool programming_judger::verify(submission &submit) const {
     }
 
     verify_timeliness(*sub);
+
+    filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
+    sub->submission_lock = lock_directory(workdir, false);
 
     return true;
 }
