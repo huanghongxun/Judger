@@ -12,9 +12,10 @@ DEST="$1"; shift
 
 SOURCE=()
 for file in "$@"; do
-    if [ "$file" == "*.c*" ]; then
+    if [[ "$file" == *.c* ]]; then
         SOURCE+=("$file")
+    fi
 done
 
-gcc-9 -DONLINE_JUDGE -fopenmp -march=native -std=c17 -Wall -Wextra -O2 -I. -o "$DEST" "$@" -lm -lpthread
+gcc-9 -DONLINE_JUDGE -fopenmp -march=native -std=c17 -Wall -Wextra -O2 -I. -o "$DEST" "${SOURCE[@]}" -lm -lpthread
 exit $?

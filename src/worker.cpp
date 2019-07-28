@@ -1,7 +1,7 @@
 #include "worker.hpp"
 #include <glog/logging.h>
-#include <boost/stacktrace.hpp>
 #include <boost/exception/diagnostic_information.hpp>
+#include <boost/stacktrace.hpp>
 
 namespace judge {
 using namespace std;
@@ -108,8 +108,14 @@ static bool fetch_submission(concurrent_queue<message::client_task> &task_queue)
  *     CACHE_DIR
  */
 static void worker_loop(int worker_id, const string &execcpuset, concurrent_queue<message::client_task> &task_queue) {
-#define REPORT_WORKER_STATE(state) \
-    for (auto &[category, server] : judge_servers) server->report_worker_state(worker_id, worker_state::state)
+#define REPORT_WORKER_STATE(state)                                                                                      \
+    do {                                                                                                                \
+        try {                                                                                                           \
+            for (auto &[category, server] : judge_servers) server->report_worker_state(worker_id, worker_state::state); \
+        } catch (std::exception & ex) {                                                                                 \
+            LOG(ERROR) << "Worker " << worker_id << " has crashed when reporting state to judge server, " << ex.what(); \
+        }                                                                                                               \
+    } while (0)
 
     REPORT_WORKER_STATE(START);
 

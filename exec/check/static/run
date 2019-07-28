@@ -40,7 +40,7 @@ IFS=':' read -ra ASSIST_FILES_SPLITTED <<< "$ASSIST_FILES"
 SRC=()
 INC=()
 for i in "${SOURCE_FILES_SPLITTED[@]}"; do
-    if [ "$file" == "*.c*" ]; then
+    if [[ "$i" == *.c* ]]; then
         SRC+=("$WORKDIR/compile/$i")
     else
         INC+=(-I); INC+=("$WORKDIR/compile/$i")

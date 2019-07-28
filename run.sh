@@ -24,4 +24,4 @@ if [ -n "$SICILY_CONF" ]; then
     SICILY_OPT="--enable-sicily $SICILY_CONF"
 fi
 
-GLOG_log_dir=/var/log/matrix GLOG_alsologtostderr=1 GLOG_colorlogtostderr=1 "$DIR/bin/judge-system" $MOJ_OPT $MCOURSE_OPT $FORTH_OPT $SICILY_OPT --worker=1 --exec-dir="$DIR/exec" --cache-dir=/tmp --run-dir=/tmp --chroot-dir=/chroot --log-dir=/tmp --cache-random-data=100 --run-user=domjudge-run --run-group=domjudge-run $OPT
+GLOG_log_dir=/var/log/matrix GLOG_alsologtostderr=1 GLOG_colorlogtostderr=1 "$DIR/bin/judge-system" $MOJ_OPT $MCOURSE_OPT $FORTH_OPT $SICILY_OPT --cores 10 --auto-workers --exec-dir "$DIR/exec" --cache-dir /tmp/judge/cache --run-dir /tmp/judge/run --chroot-dir /chroot --log-dir /tmp/log --cache-random-data 100 --run-user domjudge-run --run-group domjudge-run $OPT
