@@ -312,7 +312,8 @@ void from_json_programming(const json &config, const json &detail, judge_request
     int random_full_grade = get_value_def(grading, 0, "random tests");
     if (random_full_grade > 0 && random_test_times > 0) {  // 随机测试
         judge_task testcase;
-        testcase.score = random_full_grade / random_test_times;
+        testcase.score = random_full_grade;
+        testcase.score /= random_test_times;
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = RANDOM_CHECK_TYPE;
@@ -336,7 +337,8 @@ void from_json_programming(const json &config, const json &detail, judge_request
     int standard_full_grade = get_value_def(grading, 0, "standard tests");
     if (!submit.test_data.empty() && standard_full_grade > 0) {  // 标准测试
         judge_task testcase;
-        testcase.score = standard_full_grade / submit.test_data.size();
+        testcase.score = standard_full_grade;
+        testcase.score /= submit.test_data.size();
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = STANDARD_CHECK_TYPE;
