@@ -38,6 +38,7 @@
             "program": "${workspaceFolder}/bin/judge-system",
             "args": [
                 "--enable-3=config-moj.json",
+                "--cores=4",
                 "--auto-workers",
                 "--exec-dir=${workspaceFolder}/exec",
                 "--cache-dir=/tmp",
@@ -84,6 +85,11 @@
                 {
                     "description": "Enable pretty-printing for gdb and add better child debugging",
                     "text": "-enable-pretty-printing -gdb-set detach-on-fork off",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable printing long string",
+                    "text": "set print elements 0",
                     "ignoreFailures": true
                 }
             ]

@@ -13,8 +13,8 @@
 # <run-uuid>     运行的 uuid，用于索引运行文件夹位置
 # <run>          运行程序的脚本的文件夹
 # <compare>      比较程序/脚本文件夹的文件夹
-# <source-files> 源文件集，使用 : 隔开，如 a.cpp:b.cpp
-# <assist-files> 头文件集，使用 : 隔开，如 a.hpp:b.hpp
+# <source-files> 源文件集，使用 : 隔开，如 a.cpp:b.cpp:c.hpp
+# <assist-files> 不传递给编译器但需要参与编译的文件
 # <run-args>     提供给选手程序的参数
 #
 # 必须包含的环境变量：
@@ -112,7 +112,7 @@ RUN_UUID="$1"; shift
 RUN_SCRIPT="$1"; shift
 COMPARE_SCRIPT="$1"; shift
 SOURCE_FILES="$1"; shift
-ASSIST_FILES="$1"
+ASSIST_FILES="$1"; shift
 
 if [ ! -d "$WORKDIR" ] || [ ! -w "$WORKDIR" ] || [ ! -x "$WORKDIR" ]; then
     error "Working directory does not exist: $WORKDIR"

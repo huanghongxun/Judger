@@ -34,15 +34,20 @@ mkdir -m 0777 -p feedback
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
 
 IFS=':' read -ra SOURCE_FILES_SPLITTED <<< "$SOURCE_FILES"
-IFS=':' read -ra HEADER_FILES_SPLITTED <<< "$ASSIST_FILES"
+IFS=':' read -ra ASSIST_FILES_SPLITTED <<< "$ASSIST_FILES"
 
-# 假如 SOURCE_FILES 为 a.cpp b.cpp，那么 SRC 为 $WORKDIR/compile/a.cpp $WORKDIR/compile/b.cpp
+# 假如 SOURCE_FILES 为 a.cpp:b.cpp:c.hpp，那么 SRC, INC 为 $WORKDIR/compile/a.cpp $WORKDIR/compile/b.cpp
 SRC=()
-for i in "${SOURCE_FILES_SPLITTED[@]}"; do SRC+=("$WORKDIR/compile/$i"); done
-
-# 假如 ASSIST_FILES 为 a.hpp b.hpp，那么 INC 为 -I $WORKDIR/compile/a.hpp -I $WORKDIR/compile/b.hpp
 INC=()
-for i in "${HEADER_FILES_SPLITTED[@]}"; do INC+=(-I); INC+=("$WORKDIR/compile/$i"); done
+for i in "${SOURCE_FILES_SPLITTED[@]}"; do
+    if [ "$file" == "*.c*" ]; then
+        SRC+=("$WORKDIR/compile/$i")
+    else
+        INC+=(-I); INC+=("$WORKDIR/compile/$i")
+    fi
+done
+
+for i in "${ASSIST_FILES_SPLITTED[@]}"; do INC+=(-I); INC+=("$WORKDIR/compile/$i"); done
 
 # oclint 是安全的，不需要挂载也可以完成评测
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \

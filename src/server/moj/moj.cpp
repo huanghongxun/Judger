@@ -204,9 +204,9 @@ static void from_json_programming(const json &j, configuration &server, programm
         auto hdr_url = files.at("support").at("header_files").get<vector<string>>();
         // 依赖文件的下载地址：FILE_API/problem/<prob_id>/support/<filename>
         append(submission->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
-        append(submission->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
+        append(submission->source_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
         append(standard->source_files, src_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
-        append(standard->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
+        append(standard->source_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
     }
 
     const json &compile = config.at("compile").at(language);
@@ -230,7 +230,7 @@ static void from_json_programming(const json &j, configuration &server, programm
 
         auto hdr_url = files.at("submission").at("header_files").get<vector<string>>();
         // 选手提交的下载地址：FILE_API/submission/<sub_id>/<filename>
-        append(submission->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("submission/{}", submit.sub_id)));
+        append(submission->source_files, hdr_url, moj_url_to_remote_file(server, fmt::format("submission/{}", submit.sub_id)));
 
         submit.submission = move(submission);
     }
@@ -243,7 +243,7 @@ static void from_json_programming(const json &j, configuration &server, programm
 
         auto hdr_url = standard_json.at("header_files").get<vector<string>>();
         // 标准程序的下载地址：FILE_API/problem/<prob_id>/support/<filename>
-        append(standard->assist_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
+        append(standard->source_files, hdr_url, moj_url_to_remote_file(server, fmt::format("problem/{}/support", submit.prob_id)));
 
         if (standard_json.count("output") && standard_json.count("output")) {
             auto input_url = standard_json.at("input").get<vector<string>>();
