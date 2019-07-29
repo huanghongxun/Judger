@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cpp_redis/cpp_redis>
+#include <vector>
 #include "server/config.hpp"
 
 namespace judge::server {
@@ -21,7 +22,13 @@ struct redis_conn {
      * 如果重试次数过多则抛出异常。
      * @param callback 你可以在 callback 内完成 Redis 的操作
      */
-    void execute(std::function<void(cpp_redis::client &)> callback);
+    void execute(std::function<void(cpp_redis::client &, std::vector<std::future<cpp_redis::reply>> &)> callback);
+
+    /**
+     * @brief 尝试重连
+     * @param force 真时强制重连
+     */
+    void reconnect(bool force = false);
 
 private:
     redis redis_config;

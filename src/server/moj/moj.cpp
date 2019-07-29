@@ -532,24 +532,20 @@ static void from_json_choice(const json &j, configuration &server, choice_submis
 static bool report_to_server(configuration &server, bool is_complete, const judge_report &report) {
     string report_string = json(report).dump();
     try {
-        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << report.sub_id << " into redis";
-        std::future<cpp_redis::reply> reply;
-        server.redis_server.execute([=, &server, &reply](cpp_redis::client &redis) {
-            if (server.redis_config.channel.empty())
-                reply = redis.set(to_string(report.sub_id), report_string);
-            else
-                reply = redis.publish(server.redis_config.channel, report_string);
-        });
-        cpp_redis::reply msg = reply.get();
-        if (!msg.ok()) return false;
-        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << report.sub_id << " into redis, reply " << msg;
-
         if (is_complete) {
             LOG(INFO) << "MOJ Submission Reporter: updating database record of submission " << report.sub_id;
             if (!server.db.ping()) connect_database(server.db, server.dbcfg);
             server.db.execute("UPDATE submission, submission_detail SET submission.grade=?, submission_detail.report=? WHERE submission.sub_id=? AND submission_detail.sub_id=?",
                               report.grade, report.report.dump(), report.sub_id, report.sub_id);
         }
+
+        LOG(INFO) << "MOJ Submission Reporter: inserting submission " << report.sub_id << " into redis";
+        server.redis_server.execute([=, &server](cpp_redis::client &redis, vector<future<cpp_redis::reply>> &replies) {
+            if (server.redis_config.channel.empty())
+                replies.push_back(move(redis.set(to_string(report.sub_id), report_string)));
+            else
+                replies.push_back(move(redis.publish(server.redis_config.channel, report_string)));
+        });
         return true;
     } catch (std::exception &ex) {
         LOG(ERROR) << "MOJ Submission Reporter: unable to report to server: " << ex.what() << ", report: " << endl
