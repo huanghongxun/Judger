@@ -126,7 +126,7 @@ void to_json(json &j, const judge_task_result &result) {
     try {
         report = json::parse(result.report);
     } catch (json::exception &e) {
-        report = "";
+        report = json();
     }
 
     j = {{"status", get_display_message(result.status)},

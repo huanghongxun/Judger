@@ -79,7 +79,8 @@ try:
         'error_cases': error_cases,
         'disabled_cases': disabled_cases,
         'time': time,
-        'report': reports
+        'report': reports,
+        'type': 'gtest'
     }, indent=4))
     if error_cases == 0:
         sys.exit(42)

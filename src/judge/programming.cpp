@@ -166,7 +166,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
                                boost::algorithm::join(submit.submission->source_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"),
                                boost::algorithm::join(submit.submission->assist_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"),
                                task.run_args);
-    result.report = read_file_content(rundir / "feedback" / "report.txt", "{}");
+    result.report = read_file_content(rundir / "feedback" / "report.txt", "");
     result.error_log = read_file_content(rundir / "system.out", "No detailed information");
     switch (ret) {
         case E_INTERNAL_ERROR:
