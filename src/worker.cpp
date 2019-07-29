@@ -7,6 +7,13 @@ namespace judge {
 using namespace std;
 using namespace judge::server;
 
+// 停止 worker 的标记
+static volatile bool stop = false;
+
+void stop_workers() {
+    stop = true;
+}
+
 static mutex server_mutex;
 static unsigned global_judge_id = 0;
 // 键为一个唯一的 judge_id
@@ -125,6 +132,14 @@ static void worker_loop(int worker_id, const string &execcpuset, concurrent_queu
             message::client_task client_task;
             {
                 if (!task_queue.try_pop(client_task)) {
+                    if (stop) {
+                        // 如果需要停止 worker，在评测队列为空时自然退出 worker。
+                        // 因为 stop 导致不再获取提交时，不会产生新的评测任务。
+                        // 可能存在极限情况：try_pop 之后另一个 worker 推送了
+                        // 新评测任务，此时另一个 worker 来完成提交的评测。
+                        break;
+                    }
+
                     if (!fetch_submission(task_queue))
                         usleep(10 * 1000);  // 10ms，这里必须等待，不可以忙等，否则会挤占返回评测结果的执行权
                     continue;
@@ -141,9 +156,9 @@ static void worker_loop(int worker_id, const string &execcpuset, concurrent_queu
             LOG(ERROR) << "Worker " << worker_id << " has crashed, " << ex.what();
             REPORT_WORKER_STATE(CRASHED);
         }
-
-        REPORT_WORKER_STATE(STOPPED);
     }
+
+    REPORT_WORKER_STATE(STOPPED);
 }
 
 thread start_worker(int worker_id, const cpu_set_t &set, const string &execcpuset, concurrent_queue<message::client_task> &task_queue) {

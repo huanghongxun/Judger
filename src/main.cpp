@@ -69,8 +69,15 @@ void validate(boost::any& v, const vector<string>& values, cpuset*, int) {
     }
 }
 
+void sigintHandler(int /* signum */) {
+    LOG(ERROR) << "Received SIGINT, stopping workers";
+    judge::stop_workers();
+}
+
 int main(int argc, char* argv[]) {
     google::InitGoogleLogging(argv[0]);
+
+    signal(SIGINT, sigintHandler);
 
     // 默认情况下，假设运行环境是拉取代码直接编译的环境，此时我们可以假定 runguard 的运行路径
     if (!getenv("RUNGUARD")) {
