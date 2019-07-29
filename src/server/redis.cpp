@@ -62,7 +62,7 @@ void redis_conn::execute(function<void(cpp_redis::client &, vector<future<cpp_re
         for (auto &reply : replies) {  // 阻塞到所有操作完成为止
             cpp_redis::reply r = reply.get();
             // 如果有操作失败，则标记重试并保存错误信息
-            if (!r.ok()) reconn = true, message = r.error;
+            if (!r.ok()) reconn = true, message = r.error();
         }
         if (!reconn) return;
         reconnect(true);  // 操作失败，强制重连
