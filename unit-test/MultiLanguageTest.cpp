@@ -48,330 +48,135 @@ protected:
             testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
             testcase.check_script = "standard";
             testcase.run_script = "standard";
-            testcase.compare_script = "diff-ign-space";
+            testcase.compare_script = "diff-all";
             testcase.time_limit = 1;
             testcase.memory_limit = 262144;
             testcase.file_limit = 262144;
+            // Java, JavaScript, Go 这类有 GC 的语言会新建很多线程，导致超出 proc_limit，因此这里直接不限制 proc_limit 了
             testcase.proc_limit = -1;
             testcase.testcase_id = 0;
             prog.judge_tasks.push_back(testcase);
         }
     }
+
+    void test(const string &lang, const string &filename, const string &source) {
+        concurrent_queue<message::client_task> task_queue;
+        local_executable_manager exec_mgr(cachedir, execdir);
+        judge::server::mock::configuration mock_judge_server;
+        programming_submission prog;
+        prog.judge_server = &mock_judge_server;
+        prepare(prog, exec_mgr, lang, filename, source);
+        programming_judger judger;
+        push_submission(judger, task_queue, prog);
+        worker_loop(judger, task_queue);
+        EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
+        EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
+    }
 };
 
 TEST_F(MultiLanguageTest, CTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "c", "main.c", R"(
+    test("c", "main.c", R"(
 #include <stdio.h>
-int main() { printf("hello world\n"); })");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
+int main() { puts("hello world"); })");
 }
 
 TEST_F(MultiLanguageTest, CppTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "cpp", "main.cpp", R"(
+    test("cpp", "main.cpp", R"(
 #include <iostream>
 int main() { std::cout << "hello world" << std::endl; })");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
 }
 
 TEST_F(MultiLanguageTest, Python2Test) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "python2", "main.py", R"(print "hello world")");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
+    test("python2", "main.py", R"(print "hello world")");
 }
 
 TEST_F(MultiLanguageTest, Python3Test) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "python3", "main.py", R"(print("hello world"))");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
+    test("python3", "main.py", R"(print("hello world"))");
 }
 
 TEST_F(MultiLanguageTest, PascalTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "pas", "main.pas", R"(
+    test("pas", "main.pas", R"(
 begin
   writeln('hello world');
 end.)");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
 }
 
 TEST_F(MultiLanguageTest, BashTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "bash", "main.sh", R"(
-echo "hello world")");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
+    test("bash", "main.sh", R"(echo "hello world")");
 }
 
 TEST_F(MultiLanguageTest, GoTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "go", "main.go", R"(
-package main
+    test("go", "main.go", R"(package main
 import "fmt"
 func main() {
     fmt.Println("hello world")
 })");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
 }
 
 TEST_F(MultiLanguageTest, HaskellTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "haskell", "main.hs", R"(
-main = putStrLn "hello world")");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
+    test("haskell", "main.hs", R"(main = putStrLn "hello world")");
 }
 
 TEST_F(MultiLanguageTest, AdaTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "ada", "main.adb", R"(
+    test("ada", "main.adb", R"(
 with Ada.Text_IO;
 procedure main is
 begin
     Ada.Text_IO.Put_Line("hello world");
 end main;)");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
 }
 
 TEST_F(MultiLanguageTest, CSharpTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "csharp", "main.cs", R"(using System;
+    test("csharp", "main.cs", R"(using System;
 class Program {
     static void Main(string[] args) {
         Console.WriteLine("hello world");
     }
 })");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
 }
 
 TEST_F(MultiLanguageTest, FSharpTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "fsharp", "main.fs", R"(open System
+    test("fsharp", "main.fs", R"(open System
 [<EntryPoint>]
 let main argv =
     printfn "hello world"
     0)");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
 }
 
 TEST_F(MultiLanguageTest, VBNetTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "vbnet", "main.vb", R"(Imports System
+    test("vbnet", "main.vb", R"(Imports System
 Module Program
     Sub Main(args As String())
         Console.WriteLine("Hello World!")
     End Sub
 End Module)");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
 }
 
 TEST_F(MultiLanguageTest, JavaTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "java", "Main.java", R"(
+    test("java", "Main.java", R"(
 public class Main {
     public static void main(String[] args) {
         System.out.println("hello world");
     }
 })");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
 }
 
 TEST_F(MultiLanguageTest, RustTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "rust", "main.rs", R"(
-fn main() {
-    println!("hello world");
-})");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
+    test("rust", "main.rs", R"(fn main() { println!("hello world"); })");
 }
 
 TEST_F(MultiLanguageTest, FortranTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "fortran95", "main.f95", R"(
+    test("fortran95", "main.f95", R"(
 program helloworld
 implicit none
 write (*, '(a)') "hello world"
 end program)");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
 }
 
 TEST_F(MultiLanguageTest, JavaScriptTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "js", "main.js", R"(console.log("hello world"))");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
+    test("js", "main.js", R"(console.log("hello world"))");
 }
 
 TEST_F(MultiLanguageTest, RubyTest) {
-    concurrent_queue<message::client_task> task_queue;
-    local_executable_manager exec_mgr(cachedir, execdir);
-    judge::server::mock::configuration mock_judge_server;
-    programming_submission prog;
-    prog.judge_server = &mock_judge_server;
-    prepare(prog, exec_mgr, "ruby", "main.rb", R"(puts 'hello world')");
-    programming_judger judger;
-
-    push_submission(judger, task_queue, prog);
-    worker_loop(judger, task_queue);
-
-    EXPECT_EQ(prog.results[0].status, status::ACCEPTED);
-    EXPECT_EQ(prog.results[1].status, status::ACCEPTED);
+    test("ruby", "main.rb", R"(puts 'hello world')");
 }
