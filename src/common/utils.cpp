@@ -10,6 +10,8 @@ int exec_program(const map<string, string> &env, const char **argv) {
         case -1:  // fork 失败
             throw system_error();
         case 0:  // 子进程
+            // 避免子进程被终止，要求父进程处理中断信号
+            signal(SIGINT, SIG_IGN);
             for (auto &[key, value] : env)
                 set_env(key, value);
             execvp(argv[0], (char **)argv);
