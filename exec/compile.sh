@@ -80,8 +80,6 @@ else
     export VERBOSE=$LOG_ERR
 fi
 
-GAINROOT="sudo -n"
-
 [ $# -ge 4 ] || error "Not enough arguments."
 COMPILE_SCRIPT="$1"; shift
 CHROOTDIR="$1"; shift

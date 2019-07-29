@@ -100,8 +100,6 @@ else
     export VERBOSE=$LOG_ERR
 fi
 
-GAINROOT="sudo -n"
-
 [ $# -ge 9 ] || error "not enough arguments"
 
 DATADIR="$1"; shift

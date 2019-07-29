@@ -94,8 +94,6 @@ else
     export VERBOSE=$LOG_ERR
 fi
 
-GAINROOT="sudo -n"
-
 [ $# -ge 1 ] || error "Not enough arguments."
 RAN_GEN="$1"; shift
 STD_PROG="$1"; shift
