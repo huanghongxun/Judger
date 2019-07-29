@@ -63,12 +63,16 @@ void configuration::init(const filesystem::path &config_path) {
     config.at("database").get_to(dbcfg);
     connect_database(db, dbcfg);
 
-    config.at("choiceSubmissionQueue").get_to(choice_queue);
-    config.at("programmingSubmissionQueue").get_to(programming_queue);
     config.at("systemConfig").get_to(system);
+    if (exists(config, "choiceSubmissionQueue")) {
+        config.at("choiceSubmissionQueue").get_to(choice_queue);
+        choice_fetcher = make_unique<rabbitmq>(choice_queue, false);
+    }
 
-    programming_fetcher = make_unique<rabbitmq>(programming_queue, false);
-    choice_fetcher = make_unique<rabbitmq>(choice_queue, false);
+    if (exists(config, "programmingSubmissionQueue")) {
+        config.at("programmingSubmissionQueue").get_to(programming_queue);
+        programming_fetcher = make_unique<rabbitmq>(programming_queue, false);
+    }
 }
 
 string configuration::category() const {
@@ -556,7 +560,7 @@ static bool report_to_server(configuration &server, bool is_complete, const judg
 
 bool configuration::fetch_submission(unique_ptr<submission> &submit) {
     AmqpClient::Envelope::ptr_t envelope;
-    if (programming_fetcher->fetch(envelope, 0)) {
+    if (programming_fetcher && programming_fetcher->fetch(envelope, 0)) {
         auto prog_submit = make_unique<programming_submission>();
         prog_submit->envelope = envelope;
         try {
@@ -569,7 +573,7 @@ bool configuration::fetch_submission(unique_ptr<submission> &submit) {
         }
     }
 
-    if (choice_fetcher->fetch(envelope, 0)) {
+    if (choice_fetcher && choice_fetcher->fetch(envelope, 0)) {
         auto choice_submit = make_unique<choice_submission>();
         choice_submit->envelope = envelope;
         try {
