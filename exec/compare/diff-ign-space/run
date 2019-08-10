@@ -6,9 +6,9 @@
 # 本运行脚本通过 diff 命令比较程序输出和标准输出
 # 在存在多余空格和空行时也会判为 Accepted
 
-TESTIN="$1"
-PROGRAM="$2"
-TESTOUT="$3"
+TESTIN="$1/testdata.in"
+PROGRAM="$2/testdata.out"
+TESTOUT="$3/testdata.out"
 
 diff --strip-trailing-cr --ignore-trailing-space --ignore-space-change --ignore-blank-lines "$PROGRAM" "$TESTOUT"
 EXITCODE=$?

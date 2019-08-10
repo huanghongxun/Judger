@@ -112,17 +112,23 @@ check script 通过返回值来确定评分，比如返回 42 表示 AC，43 表
     │           │   └── (Makefile) // 允许 Makefile
     │           ├── run-[client_id] // 选手程序的运行目录，包含选手程序输出结果
     │           │   ├── run // 运行路径
-    │           │   │   ├── testdata.in // 映射进来的标准输入文件
-    │           │   │   ├── testdata.out // 映射进来的标准输出文件（在选手程序运行完成后再挂载）
-    │           │   │   └── program.out // 选手程序的 stdout 输出
+    │           │   │   └── testdata.out // 选手程序的 stdout 输出
     │           │   ├── feedback // 比较器结果路径
     │           │   │   ├── judgemessage.txt // 比较器的输出信息
     │           │   │   ├── judgeerror.txt // 比较器的错误信息
     │           │   │   └── score.txt // 如果比较器支持部分分，那么这里将保存部分分数
     │           │   ├── work // 构建的根目录
+    │           │   ├── merged // 构建好的 chroot 环境
+    │           │   │   ├── judge // 挂载 compile 文件夹、输入数据文件夹、run 文件夹
+    │           │   │   ├── testin // 挂载输入数据文件夹
+    │           │   │   ├── testout // 挂载输出数据文件夹
+    │           │   │   ├── compare // 挂载比较脚本文件夹
+    │           │   │   └── run // 挂载运行脚本文件夹
     │           │   ├── program.err // 选手程序的 stderr 输出
     │           │   ├── program.meta // 选手程序的运行信息
-    │           │   └── runguard.err // runguard 的错误输出
+    │           │   ├── compare.err // 比较程序的 stderr 输出
+    │           │   ├── compare.meta // 比较程序的运行信息
+    │           │   └── system.out // 检查脚本的日志
     │           └── run-...
     ├── moj
     └── mcourse

@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 # 评测提交的脚本
+# 与 standard 不同的是，该提交脚本会强制运行脚本是 standard，而且信任比较脚本，这代表不会限制比较脚本的运行环境以及运行时间、内存等资源
+# 好处是可以缓解 mount 命令的性能问题。比较脚本所需的运行环境必须在宿主机安装
 #
 # 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <run> <compare>
 #
@@ -47,15 +49,11 @@ chmod +x "$RUN_SCRIPT/run"
 chmod +x "$COMPARE_SCRIPT/run"
 
 touch program.meta program.err
-touch compare.meta compare.err
 
 mkdir -m 0777 -p run # 运行的临时文件都在这里
+mkdir -m 0777 -p feedback
 mkdir -m 0755 -p work
 mkdir -m 0777 -p work/judge
-mkdir -m 0755 -p work/compare
-mkdir -m 0755 -p work/testin
-mkdir -m 0755 -p work/testout
-mkdir -m 0777 -p work/run
 mkdir -m 0777 -p ofs
 mkdir -m 0777 -p ofs/merged
 mkdir -m 0777 -p ofs/judge
@@ -63,7 +61,6 @@ mkdir -m 0755 -p merged
 # 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
 $GAINROOT mount -t overlay overlay -olowerdir="$CHROOTDIR",upperdir=work,workdir=ofs/merged merged
 $GAINROOT mount -t overlay overlay -olowerdir="$WORKDIR/compile":"$TESTIN",upperdir=run,workdir=ofs/judge merged/judge
-$GAINROOT mount --bind -o ro "$RUN_SCRIPT" merged/run
 
 chroot_start "$CHROOTDIR" merged
 
@@ -75,44 +72,25 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
     --user "$RUNUSER" \
     --group "$RUNGROUP" \
     --wall-time "$TIMELIMIT" \
+    --standard-input-file "$TESTIN/testdata.in" \
+    --standard-output-file run/testdata.out \
     --standard-error-file program.err \
     --out-meta program.meta \
     -VONLINE_JUDGE=1 -- \
-    /run/run testdata.in testdata.out /judge/run "$@"
+    /judge/run "$@"
+
+chmod -R 0777 run
 
 # 比较选手程序输出
 echo "Comparing output"
-rm -rf work/feedback || /bin/true
-mkdir -m 0777 -p work/feedback
-$GAINROOT mount --bind -o ro "$TESTIN" merged/testin
-$GAINROOT mount --bind -o ro "$TESTOUT" merged/testout
-$GAINROOT mount --bind -o ro "$COMPARE_SCRIPT" merged/compare
-
-runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT \
-    --root merged \
-    --work /judge \
-    --no-core-dumps \
-    --user "$RUNUSER" \
-    --group "$RUNGROUP" \
-    --memory-limit "$SCRIPTMEMLIMIT" \
-    --wall-time "$SCRIPTTIMELIMIT" \
-    --file-limit "$SCRIPTFILELIMIT" \
-    --standard-output-file compare.out \
-    --standard-error-file compare.err \
-    --out-meta compare.meta \
-    -VONLINE_JUDGE=1 \
-    /compare/run /testin /judge /testout /feedback
+export ONLINE_JUDGE=1
+runcheck "$COMPARE_SCRIPT/run" "$TESTIN" run "$TESTOUT" feedback
 
 chroot_stop "$CHROOTDIR" merged
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/run-$uuid 中，因此删除挂载点即可。
 force_umount merged/judge
-force_umount merged/compare
-force_umount merged/testin
-force_umount merged/testout
-force_umount merged/run
 force_umount merged
-mv work/feedback feedback
 rm -rf merged
 rm -rf work
 rm -rf ofs
@@ -123,30 +101,6 @@ rm -rf ofs
 # user/group, so that we can append content.
 $GAINROOT chown -R "$(id -un):" feedback
 chmod -R go-w feedback
-
-# 记录比较器的标准输出
-if [ -s compare.out ]; then
-	printf "\\n---------- output validator stdout messages ----------\\n"
-	cat compare.out
-fi
-
-# 记录比较器的标准错误流
-if [ -s compare.err ]; then
-	printf "\\n---------- output validator stderr messages ----------\\n"
-	cat compare.err
-fi
-
-echo "checking compare script exit-status: $exitcode"
-if grep '^time-result: .*timelimit' compare.meta >/dev/null 2>&1; then
-    echo "Comparing aborted after $SCRIPTTIMELIMIT seconds"
-    cleanexit ${E_COMPARE_ERROR:-1}
-fi
-
-if grep -E '^internal-error: .+$' compare.meta >/dev/null 2>&1; then
-    echo "Internal Error"
-    echo "$resource_usage"
-    cleanexit ${E_INTERNAL_ERROR:-1}
-fi
 
 if [ ! -r program.meta ]; then
     error "'program.meta' is not readable"

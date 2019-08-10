@@ -8,7 +8,6 @@
 #include <sys/time.h>
 #include <sys/times.h>
 #include <sys/types.h>
-#include <sys/eventfd.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <boost/algorithm/string/join.hpp>
@@ -416,6 +415,9 @@ int runit(struct runguard_options opt) {
         case -1:
             throw system_error(errno, system_category(), "unable to fork");
         case 0: {  // child process, run the command
+            if (opt.stdin_filename.size())
+                freopen(opt.stdin_filename.c_str(), "r", stdin);
+
             set_restrictions(opt);
 
             // 将管道连接到 (stdin/)stdout/stderr。

@@ -316,7 +316,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = RANDOM_CHECK_TYPE;
-        testcase.check_script = "standard";
+        testcase.check_script = "standard-trusted";
         testcase.run_script = "standard";
         testcase.compare_script = "diff-all";
         testcase.is_random = true;
@@ -341,7 +341,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = STANDARD_CHECK_TYPE;
-        testcase.check_script = "standard";
+        testcase.check_script = "standard-trusted";
         testcase.run_script = "standard";
         testcase.compare_script = "diff-all";
         testcase.is_random = false;
@@ -661,7 +661,7 @@ static bool summarize_random_check(boost::rational<int> &total_score, programmin
             kase.result = status_string.at(task_result.status);
             kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
             kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
-            kase.subout = read_file_content(task_result.run_dir / "run" / "program.out");
+            kase.subout = read_file_content(task_result.run_dir / "run" / "testdata.out");
             random_check.report.push_back(kase);
         }
     }
@@ -703,7 +703,7 @@ static bool summarize_standard_check(boost::rational<int> &total_score, programm
             kase.result = status_string.at(task_result.status);
             kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
             kase.stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
-            kase.subout = read_file_content(task_result.run_dir / "run" / "program.out");
+            kase.subout = read_file_content(task_result.run_dir / "run" / "testdata.out");
             standard_check.report.push_back(kase);
         }
     }

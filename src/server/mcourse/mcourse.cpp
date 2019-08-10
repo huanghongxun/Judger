@@ -317,7 +317,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = RANDOM_CHECK_TYPE;
-        testcase.check_script = "standard";
+        testcase.check_script = "standard-trusted";
         testcase.run_script = "standard";
         testcase.compare_script = "diff-all";
         testcase.is_random = true;
@@ -342,7 +342,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         testcase.depends_on = 0;  // 依赖编译任务
         testcase.depends_cond = judge_task::dependency_condition::ACCEPTED;
         testcase.check_type = STANDARD_CHECK_TYPE;
-        testcase.check_script = "standard";
+        testcase.check_script = "standard-trusted";
         testcase.run_script = "standard";
         testcase.compare_script = "diff-all";
         testcase.is_random = false;
@@ -662,7 +662,7 @@ static bool summarize_random_check(boost::rational<int> &total_score, programmin
             kase.memoryused = task_result.memory_used >> 10;
             kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
             kase.standard_stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
-            kase.stdout = read_file_content(task_result.run_dir / "run" / "program.out");
+            kase.stdout = read_file_content(task_result.run_dir / "run" / "testdata.out");
             random_check.cases.push_back(kase);
         }
     }
@@ -701,7 +701,7 @@ static bool summarize_standard_check(boost::rational<int> &total_score, programm
             kase.memoryused = task_result.memory_used >> 10;
             kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
             kase.standard_stdout = read_file_content(task_result.data_dir / "output" / "testdata.out");
-            kase.stdout = read_file_content(task_result.run_dir / "run" / "program.out");
+            kase.stdout = read_file_content(task_result.run_dir / "run" / "testdata.out");
             standard_check.cases.push_back(kase);
         }
     }

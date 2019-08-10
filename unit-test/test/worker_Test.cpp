@@ -26,6 +26,8 @@ void worker_loop(const judger &j, concurrent_queue<message::client_task> &task_q
 void setup_test_environment() {
     put_error_codes();
 
+    if (getenv("DEBUG")) judge::DEBUG = true;
+
     judge::EXEC_DIR = filesystem::weakly_canonical(filesystem::path("exec"));
     set_env("JUDGE_UTILS", judge::EXEC_DIR / "utils", true);
     CHECK(filesystem::is_directory(judge::EXEC_DIR))

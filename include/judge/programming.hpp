@@ -214,7 +214,7 @@ struct judge_task_result {
      * 
      * RUN_DIR // 选手程序的运行目录，包含选手程序输出结果
      * ├── run // 运行路径
-     * │   └── program.out // 选手程序的 stdout 输出
+     * │   └── testdata.out // 选手程序的 stdout 输出
      * ├── work // 工作路径，提供给 check script 用来 mount 的
      * ├── program.err // 选手程序的 stderr 输出
      * └── runguard.err // runguard 的错误输出

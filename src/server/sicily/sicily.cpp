@@ -151,9 +151,6 @@ static bool fetch_queue(configuration &sicily, programming_submission &submit) {
             spj->source_files.push_back(make_unique<local_asset>("run", EXEC_DIR / "sicily_spjudge.sh"));
             spj->assist_files.push_back(make_unique<local_asset>("spjudge", get_data_path(sicily.testdata, submit.prob_id, "spjudge")));
             submit.compare = move(spj);
-        } else {
-            // Sicily 默认使用完全比较，格式错误时返回 Presentation Error
-            submit.compare = sicily.exec_mgr.get_compare_script("diff-all");
         }
 
         if (has_framework) {
@@ -181,8 +178,9 @@ static bool fetch_queue(configuration &sicily, programming_submission &submit) {
 
                 // 添加评测任务，sicily 只有标准测试，因此为每个测试数据添加一个标准测试数据组
                 judge_task kase;
-                kase.check_script = "standard";
+                kase.check_script = spj ? "standard" : "standard-trusted";
                 kase.run_script = "standard";
+                kase.compare_script = spj ? "" : "diff-all";
                 kase.is_random = false;
                 kase.score = 0;
                 kase.testcase_id = i;

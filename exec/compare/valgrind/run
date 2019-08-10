@@ -17,7 +17,7 @@ if len(sys.argv) != 5:
     print("Usage: {0} [stdin] [userout] [stdout] [feedback]".format(sys.argv[0]))
     sys.exit(2)
 
-xml_file = open(sys.argv[2], 'r')
+xml_file = open(os.path.join(sys.argv[2], 'testdata.out'), 'r')
 result_file = open(os.path.join(sys.argv[4], 'report.txt'), 'w')
 
 xml_result = xmltodict.parse(xml_file.read())

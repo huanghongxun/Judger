@@ -40,7 +40,7 @@ result_file = open(os.path.join(sys.argv[4], 'report.txt'), 'w')
 score_file = open(os.path.join(sys.argv[4], 'score.txt'), 'w')
 
 try:
-    xml_file = open('test_detail.xml', 'r')
+    xml_file = open(os.path.join(sys.argv[2], 'test_detail.xml'), 'r')
     xml_result = xmltodict.parse(xml_file.read())
     reports = []
     pass_cases = 0
