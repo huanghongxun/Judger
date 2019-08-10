@@ -242,7 +242,7 @@ static void child_handler(int /* signal */) {
     received_SIGCHLD = true;
 }
 
-static void pump_pipes(struct runguard_options& opt, fd_set* readfds, bool &use_splice, int child_pipefd[3][2], int child_redirfd[3], size_t data_read[], size_t data_passed[]) {
+static void pump_pipes(struct runguard_options& opt, fd_set* readfds, bool& use_splice, int child_pipefd[3][2], int child_redirfd[3], size_t data_read[], size_t data_passed[]) {
     char buf[BUF_SIZE];
     ssize_t nread, nwritten;
     size_t to_read, to_write;
@@ -485,9 +485,13 @@ int runit(struct runguard_options opt) {
                     }
                 }
                 if (!opt.stderr_filename.empty()) {
-                    child_redirfd[STDERR_FILENO] = creat(opt.stderr_filename.c_str(), S_IRUSR | S_IWUSR);
-                    if (child_redirfd[STDERR_FILENO] < 0) {
-                        error(errno, "opening file '{}'", opt.stderr_filename);
+                    if (opt.stderr_filename == opt.stdout_filename) {
+                        child_redirfd[STDERR_FILENO] = child_redirfd[STDOUT_FILENO];
+                    } else {
+                        child_redirfd[STDERR_FILENO] = creat(opt.stderr_filename.c_str(), S_IRUSR | S_IWUSR);
+                        if (child_redirfd[STDERR_FILENO] < 0) {
+                            error(errno, "opening file '{}'", opt.stderr_filename);
+                        }
                     }
                 }
                 LOG(INFO) << "redirection done in parent";
@@ -588,9 +592,8 @@ int runit(struct runguard_options opt) {
             } while (data_passed[1] + data_passed[2] > total_data);
 
             /* Close the output files */
-            for (int i = 1; i <= 2; i++) {
-                if (close(child_redirfd[i]) != 0) error(errno, "closing output fd {}", i);
-            }
+            if (close(child_redirfd[STDIN_FILENO]) != 0) error(errno, "closing output fd {}", STDIN_FILENO);
+            if (child_redirfd[STDIN_FILENO] != child_redirfd[STDERR_FILENO] && close(child_redirfd[STDERR_FILENO]) != 0) error(errno, "closing output fd {}", STDERR_FILENO);
 
             if (times(&endticks) == (clock_t)-1)
                 error(errno, "getting end clock ticks");

@@ -156,7 +156,7 @@ void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs:
     if (auto ret = call_process(EXEC_DIR / "compile.sh", "-n", cpuset, /* compile script */ exec->get_run_path(), chrootdir, workdir, /* source files */ paths); ret != 0) {
         switch (ret) {
             case E_COMPILER_ERROR:
-                throw compilation_error("Compilation failed", get_compilation_log(workdir));
+                throw compilation_error("", get_compilation_log(workdir));
             case E_INTERNAL_ERROR:
                 throw compilation_error("Compilation failed because of internal errors", get_compilation_log(workdir));
             default:
@@ -166,8 +166,11 @@ void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs:
 }
 
 string source_code::get_compilation_log(const fs::path &workdir) {
-    fs::path compilation_log_file(workdir / "compile" / "compile.out");
-    return read_file_content(compilation_log_file, "No compilation information");
+    fs::path compilation_log_file(workdir / "compile" / "compile.tmp");
+    string compilation_log = read_file_content(compilation_log_file, "");
+    if (!compilation_log.empty()) return compilation_log;
+    fs::path system_log_file(workdir / "compile" / "compile.out");
+    return read_file_content(system_log_file, "No compilation information");
 }
 
 fs::path source_code::get_run_path(const fs::path &path) noexcept {

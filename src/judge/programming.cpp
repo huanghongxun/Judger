@@ -240,10 +240,12 @@ static void compile(judge::program *program, const filesystem::path &workdir, co
         task_result.status = status::ACCEPTED;
     } catch (executable_compilation_error &ex) {
         task_result.status = status::EXECUTABLE_COMPILATION_ERROR;
-        task_result.error_log = string(ex.what()) + "\n" + program->get_compilation_log(workdir);
+        string what = ex.what();
+        task_result.error_log = (what.empty() ? "" : what + "\n") + program->get_compilation_log(workdir);
     } catch (compilation_error &ex) {
         task_result.status = executable ? status::EXECUTABLE_COMPILATION_ERROR : status::COMPILATION_ERROR;
-        task_result.error_log = string(ex.what()) + "\n" + program->get_compilation_log(workdir);
+        string what = ex.what();
+        task_result.error_log = (what.empty() ? "" : what + "\n") + program->get_compilation_log(workdir);
     } catch (exception &ex) {
         task_result.status = status::SYSTEM_ERROR;
         task_result.error_log = ex.what();

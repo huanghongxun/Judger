@@ -141,9 +141,11 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --group "$RUNGROUP" \
         --memory-limit "$SCRIPTMEMLIMIT" \
         --wall-time "$SCRIPTTIMELIMIT" \
+        --standard-output-file compile.tmp \
+        --standard-error-file compile.tmp \
         --out-meta compile.meta \
         $ENVIRONMENT_VARS -- \
-        "/compile/run" run "$@" > compile.tmp 2>&1
+        "/compile/run" run "$@"
 
 chroot_stop "$CHROOTDIR" "$RUNDIR/merged"
 
