@@ -8,7 +8,7 @@ TESTIN="$1"; shift
 PROGOUT="$1"; shift
 
 if [ -f "$TESTIN" ]; then
-    exec valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-fd=1 -- "$@" < "$TESTIN" > "$PROGOUT"
+    exec valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-file=valgrind.xml -- "$@" < "$TESTIN" > "$PROGOUT"
 else
-    exec valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-fd=1 -- "$@" > "$PROGOUT"
+    exec valgrind --leak-check=full --undef-value-errors=yes --track-origins=yes --xml=yes --xml-file=valgrind.xml -- "$@" > "$PROGOUT"
 fi

@@ -75,6 +75,18 @@ int main() {
     return 0;
 })";
 
+static const char *STANDARD_SPECIAL = R"(#include <stdio.h>
+#include <stdlib.h>
+int main() {
+  int *a = (int*)malloc(1);
+  a[3] = 10000000;
+  if (~(a[0] ^ 1)) {
+    putchar(1);
+  }
+  while (a[3]--);
+  printf("d\none");
+})";
+
 class MemoryCheckerTest : public ::testing::Test {
 protected:
     static void SetUpTestCase() {
@@ -256,6 +268,10 @@ protected:
         EXPECT_EQ(prog.results[2].status, stage2);                                   \
         EXPECT_TRUE(!check || prog.results[1].data_dir == prog.results[2].data_dir); \
     } while (0)
+
+TEST_F(MemoryCheckerTest, SpecialTest) {
+    TEST_TASK(STANDARD_SPECIAL, prepare_only_memory_check, status::WRONG_ANSWER, status::DEPENDENCY_NOT_SATISFIED, true);
+}
 
 TEST_F(MemoryCheckerTest, MemoryOnlyAcceptedTest) {
     TEST_TASK(STANDARD_AC, prepare_only_memory_check, status::ACCEPTED, status::ACCEPTED, false);

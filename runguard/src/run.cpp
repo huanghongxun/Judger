@@ -592,8 +592,8 @@ int runit(struct runguard_options opt) {
             } while (data_passed[1] + data_passed[2] > total_data);
 
             /* Close the output files */
-            if (close(child_redirfd[STDIN_FILENO]) != 0) error(errno, "closing output fd {}", STDIN_FILENO);
-            if (child_redirfd[STDIN_FILENO] != child_redirfd[STDERR_FILENO] && close(child_redirfd[STDERR_FILENO]) != 0) error(errno, "closing output fd {}", STDERR_FILENO);
+            if (close(child_redirfd[STDOUT_FILENO]) != 0) error(errno, "closing output fd {}", STDOUT_FILENO);
+            if (child_redirfd[STDOUT_FILENO] != child_redirfd[STDERR_FILENO] && close(child_redirfd[STDERR_FILENO]) != 0) error(errno, "closing output fd {}", STDERR_FILENO);
 
             if (times(&endticks) == (clock_t)-1)
                 error(errno, "getting end clock ticks");

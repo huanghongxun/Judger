@@ -17,7 +17,7 @@ if len(sys.argv) != 5:
     print("Usage: {0} [stdin] [userout] [stdout] [feedback]".format(sys.argv[0]))
     sys.exit(2)
 
-xml_file = open(os.path.join(sys.argv[2], 'testdata.out'), 'r')
+xml_file = open(os.path.join(sys.argv[2], 'valgrind.xml'), 'r')
 result_file = open(os.path.join(sys.argv[4], 'report.txt'), 'w')
 
 xml_result = xmltodict.parse(xml_file.read())
@@ -28,13 +28,12 @@ try:
     if not isinstance(xml_result["error"], list):
         xml_result["error"] = [xml_result["error"]]
     for err in xml_result["error"]:
-        if isinstance(err["stack"], list):
-            for stack in err["stack"]:
-                for item in stack["frame"]:
-                    item.pop("obj", None)
-                    item.pop("dir", None)
-        else:
-            for item in err["stack"]["frame"]:
+        if not isinstance(err["stack"], list):
+            err["stack"] = [err["stack"]]
+        for stack in err["stack"]:
+            if not isinstance(stack["frame"], list):
+                stack["frame"] = [stack["frame"]]
+            for item in stack["frame"]:
                 item.pop("obj", None)
                 item.pop("dir", None)
     result_file.write(json.dumps(xml_result, indent=4))
