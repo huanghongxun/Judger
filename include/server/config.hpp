@@ -83,6 +83,11 @@ struct redis {
     int port;
 
     /**
+     * @brief 重试时间间隔，单位毫秒
+     */
+    unsigned retry_interval;
+
+    /**
      * @brief 密码，若不为空，则使用该密码登录
      */
     std::string password;

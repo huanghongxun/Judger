@@ -37,6 +37,10 @@ void from_json(const json &j, redis &redis_config) {
         j.at("channel").get_to(redis_config.channel);
     else
         redis_config.channel = "";
+    if (exists(j, "retry_interval"))
+        j.at("retry_interval").get_to(redis_config.retry_interval);
+    else
+        redis_config.retry_interval = 1000;
 }
 
 void from_json(const json &j, system_config &config) {

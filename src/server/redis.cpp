@@ -36,8 +36,8 @@ void redis_conn::reconnect(bool force) {
         connect_to_server(redis_client, redis_config);
     for (; !redis_client.is_connected() && fail < 5; ++fail) {
         LOG(INFO) << "Redis: lost connection, trying to reconnect";
-        if (fail > 0)  // 两次重试间隔 5s
-            this_thread::sleep_for(chrono::seconds(5));
+        if (fail > 0)
+            this_thread::sleep_for(chrono::milliseconds(redis_config.retry_interval));
         connect_to_server(redis_client, redis_config);
     }
     if (fail >= 5) {
