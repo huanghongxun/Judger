@@ -4,6 +4,7 @@
 #include <ctime>
 #include <mutex>
 #include <string>
+#include "common/utils.hpp"
 
 namespace judge {
 
@@ -79,6 +80,11 @@ struct submission {
      * 此项是可选项，给特定的评测服务器使用
      */
     std::string contest_prob_id;
+
+    /**
+     * @brief 评测系统获取到的提交时间
+     */
+    elapsed_time judge_time;
 
     /**
      * @brief 提交时间

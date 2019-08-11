@@ -80,17 +80,23 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
             if (number < 0) LOG(FATAL) << "Unknown test case";
             datadir = random_data_dir / to_string(number);
         } else {
-            // 随机目录的写入必须加锁
+            // 创建一组随机数据
             scoped_file_lock lock = lock_directory(random_data_dir, false);
+            // 检查已经产生了多少组随机测试数据
             int number = count_directories_in_directory(random_data_dir);
-            if (number < MAX_RANDOM_DATA_NUM) {
-                filesystem::create_directories(random_data_dir / to_string(number));
+            if (number < MAX_RANDOM_DATA_NUM) {  // 如果没有达到创建上限，则生成随机测试数据
+                datadir = random_data_dir / to_string(number);
+                scoped_file_lock case_lock = lock_directory(datadir, false);  // 随机目录的写入必须加锁
+                lock.release();
 
+                elapsed_time random_time;
+
+                filesystem::path errorpath = datadir / ".error";  // 文件存在表示该组测试数据生成失败
+                // 随机生成器和标准程序已经在编译阶段完成下载和编译
                 filesystem::path randomdir = cachedir / "random";
                 filesystem::path standarddir = cachedir / "standard";
-                datadir = random_data_dir / to_string(number);
-                task.testcase_id = number;  // 标记当前测试点使用了哪个随机测试
-                // random_generator.sh <random_gen> <std_program> <timelimit> <chrootdir> <datadir> <run>
+                task.testcase_id = number;  // 标记当前测试点使用了哪个随机测试点
+                // random_generator.sh <random_gen> <std_program> <timelimit> <chrootdir> <datadir> <run> <std_program run_args...>
                 int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), task.time_limit, CHROOT_DIR, datadir, run_script->get_run_path(), task.run_args);
                 switch (ret) {
                     case E_SUCCESS: {
@@ -100,19 +106,32 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
                         // 随机数据生成器出错，返回 RANDOM_GEN_ERROR 并携带错误信息
                         result.status = status::RANDOM_GEN_ERROR;
                         result.error_log = read_file_content(datadir / "system.out", "No information");
+                        ofstream to_be_created(errorpath);  // 标记该组随机测试数据生成失败
                         return result;
                     } break;
                     default: {  // INTERNAL_ERROR
                         // 随机数据生成器出错，返回 SYSTEM_ERROR 并携带错误信息
                         result.status = status::SYSTEM_ERROR;
                         result.error_log = read_file_content(datadir / "system.out", "No information");
+                        ofstream to_be_created(errorpath);  // 标记该组随机测试数据生成失败
                         return result;
                     } break;
                 }
+
+                LOG(INFO) << "Generated random data case [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "-" << number << "] in " << random_time.template duration<chrono::milliseconds>().count() << "ms";
             } else {
                 int number = random(0, MAX_RANDOM_DATA_NUM - 1);
                 task.testcase_id = number;  // 标记当前测试点使用了哪个随机测试
                 datadir = random_data_dir / to_string(number);
+                // 加锁：可能出现某个进程正在生成随机数据的情况，此时需要等待数据生成完成。
+                scoped_file_lock case_lock = lock_directory(datadir, false);
+                lock.release();
+                filesystem::path errorpath = datadir / ".error";  // 文件存在表示该组测试数据生成失败
+                if (filesystem::exists(errorpath)) {              // 该组测试数据生成失败则直接返回 RANDOM_GEN_ERROR
+                    result.status = status::RANDOM_GEN_ERROR;
+                    result.error_log = read_file_content(datadir / "system.out", "No information");
+                    return result;
+                }
             }
         }
     } else {
@@ -428,6 +447,8 @@ bool programming_judger::distribute(concurrent_queue<message::client_task> &task
 }
 
 static void summarize(programming_submission &submit) {
+    LOG(INFO) << "Submission [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "] finished in " << submit.judge_time.template duration<chrono::milliseconds>().count() << "ms";
+
     submit.judge_server->summarize(submit);
 
     filesystem::path workdir = RUN_DIR / submit.category / submit.prob_id / submit.sub_id;
@@ -439,11 +460,14 @@ static void summarize(programming_submission &submit) {
 }
 
 /**
- * @brief 处理 client 返回的评测结果
+ * @brief 完成评测结果的统计，如果统计的是编译任务，则会分发具体的评测任务
+ * 在评测完成后，通过调用 process 函数来完成数据点的统计，如果发现评测完了一个提交，则立刻返回。
+ * 因此大部分情况下评测队列不会过长：只会拉取适量的评测，确保评测队列不会过长。
  * 
- * @param task_result client 返回的评测结果
+ * @param result 评测结果
  */
-void programming_judger::process(concurrent_queue<message::client_task> &testcase_queue, programming_submission &submit, const judge_task_result &result) const {
+template <typename DurationT>
+void process(const programming_judger &judger, concurrent_queue<message::client_task> &testcase_queue, programming_submission &submit, const judge_task_result &result, DurationT dur) {
     // 记录测试信息
     submit.results[result.id] = result;
 
@@ -451,7 +475,7 @@ void programming_judger::process(concurrent_queue<message::client_task> &testcas
                << ", type: " << (int)submit.judge_tasks[result.id].check_type
                << ", status: " << get_display_message(result.status) << ", runtime: " << result.run_time
                << ", memory: " << result.memory_used << ", run_dir: " << result.run_dir
-               << ", data_dir: " << result.data_dir << "]";
+               << ", data_dir: " << result.data_dir << "] in " << chrono::duration_cast<chrono::milliseconds>(dur).count() << "ms";
     if (result.status == status::SYSTEM_ERROR)
         LOG(ERROR) << "Testcase [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "-" << result.id << "]: error: " << result.error_log;
 
@@ -489,7 +513,7 @@ void programming_judger::process(concurrent_queue<message::client_task> &testcas
                 judge_task_result next_result = result;
                 next_result.status = status::DEPENDENCY_NOT_SATISFIED;
                 next_result.id = i;
-                process(testcase_queue, submit, next_result);
+                process(judger, testcase_queue, submit, next_result, DurationT());
             }
         }
     }
@@ -498,7 +522,7 @@ void programming_judger::process(concurrent_queue<message::client_task> &testcas
     // 如果当前提交的所有测试点都完成测试，则返回评测结果
     if (finished == submit.judge_tasks.size()) {
         summarize(submit);
-        fire_judge_finished(submit);
+        judger.fire_judge_finished(submit);
         return;  // 跳过本次评测过程
     } else if (finished > submit.judge_tasks.size()) {
         LOG(ERROR) << "Test case exceeded [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "]";
@@ -513,6 +537,8 @@ void programming_judger::judge(const message::client_task &client_task, concurre
     judge_task &task = submit->judge_tasks[client_task.id];
     judge_task_result result;
 
+    auto begin = chrono::system_clock::now();
+
     try {
         if (task.check_script == "compile")
             result = compile(client_task, *submit, task, execcpuset);
@@ -524,8 +550,10 @@ void programming_judger::judge(const message::client_task &client_task, concurre
         result.error_log = ex.what();
     }
 
+    auto end = chrono::system_clock::now();
+
     lock_guard<mutex> guard(submit->mut);
-    process(task_queue, *submit, result);
+    process(*this, task_queue, *submit, result, end - begin);
 }
 
 }  // namespace judge

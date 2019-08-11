@@ -35,3 +35,7 @@ string get_env(const string &key, const string &def_value) {
 void set_env(const string &key, const string &value, bool replace) {
     setenv(key.c_str(), value.c_str(), replace);
 }
+
+elapsed_time::elapsed_time() {
+    start = chrono::system_clock::now();
+}

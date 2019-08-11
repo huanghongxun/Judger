@@ -80,9 +80,7 @@ scoped_file_lock::scoped_file_lock(scoped_file_lock &&lock) {
 }
 
 scoped_file_lock::~scoped_file_lock() {
-    if (!valid) return;
-    flock(fd, LOCK_UN);
-    close(fd);
+    release();
 }
 
 scoped_file_lock &scoped_file_lock::operator=(scoped_file_lock &&lock) {
@@ -90,8 +88,16 @@ scoped_file_lock &scoped_file_lock::operator=(scoped_file_lock &&lock) {
     swap(valid, lock.valid);
     return *this;
 }
+
 std::filesystem::path scoped_file_lock::file() const {
     return lock_file;
+}
+
+void scoped_file_lock::release() {
+    if (!valid) return;
+    flock(fd, LOCK_UN);
+    close(fd);
+    valid = false;
 }
 
 scoped_file_lock lock_directory(const fs::path &dir, bool shared) {

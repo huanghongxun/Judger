@@ -1,11 +1,12 @@
 #pragma once
 
 #include <fmt/core.h>
+#include <glog/logging.h>
 #include <boost/lexical_cast.hpp>
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
 
 namespace fmt {
 template <>
@@ -124,14 +125,14 @@ int call_process_env(std::map<std::string, std::string> const &env, Args &&... a
     argv[list.size()] = nullptr;
 
 #ifndef NDEBUG
+    std::stringstream ss;
     for (size_t i = 0; i < list.size(); ++i)
-        printf("%s ", argv[i]);
-    puts("");
+        ss << argv[i] << ' ';
+    LOG(INFO) << ss.str();
 #endif
 
     return exec_program(env, argv);
 }
-
 
 template <typename... Args>
 int call_process(Args &&... args) {
@@ -153,3 +154,16 @@ std::string get_env(const std::string &key, const std::string &def_value);
  * @param replace 若为真，则覆盖已有的环境变量值
  */
 void set_env(const std::string &key, const std::string &value, bool replace = true);
+
+struct elapsed_time {
+
+    elapsed_time();
+
+    template <typename DurationT>
+    DurationT duration() {
+        return std::chrono::duration_cast<DurationT>(std::chrono::system_clock::now() - start);
+    }
+
+private:
+    std::chrono::system_clock::time_point start;
+};

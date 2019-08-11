@@ -47,7 +47,6 @@ struct judger {
      */
     void on_judge_finished(std::function<void(submission &)> callback);
 
-protected:
     void fire_judge_finished(submission &submit) const;
 
 private:

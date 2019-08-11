@@ -309,16 +309,6 @@ struct programming_judger : public judger {
     bool distribute(concurrent_queue<message::client_task> &task_queue, submission &submit) const override;
 
     void judge(const message::client_task &task, concurrent_queue<message::client_task> &task_queue, const std::string &execcpuset) const override;
-
-private:
-    /**
-     * @brief 完成评测结果的统计，如果统计的是编译任务，则会分发具体的评测任务
-     * 在评测完成后，通过调用 process 函数来完成数据点的统计，如果发现评测完了一个提交，则立刻返回。
-     * 因此大部分情况下评测队列不会过长：只会拉取适量的评测，确保评测队列不会过长。
-     * 
-     * @param result 评测结果
-     */
-    void process(concurrent_queue<message::client_task> &testcase_queue, programming_submission &submit, const judge_task_result &result) const;
 };
 
 }  // namespace judge

@@ -11,7 +11,7 @@ TESTIN = "$1"
 PROGRAM = "$2"
 TESTOUT = "$3"
 
-result=./spjudge $TESTIN $PROGRAM $TESTOUT
+result="$(./spjudge "$TESTIN" "$PROGRAM" "$TESTOUT")"
 exitcode=$?
 
 if echo "$result" | head -n 1 - | grep '^[Yy]' >/dev/null 2>&1; then
