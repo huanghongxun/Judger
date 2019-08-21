@@ -1,4 +1,5 @@
 #include "worker.hpp"
+#include "common/exceptions.hpp"
 #include <glog/logging.h>
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/stacktrace.hpp>
@@ -152,8 +153,11 @@ static void worker_loop(int worker_id, const string &execcpuset, concurrent_queu
             j.judge(client_task, task_queue, execcpuset);
 
             REPORT_WORKER_STATE(IDLE);
-        } catch (exception &ex) {
-            LOG(ERROR) << "Worker " << worker_id << " has crashed, " << ex.what();
+        } catch (judge_exception &ex) {
+            LOG(ERROR) << "Worker " << worker_id << " has crashed, " << ex;
+            REPORT_WORKER_STATE(CRASHED);
+        } catch (...) {
+            LOG(ERROR) << "Worker " << worker_id << " has crashed, " << boost::current_exception_diagnostic_information();
             REPORT_WORKER_STATE(CRASHED);
         }
     }

@@ -1,5 +1,6 @@
 #include "server/redis.hpp"
 #include <glog/logging.h>
+#include "common/exceptions.hpp"
 
 namespace judge::server {
 using namespace std;
@@ -42,7 +43,7 @@ void redis_conn::reconnect(bool force) {
         connect_to_server(redis_client, redis_config);
     }
     if (fail >= 5) {
-        throw std::runtime_error("unable to connect to redis server");
+        BOOST_THROW_EXCEPTION(judge_exception("unable to connect to redis server"));
     }
 }
 

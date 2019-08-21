@@ -552,7 +552,7 @@ static void from_json_mcourse(AmqpClient::Envelope::ptr_t envelope, const json &
                 submit = move(prog_submit);
             } break;
             default: {
-                throw runtime_error("Unrecognized problem type");
+                BOOST_THROW_EXCEPTION(judge_exception("Unrecognized problem type"));
             } break;
         }
 
@@ -565,7 +565,7 @@ static void from_json_mcourse(AmqpClient::Envelope::ptr_t envelope, const json &
         report.grade = 0;
         report.report = "Invalid submission";
         report_to_server(server, true, report);
-        throw e;
+        throw;
     }
 }
 
@@ -584,10 +584,10 @@ bool configuration::fetch_submission(unique_ptr<submission> &submit) {
     return false;
 }
 
-void configuration::summarize_invalid(submission &) {
-    throw runtime_error("Invalid submission");
+void configuration::summarize_invalid(submission &submit) {
+    BOOST_THROW_EXCEPTION(judge_exception() << "Invalid submission " << submit);
 }
-
+ 
 static json get_error_report(const judge_task_result &result) {
     error_report report;
     report.message = "SystemError: " + result.error_log;

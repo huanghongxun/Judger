@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <boost/algorithm/string.hpp>
+#include <boost/exception/diagnostic_information.hpp>
 #include <boost/program_options.hpp>
 #include <iostream>
 #include <regex>
@@ -74,10 +75,15 @@ void sigintHandler(int /* signum */) {
     judge::stop_workers();
 }
 
+void my_terminate_handler() {
+    LOG(ERROR) << "Unhandled exception: " << boost::current_exception_diagnostic_information();
+}
+
 int main(int argc, char* argv[]) {
     google::InitGoogleLogging(argv[0]);
 
     signal(SIGINT, sigintHandler);
+    set_terminate(my_terminate_handler);
 
     // 默认情况下，假设运行环境是拉取代码直接编译的环境，此时我们可以假定 runguard 的运行路径
     if (!getenv("RUNGUARD")) {

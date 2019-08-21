@@ -114,4 +114,10 @@ struct submission {
     std::mutex mut;
 };
 
+template <typename T>
+T &operator<<(T &os, const submission &submit) {
+    os << "Submission[" << submit.sub_type << ":" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "]";
+    return os;
+}
+
 }  // namespace judge

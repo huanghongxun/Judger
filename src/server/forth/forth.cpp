@@ -219,7 +219,7 @@ void configuration::summarize(submission &submit) {
     if (submit.sub_type == "programming") {
         summarize_programming(*this, dynamic_cast<programming_submission &>(submit));
     } else {
-        throw runtime_error("Unrecognized submission type " + submit.sub_type);
+        BOOST_THROW_EXCEPTION(judge_exception() << "Unrecognized submission type " << submit.sub_type);
     }
 }
 

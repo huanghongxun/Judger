@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include "common/exceptions.hpp"
 #include "sql/entity.hpp"
 #include "sql/type_mapping.hpp"
 #include "sql/utility.hpp"
@@ -84,15 +85,15 @@ public:
         constexpr auto args_sz = sizeof...(Args);
         if (args_sz != std::count(sql, sql + strlen(sql), '?')) {
             // or we can do compile-time checking
-            throw std::runtime_error("argument number not matched");
+            BOOST_THROW_EXCEPTION(judge::judge_exception("argument number not matched"));
         }
 
         if (!(stmt_ = mysql_stmt_init(con_))) {
-            throw std::runtime_error(mysql_error(con_));
+            BOOST_THROW_EXCEPTION(judge::database_error(mysql_error(con_)));
         }
 
         if (mysql_stmt_prepare(stmt_, sql, strlen(sql))) {
-            throw std::runtime_error(mysql_error(con_));
+            BOOST_THROW_EXCEPTION(judge::database_error(mysql_error(con_)));
         }
 
         std::tuple<Args...> param_tp{args...};
@@ -129,7 +130,7 @@ public:
             });
 
             if (mysql_stmt_bind_param(stmt_, params)) {
-                throw std::runtime_error(mysql_error(con_));
+                BOOST_THROW_EXCEPTION(judge::database_error(mysql_error(con_)));
             }
         }
 
@@ -165,12 +166,12 @@ public:
             });
 
             if (auto ret = mysql_stmt_bind_result(stmt_, results)) {
-                throw std::runtime_error(mysql_error(con_));
+                BOOST_THROW_EXCEPTION(judge::database_error(mysql_error(con_)));
             }
         }
 
         if (auto ret = mysql_stmt_execute(stmt_)) {
-            throw std::runtime_error(mysql_error(con_));
+            BOOST_THROW_EXCEPTION(judge::database_error(mysql_error(con_)));
         }
 
         int ret = mysql_stmt_affected_rows(stmt_);

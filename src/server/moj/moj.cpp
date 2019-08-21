@@ -971,7 +971,7 @@ void configuration::summarize(submission &submit) {
     } else if (submit.sub_type == "choice") {
         summarize_choice(*this, dynamic_cast<choice_submission &>(submit));
     } else {
-        throw runtime_error("Unrecognized submission type " + submit.sub_type);
+        BOOST_THROW_EXCEPTION(judge_exception() << "Unrecognized submission type " << submit.sub_type);
     }
 }
 

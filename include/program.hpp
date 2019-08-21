@@ -2,6 +2,7 @@
 
 #include <vector>
 #include "asset.hpp"
+#include "common/exceptions.hpp"
 
 /**
  * 这个头文件包含表示可以编译的可执行文件的类
@@ -23,7 +24,7 @@ namespace judge {
  * @brief 表示 program 编译错误
  * 可以表示 program 格式不正确，或者编译错误
  */
-struct compilation_error : public std::runtime_error {
+struct compilation_error : public judge_exception {
 public:
     const std::string error_log;
 

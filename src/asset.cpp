@@ -1,6 +1,7 @@
 #include "asset.hpp"
 #include <curl/curl.h>
 #include <fstream>
+#include "common/exceptions.hpp"
 
 namespace judge {
 using namespace std;
@@ -37,12 +38,12 @@ void remote_asset::fetch(const filesystem::path &path) {
         CURLcode res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
         fclose(fp);
-
+ 
         if (res != CURLcode::CURLE_OK) {
-            throw runtime_error("unable to download " + url);
+            BOOST_THROW_EXCEPTION(network_error() << "unable to download " << url << ", CURLcode=" << res);
         }
     } else {
-        throw runtime_error("unable to download " + url);
+        BOOST_THROW_EXCEPTION(network_error() << "unable to download " << url << ", unable to init curl");
     }
 }
 

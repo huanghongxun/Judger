@@ -6,6 +6,7 @@
 #include <utime.h>
 #include <algorithm>
 #include <fstream>
+#include "common/exceptions.hpp"
 
 namespace judge {
 using namespace std;
@@ -55,7 +56,7 @@ string read_file_content(filesystem::path const &path, const string &def) {
 
 string assert_safe_path(const string &subpath) {
     if (subpath.find("../") != string::npos)
-        throw runtime_error("subpath is not safe " + subpath);
+        BOOST_THROW_EXCEPTION(judge_exception() << "subpath is not safe " << subpath);
     return subpath;
 }
 
@@ -111,7 +112,7 @@ scoped_file_lock lock_directory(const fs::path &dir, bool shared) {
 time_t last_write_time(const fs::path &path) {
     struct stat attr;
     if (stat(path.c_str(), &attr) != 0)
-        throw system_error(errno, system_category(), "error when reading modification time of path " + path.string());
+        BOOST_THROW_EXCEPTION(system_error(errno, system_category(), "error when reading modification time of path " + path.string()));
     return attr.st_mtim.tv_sec;
 }
 
@@ -122,7 +123,7 @@ void last_write_time(const fs::path &path, time_t timestamp) {
     buf.actime = chrono::system_clock::to_time_t(chrono::system_clock::now());
     buf.modtime = timestamp;
     if (utime(path.c_str(), &buf) == -1)
-        throw system_error(errno, system_category(), "error when setting modification time of path " + path.string());
+        BOOST_THROW_EXCEPTION(system_error(errno, system_category(), "error when setting modification time of path " + path.string()));
 }
 
 }  // namespace judge

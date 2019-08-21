@@ -53,7 +53,7 @@ const executable_manager &configuration::get_executable_manager() const {
 
 void configuration::init(const filesystem::path &config_path) {
     if (!filesystem::exists(config_path))
-        throw runtime_error("Unable to find configuration file");
+        BOOST_THROW_EXCEPTION(judge_exception("Unable to find configuration file"));
     ifstream fin(config_path);
     json config;
     fin >> config;
@@ -65,7 +65,7 @@ void configuration::init(const filesystem::path &config_path) {
 }
 
 void configuration::summarize_invalid(submission &) {
-    throw runtime_error("Invalid submission");
+    BOOST_THROW_EXCEPTION(judge_exception("Invalid submission"));
 }
 
 static filesystem::path get_data_path(const filesystem::path &testdata, const string &prob_id, const string &filename) {

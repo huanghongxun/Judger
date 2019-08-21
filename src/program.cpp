@@ -15,7 +15,7 @@ namespace judge {
 namespace fs = std::filesystem;
 
 compilation_error::compilation_error(const string &what, const string &error_log) noexcept
-    : runtime_error(what), error_log(error_log) {}
+    : judge_exception(what), error_log(error_log) {}
 
 executable_compilation_error::executable_compilation_error(const string &what, const string &error_log) noexcept
     : compilation_error(what, error_log) {}
@@ -41,15 +41,15 @@ void executable::fetch(const string &cpuset, const fs::path &, const fs::path &c
             if (auto ret = call_process(EXEC_DIR / "compile_executable.sh", "-n", cpuset, /* workdir */ dir, chrootdir); ret != 0) {
                 switch (ret) {
                     case E_COMPILER_ERROR:
-                        throw executable_compilation_error("executable compilation error", get_compilation_log(dir));
+                        BOOST_THROW_EXCEPTION(executable_compilation_error("executable compilation error", get_compilation_log(dir)));
                     default:
-                        throw internal_error("unknown exitcode " + to_string(ret));
+                        BOOST_THROW_EXCEPTION(internal_error() << "unknown exitcode " << ret);
                 }
             }
         }
 
         if (!fs::exists(runpath)) {
-            throw executable_compilation_error("executable malformed", "Executable malformed");
+            BOOST_THROW_EXCEPTION(executable_compilation_error("executable malformed", "Executable malformed"));
         }
 
         fs::permissions(runpath,
@@ -98,10 +98,10 @@ void remote_executable_asset::fetch(const fs::path &dir) {
     LOG(INFO) << "Unzipping executable " << zippath;
 
     if (system(fmt::format("unzip -Z '{}' | grep -q ^l", zippath.string()).c_str()) == 0)
-        throw executable_compilation_error("Executable contains symlinks", "Unable to unzip executable");
+        BOOST_THROW_EXCEPTION(executable_compilation_error("Executable contains symlinks", "Unable to unzip executable"));
 
     if (system(fmt::format("unzip -j -q -d {}, {}", dir, zippath).c_str()) != 0)
-        throw executable_compilation_error("Unable to unzip executable", "Unable to unzip executable");
+        BOOST_THROW_EXCEPTION(executable_compilation_error("Unable to unzip executable", "Unable to unzip executable"));
 }
 
 local_executable_manager::local_executable_manager(const fs::path &workdir, const fs::path &execdir)
@@ -156,11 +156,11 @@ void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs:
     if (auto ret = call_process(EXEC_DIR / "compile.sh", "-n", cpuset, /* compile script */ exec->get_run_path(), chrootdir, workdir, /* source files */ paths); ret != 0) {
         switch (ret) {
             case E_COMPILER_ERROR:
-                throw compilation_error("", get_compilation_log(workdir));
+                BOOST_THROW_EXCEPTION(compilation_error("", get_compilation_log(workdir)));
             case E_INTERNAL_ERROR:
-                throw compilation_error("Compilation failed because of internal errors", get_compilation_log(workdir));
+                BOOST_THROW_EXCEPTION(compilation_error("Compilation failed because of internal errors", get_compilation_log(workdir)));
             default:
-                throw compilation_error(fmt::format("Unrecognized compile.sh exitcode: {}", ret), get_compilation_log(workdir));
+                BOOST_THROW_EXCEPTION(compilation_error(fmt::format("Unrecognized compile.sh exitcode: {}", ret), get_compilation_log(workdir)));
         }
     }
 }
