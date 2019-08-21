@@ -5,6 +5,7 @@ namespace judge::server {
 using namespace std;
 
 static bool connect_to_server(cpp_redis::client &redis_client, const redis &redis_config) {
+    LOG(INFO) << "Redis: Setup connection with server " << redis_config.host << ":" << redis_config.port;
     redis_client.connect(redis_config.host, redis_config.port,
                          [&](const std::string &host, std::size_t port,
                              cpp_redis::connect_state status) {
@@ -22,10 +23,10 @@ static bool connect_to_server(cpp_redis::client &redis_client, const redis &redi
         LOG(INFO) << "Redis: Auth Reply: " << future.get();
     }
     if (redis_client.is_connected()) {
-        LOG(INFO) << "Redis: connecting to redis server succeeded " << redis_config.host << ", " << redis_config.port;
+        LOG(INFO) << "Redis: Connecting to redis server succeeded " << redis_config.host << ":" << redis_config.port;
         return true;
     } else {
-        LOG(ERROR) << "Redis: unable to connect to redis server " << redis_config.host << ", " << redis_config.port;
+        LOG(ERROR) << "Redis: Unable to connect to redis server " << redis_config.host << ":" << redis_config.port;
         return false;
     }
 }
@@ -35,7 +36,7 @@ void redis_conn::reconnect(bool force) {
     if (force)
         connect_to_server(redis_client, redis_config);
     for (; !redis_client.is_connected() && fail < 5; ++fail) {
-        LOG(INFO) << "Redis: lost connection, trying to reconnect";
+        LOG(INFO) << "Redis: Lost connection, trying to reconnect";
         if (fail > 0)
             this_thread::sleep_for(chrono::milliseconds(redis_config.retry_interval));
         connect_to_server(redis_client, redis_config);
@@ -58,7 +59,9 @@ void redis_conn::execute(function<void(cpp_redis::client &, vector<future<cpp_re
         bool reconn = false;
         vector<future<cpp_redis::reply>> replies;
         callback(redis_client, replies);
+        DLOG(INFO) << "Syncing operations to server";
         redis_client.sync_commit();
+        DLOG(INFO) << "Synced operations to server";
         for (auto &reply : replies) {  // 阻塞到所有操作完成为止
             cpp_redis::reply r = reply.get();
             // 如果有操作失败，则标记重试并保存错误信息
