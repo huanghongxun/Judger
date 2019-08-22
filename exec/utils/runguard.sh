@@ -1,3 +1,6 @@
+unset GLOG_log_dir        # 阻止 runguard 产生日志文件，我们已将 runguard 日志输出到 system.out 中
+unset GLOG_colorlogstderr # 阻止 runguard 的 glog 输出颜色控制符
+
 read_metadata()
 {
     local metafile
