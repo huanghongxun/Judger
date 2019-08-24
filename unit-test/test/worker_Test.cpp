@@ -36,9 +36,6 @@ void setup_test_environment() {
     filesystem::create_directories(judge::CACHE_DIR);
     judge::RUN_DIR = filesystem::path("/tmp/test/run");
     filesystem::create_directories(judge::RUN_DIR);
-    auto LOG_DIR = filesystem::path("/tmp/test/log");
-    filesystem::create_directories(LOG_DIR);
-    set_env("LOGDIR", LOG_DIR, false);
     judge::CHROOT_DIR = filesystem::path("/chroot");
     set_env("SCRIPTMEMLIMIT", to_string(judge::SCRIPT_MEM_LIMIT), false);
     set_env("SCRIPTTIMELIMIT", to_string(judge::SCRIPT_TIME_LIMIT), false);

@@ -65,9 +65,6 @@ shift $((OPTIND-1))
 
 if [ -n "$CPUSET" ]; then
     CPUSET_OPT="--cpuset $CPUSET"
-    LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1)-$CPUSET.log"
-else
-    LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1).log"
 fi
 
 LOGLEVEL=$LOG_DEBUG

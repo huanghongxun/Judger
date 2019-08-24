@@ -83,7 +83,6 @@ if [ -n "$PROCLIMIT" ]; then
     PROCLIMIT_OPT="--nproc $PROCLIMIT"
 fi
 
-LOGFILE="$LOGDIR/judge.$(hostname | cut -d . -f 1).log"
 LOGLEVEL=$LOG_DEBUG
 PROGNAME="$(basename "$0")"
 
