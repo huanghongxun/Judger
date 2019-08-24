@@ -41,6 +41,7 @@ void from_json(const json &j, judge_task &value) {
     assign_optional(j, value.file_limit, "file_limit");
     assign_optional(j, value.proc_limit, "proc_limit");
     assign_optional(j, value.run_args, "run_args");
+    assign_optional(j, value.name, "name");
 }
 
 void from_json(const json &j, asset_uptr &asset) {

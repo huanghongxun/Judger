@@ -19,6 +19,12 @@ struct client_task {
      * 用于返回评测结果的时候统计
      */
     std::size_t id;
+
+    /**
+     * @brief 本测试点的中文识别名
+     * 监控系统查看当前正在评测的题目类型使用
+     */
+    std::string name;
 };
 
 }  // namespace judge::message

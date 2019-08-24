@@ -24,15 +24,7 @@ struct configuration : public judge_server {
 
     database monitor_dbcfg;
 
-    /**
-     * @brief 监控系统数据库
-     */
-    ormpp::dbng<ormpp::mysql> monitor_db;
-
     amqp sub_queue;
-
-    std::string host;
-    int port;
 
     std::unique_ptr<rabbitmq> sub_fetcher;
 
@@ -71,8 +63,6 @@ struct configuration : public judge_server {
      * @param submit 不合法的提交
      */
     void summarize_invalid(submission &submit) override;
-
-    void report_worker_state(int client_id, worker_state state);
 };
 
 }  // namespace judge::server::mcourse

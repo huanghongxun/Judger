@@ -11,10 +11,12 @@
 #include <thread>
 #include "common/concurrent_queue.hpp"
 #include "common/messages.hpp"
+#include "common/python.hpp"
 #include "common/system.hpp"
 #include "common/utils.hpp"
 #include "config.hpp"
 #include "env.hpp"
+#include "monitor/elastic_apm.hpp"
 #include "judge/choice.hpp"
 #include "judge/program_output.hpp"
 #include "judge/programming.hpp"
@@ -82,13 +84,25 @@ void my_terminate_handler() {
 int main(int argc, char* argv[]) {
     google::InitGoogleLogging(argv[0]);
 
+    wchar_t* progname = Py_DecodeLocale(argv[0], NULL);
+    Py_SetProgramName(progname);
+    Py_Initialize();
+    PyEval_InitThreads();
+    vector<wchar_t*> wargv;
+    for (int i = 0; i < argc; ++i)
+        wargv.push_back(Py_DecodeLocale(argv[i], NULL));
+    PySys_SetArgv(argc, wargv.data());
+    PyThread_guard guard;
+
+    filesystem::path current(argv[0]);
+    filesystem::path repo_dir(filesystem::weakly_canonical(current).parent_path().parent_path());
+
     signal(SIGINT, sigintHandler);
     set_terminate(my_terminate_handler);
 
     // 默认情况下，假设运行环境是拉取代码直接编译的环境，此时我们可以假定 runguard 的运行路径
     if (!getenv("RUNGUARD")) {
-        filesystem::path current(argv[0]);
-        filesystem::path runguard(filesystem::weakly_canonical(current).parent_path().parent_path() / "runguard" / "bin" / "runguard");
+        filesystem::path runguard(repo_dir / "runguard" / "bin" / "runguard");
         if (filesystem::exists(runguard)) {
             set_env("RUNGUARD", filesystem::weakly_canonical(runguard).string());
         }
@@ -111,23 +125,22 @@ int main(int argc, char* argv[]) {
         ("enable",   po::value<vector<string>>(), "run Matrix Judge System 4.0 submission fetcher, with configuration file path.")
         ("enable-3", po::value<vector<string>>(), "run Matrix Judge System 3.0 submission fetcher, with configuration file path.")
         ("enable-2", po::value<vector<string>>(), "run Matrix Judge System 2.0 submission fetcher, with configuration file path.")
-        ("monitor-port", po::value<unsigned>(), "set the port the monitor server listens to, default to 80")
         ("workers", po::value<unsigned>(), "set number of single thread judge workers to be kept")
         ("worker", po::value<vector<cpuset>>(), "run a judge worker which cpuset is given")
         ("cores", po::value<unsigned>()->required(), "tell the judge-system that how many physical core are there")
         ("auto-workers", "start workers with number of hardware concurrency")
-        ("exec-dir", po::value<string>()->required(), "set the default predefined executables for falling back")
-        ("cache-dir", po::value<string>()->required(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables")
-        ("data-dir", po::value<string>(), "set the directory to store test data to be judged, for ramdisk to speed up IO performance of user program.")
-        ("run-dir", po::value<string>()->required(), "set the directory to run user programs, store compiled user program")
-        ("log-dir", po::value<string>(), "set the directory to store log files")
-        ("chroot-dir", po::value<string>()->required(), "set the chroot directory")
-        ("script-mem-limit", po::value<unsigned>(), "set memory limit in KB for random data generator, scripts, default to 262144(256MB).")
-        ("script-time-limit", po::value<unsigned>(), "set time limit in seconds for random data generator, scripts, default to 10(10 second).")
-        ("script-file-limit", po::value<unsigned>(), "set file limit in KB for random data generator, scripts, default to 524288(512MB).")
-        ("run-user", po::value<string>()->required(), "set run user")
-        ("run-group", po::value<string>()->required(), "set run group")
-        ("cache-random-data", po::value<size_t>(), "set the maximum number of cached generated random data, default to 100.")
+        ("exec-dir", po::value<string>(), "set the default predefined executables for falling back. You can either pass it from environ EXECDIR")
+        ("script-dir", po::value<string>(), "set the directory with required scripts stored. You can either pass it from environ SCRIPTDIR")
+        ("cache-dir", po::value<string>(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables. You can either pass it from environ CACHEDIR")
+        ("data-dir", po::value<string>(), "set the directory to store test data to be judged, for ramdisk to speed up IO performance of user program. You can either pass it from environ DATADIR")
+        ("run-dir", po::value<string>(), "set the directory to run user programs, store compiled user program. You can either pass it from environ RUNDIR")
+        ("chroot-dir", po::value<string>(), "set the chroot directory. You can either pass it from environ CHROOTDIR")
+        ("script-mem-limit", po::value<unsigned>(), "set memory limit in KB for random data generator, scripts, default to 262144(256MB). You can either pass it from environ SCRIPTMEMLIMIT")
+        ("script-time-limit", po::value<unsigned>(), "set time limit in seconds for random data generator, scripts, default to 10(10 second). You can either pass it from environ SCRIPTTIMELIMIT")
+        ("script-file-limit", po::value<unsigned>(), "set file limit in KB for random data generator, scripts, default to 524288(512MB). You can either pass it from environ SCRIPTFILELIMIT")
+        ("run-user", po::value<string>(), "set run user. You can either pass it from environ RUNUSER")
+        ("run-group", po::value<string>(), "set run group. You can either pass it from environ RUNGROUP")
+        ("cache-random-data", po::value<size_t>(), "set the maximum number of cached generated random data, default to 100. You can either pass it from environ CACHERANDOMDATA")
         ("debug", "turn on the debug mode to disable checking whether it is in privileged mode, and not to delete submission directory to check the validity of result files.")
         ("help", "display this help text")
         ("version", "display version of this application");
@@ -163,6 +176,8 @@ int main(int argc, char* argv[]) {
 
     if (vm.count("debug")) {
         judge::DEBUG = true;
+    } else if (getenv("DEBUG")) {
+        judge::DEBUG = true;
     }
 
     if (getuid() != 0) {
@@ -181,25 +196,50 @@ int main(int argc, char* argv[]) {
 
     if (vm.count("exec-dir")) {
         judge::EXEC_DIR = filesystem::path(vm.at("exec-dir").as<string>());
-        set_env("JUDGE_UTILS", judge::EXEC_DIR / "utils", true);
-        CHECK(filesystem::is_directory(judge::EXEC_DIR))
-            << "Executables directory " << judge::EXEC_DIR << " does not exist";
+    } else if (getenv("EXECDIR")) {
+        judge::EXEC_DIR = filesystem::path(getenv("EXECDIR"));
+    } else {
+        filesystem::path execdir(repo_dir / "exec");
+        if (filesystem::exists(execdir)) {
+            judge::EXEC_DIR = execdir;
+        }
+    }
+    set_env("JUDGE_UTILS", judge::EXEC_DIR / "utils", true);
+    CHECK(filesystem::is_directory(judge::EXEC_DIR))
+        << "Executables directory " << judge::EXEC_DIR << " does not exist";
 
-        for (auto& p : filesystem::directory_iterator(judge::EXEC_DIR))
-            if (filesystem::is_regular_file(p))
-                filesystem::permissions(p,
-                                        filesystem::perms::group_exec | filesystem::perms::others_exec | filesystem::perms::owner_exec,
-                                        filesystem::perm_options::add);
+    for (auto& p : filesystem::directory_iterator(judge::EXEC_DIR))
+        if (filesystem::is_regular_file(p))
+            filesystem::permissions(p,
+                                    filesystem::perms::group_exec | filesystem::perms::others_exec | filesystem::perms::owner_exec,
+                                    filesystem::perm_options::add);
+
+    if (vm.count("script-dir")) {
+        judge::SCRIPT_DIR = filesystem::path(vm.at("script-dir").as<string>());
+    } else if (getenv("SCRIPTDIR")) {
+        judge::SCRIPT_DIR = filesystem::path(getenv("SCRIPTDIR"));
+    } else {
+        filesystem::path scriptdir(repo_dir / "script");
+        if (filesystem::exists(scriptdir)) {
+            judge::SCRIPT_DIR = scriptdir;
+        }
     }
 
     if (vm.count("cache-dir")) {
         judge::CACHE_DIR = filesystem::path(vm.at("cache-dir").as<string>());
-        CHECK(filesystem::is_directory(judge::CACHE_DIR))
-            << "Cache directory " << judge::CACHE_DIR << " does not exist";
+    } else if (getenv("CACHEDIR")) {
+        judge::CACHE_DIR = filesystem::path(getenv("CACHEDIR"));
     }
+    CHECK(filesystem::is_directory(judge::CACHE_DIR))
+        << "Cache directory " << judge::CACHE_DIR << " does not exist";
 
     if (vm.count("data-dir")) {
         judge::DATA_DIR = filesystem::path(vm.at("data-dir").as<string>());
+        judge::USE_DATA_DIR = true;
+        CHECK(filesystem::is_directory(judge::DATA_DIR))
+            << "Data directory " << judge::DATA_DIR << " does not exist";
+    } else if (getenv("DATADIR")) {
+        judge::DATA_DIR = filesystem::path(getenv("DATADIR"));
         judge::USE_DATA_DIR = true;
         CHECK(filesystem::is_directory(judge::DATA_DIR))
             << "Data directory " << judge::DATA_DIR << " does not exist";
@@ -207,36 +247,38 @@ int main(int argc, char* argv[]) {
 
     if (vm.count("run-dir")) {
         judge::RUN_DIR = filesystem::path(vm.at("run-dir").as<string>());
-        CHECK(filesystem::is_directory(judge::RUN_DIR))
-            << "Run directory " << judge::RUN_DIR << " does not exist";
+    } else if (getenv("RUNDIR")) {
+        judge::RUN_DIR = filesystem::path(getenv("RUNDIR"));
     }
-
-    if (vm.count("log-dir")) {
-        string logdir = vm.at("log-dir").as<string>();
-        CHECK(filesystem::is_directory(filesystem::path(logdir)))
-            << "Log directory " << logdir << " does not exist";
-        set_env("LOGDIR", logdir);
-    }
-    set_env("LOGDIR", filesystem::weakly_canonical(filesystem::current_path()).string(), false);
+    CHECK(filesystem::is_directory(judge::RUN_DIR))
+        << "Run directory " << judge::RUN_DIR << " does not exist";
 
     if (vm.count("chroot-dir")) {
         judge::CHROOT_DIR = filesystem::path(vm.at("chroot-dir").as<string>());
-        CHECK(filesystem::is_directory(judge::CHROOT_DIR))
-            << "Chroot directory " << judge::CHROOT_DIR << " does not exist";
+    } else if (getenv("CHROOTDIR")) {
+        judge::CHROOT_DIR = filesystem::path(getenv("CHROOTDIR"));
     }
+    CHECK(filesystem::is_directory(judge::CHROOT_DIR))
+        << "Chroot directory " << judge::CHROOT_DIR << " does not exist";
 
     if (vm.count("script-mem-limit")) {
         judge::SCRIPT_MEM_LIMIT = vm["script-mem-limit"].as<unsigned>();
+    } else if (getenv("SCRIPTMEMLIMIT")) {
+        judge::SCRIPT_MEM_LIMIT = boost::lexical_cast<unsigned>("SCRIPTMEMLIMIT");
     }
     set_env("SCRIPTMEMLIMIT", to_string(judge::SCRIPT_MEM_LIMIT), false);
 
     if (vm.count("script-time-limit")) {
         judge::SCRIPT_TIME_LIMIT = vm["script-time-limit"].as<unsigned>();
+    } else if (getenv("SCRIPTTIMELIMIT")) {
+        judge::SCRIPT_TIME_LIMIT = boost::lexical_cast<unsigned>("SCRIPTTIMELIMIT");
     }
     set_env("SCRIPTTIMELIMIT", to_string(judge::SCRIPT_TIME_LIMIT), false);
 
     if (vm.count("script-file-limit")) {
         judge::SCRIPT_FILE_LIMIT = vm["script-file-limit"].as<unsigned>();
+    } else if (getenv("SCRIPTFILELIMIT")) {
+        judge::SCRIPT_FILE_LIMIT = boost::lexical_cast<unsigned>("SCRIPTFILELIMIT");
     }
     set_env("SCRIPTFILELIMIT", to_string(judge::SCRIPT_FILE_LIMIT), false);
 
@@ -255,6 +297,8 @@ int main(int argc, char* argv[]) {
 
     if (vm.count("cache-random-data")) {
         judge::MAX_RANDOM_DATA_NUM = vm["cache-random-data"].as<size_t>();
+    } else if (getenv("CACHERANDOMDATA")) {
+        judge::MAX_RANDOM_DATA_NUM = boost::lexical_cast<unsigned>(getenv("CACHERANDOMDATA"));
     }
 
     if (vm.count("enable-sicily")) {
@@ -308,6 +352,8 @@ int main(int argc, char* argv[]) {
     judge::register_judger(make_unique<judge::programming_judger>());
     judge::register_judger(make_unique<judge::choice_judger>());
     judge::register_judger(make_unique<judge::program_output_judger>());
+
+    judge::register_monitor(make_unique<judge::elastic>(judge::SCRIPT_DIR / "elastic"));
 
     set<unsigned> cores;
     vector<thread> worker_threads;
@@ -368,5 +414,7 @@ int main(int argc, char* argv[]) {
 
     for (auto& th : worker_threads)
         th.join();
+
+    Py_Finalize();
     return 0;
 }

@@ -102,6 +102,12 @@ struct submission {
     time_t contest_end_time;
 
     /**
+     * @brief 提交的结果
+     * 比如 Matrix 系列返回分数，Sicily 返回评测结果状态
+     */
+    std::string result = "SUCCESS";
+
+    /**
      * @brief 给 judge_server 保存消息队列信封的地方
      */
     std::any envelope;

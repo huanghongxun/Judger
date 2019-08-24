@@ -12,7 +12,8 @@
                 "${workspaceFolder}/build/ext/glog",
                 "${workspaceFolder}/include",
                 "${workspaceFolder}/runguard/include",
-                "${workspaceFolder}/unit-test"
+                "${workspaceFolder}/unit-test",
+                "/usr/include/python3.6m"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc-9",

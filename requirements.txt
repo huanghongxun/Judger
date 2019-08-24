@@ -1,8 +1,10 @@
-xmltodict
-tornado
-pika
+xmltodict # GTest、Valgrind 比较脚本使用
+tornado   # Matrix Course 兼容接口需要
+pika      # Matrix Course 兼容接口发布消息使用
 requests
-mysqlclient
+mysqlclient # Matrix Course 兼容接口需要
 ConfigParser
 pymysql
 colorlog
+contextvars # 使评测系统能运行在 Python 3.6 上
+elastic-apm # 为 ElasticSearch APM 提供评测监控信息

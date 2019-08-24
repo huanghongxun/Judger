@@ -3,6 +3,7 @@
 #include <thread>
 #include "common/concurrent_queue.hpp"
 #include "common/messages.hpp"
+#include "monitor/monitor.hpp"
 #include "judge/judger.hpp"
 #include "server/judge_server.hpp"
 
@@ -41,6 +42,11 @@ void register_judge_server(std::unique_ptr<server::judge_server> &&judge_server)
  * 评测器负责评测具体题型
  */
 void register_judger(std::unique_ptr<judger> &&judger);
+
+/**
+ * @brief 注册监控器
+ */
+void register_monitor(std::unique_ptr<monitor> &&monitor);
 
 /**
  * @brief 启动评测 worker 线程

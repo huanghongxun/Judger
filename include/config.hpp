@@ -133,6 +133,12 @@ extern std::filesystem::path RUN_DIR;
 extern std::filesystem::path CHROOT_DIR;
 
 /**
+ * @brief 存放帮助的 Python 脚本的路径
+ * 必须和源代码仓库根目录下的 script 文件夹一致
+ */
+extern std::filesystem::path SCRIPT_DIR;
+
+/**
  * @brief 是否开启 DEBUG 模式
  * 如果开启 DEBUG 模式，评测系统将不再检查程序是否在特权模式下执行，
  * 并且不会删除产生的提交目录，以便手动检查测试产生的文件内容是否符合预期。

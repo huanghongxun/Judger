@@ -5,7 +5,6 @@
 #include "common/status.hpp"
 #include "config.hpp"
 #include "program.hpp"
-#include "worker_state.hpp"
 
 namespace judge::server {
 
@@ -58,14 +57,6 @@ struct judge_server {
      * @brief 获取服务器对应的 executable manager
      */
     virtual const executable_manager &get_executable_manager() const = 0;
-
-    /**
-     * @brief 报告当前 worker 的状态
-     * 提供给 Matrix 课程系统用于监控评测系统状态
-     * @param worker_id 已知 id 的 worker 的状态发生了改变
-     * @param state worker 的新状态
-     */
-    virtual void report_worker_state(int worker_id, worker_state state);
 };
 
 }  // namespace judge::server

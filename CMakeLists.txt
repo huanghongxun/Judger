@@ -21,6 +21,12 @@ option(BUILD_GTEST_MODULE_TEST "Build test for gtest module" OFF)
 option(BUILD_ENTRY "Build the Judge System main entry" OFF)
 ################################################################################
 
+# Necessary libraries
+################################################################################
+find_package(Threads REQUIRED)
+find_package(PythonLibs 3.6 REQUIRED)
+find_package(Boost 1.65 REQUIRED COMPONENTS program_options python3)
+
 # header directories
 ################################################################################
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -29,6 +35,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/json/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/SimpleAmqpClient/src")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/cpp_redis/includes")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ext/cpp_redis/tacopie/includes")
+include_directories("${PYTHON_INCLUDE_DIRS}")
 ################################################################################
 
 # source files
@@ -37,11 +44,6 @@ file(GLOB_RECURSE SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 list(FILTER SOURCE_FILES EXCLUDE REGEX ".*main.cpp$")
 file(GLOB ENTRY_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
 ################################################################################
-
-# Necessary libraries
-################################################################################
-find_package(Threads REQUIRED)
-find_package(Boost 1.65 REQUIRED COMPONENTS program_options)
 
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/glog")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt")
@@ -86,6 +88,7 @@ if (BUILD_UNIT_TEST)
     boost_stacktrace_addr2line
     dl
     ${Boost_LIBRARIES}
+    ${PYTHON_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     )
 endif ()
@@ -124,6 +127,7 @@ if (BUILD_ENTRY)
     boost_stacktrace_addr2line
     dl
     ${Boost_LIBRARIES}
+    ${PYTHON_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     )
   install(TARGETS ${MATRIX_JUDGE_TARGET} RUNTIME DESTINATION bin)

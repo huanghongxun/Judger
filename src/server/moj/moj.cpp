@@ -305,6 +305,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
+        testcase.name = "CompileCheck";
         submit.judge_tasks.push_back(testcase);
     }
 
@@ -324,6 +325,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.memory_limit = memory_limit;
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
+        testcase.name = "RandomCheck";
 
         for (int i = 0; i < random_test_times; ++i) {
             testcase.testcase_id = -1;  // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
@@ -349,6 +351,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.memory_limit = memory_limit;
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
+        testcase.name = "StandardCheck";
 
         for (size_t i = 0; i < submit.test_data.size(); ++i) {
             testcase.testcase_id = i;
@@ -374,6 +377,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
+        testcase.name = "StaticCheck";
         submit.judge_tasks.push_back(testcase);
     }
 
@@ -393,6 +397,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
+        testcase.name = "GTestCheck";
         submit.judge_tasks.push_back(testcase);
     }
 
@@ -410,6 +415,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
         testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
         testcase.proc_limit = proc_limit;
+        testcase.name = "MemoryCheck";
 
         if (testcase.is_random) {
             if (!random_checks.empty()) {  // 如果存在随机测试，则依赖随机测试点的数据

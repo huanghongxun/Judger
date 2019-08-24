@@ -1,8 +1,11 @@
 #include "worker.hpp"
-#include "common/exceptions.hpp"
+#include <Python.h>
 #include <glog/logging.h>
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/stacktrace.hpp>
+#include <functional>
+#include "common/defer.hpp"
+#include "common/exceptions.hpp"
 
 namespace judge {
 using namespace std;
@@ -20,18 +23,37 @@ static unsigned global_judge_id = 0;
 // 键为一个唯一的 judge_id
 static map<unsigned, unique_ptr<submission>> submissions;
 
-/**
- * @brief 提交结束，要求释放 submission 所占内存
- */
-static void finish_submission(submission &submit) {
-    submissions.erase(submit.judge_id);
-}
-
 static map<string, unique_ptr<judge_server>> judge_servers;
 
 void register_judge_server(unique_ptr<judge_server> &&judge_server) {
     string category = judge_server->category();
     judge_servers.insert({category, move(judge_server)});
+}
+
+static vector<unique_ptr<monitor>> monitors;
+
+void register_monitor(unique_ptr<monitor> &&monitor) {
+    monitors.push_back(move(monitor));
+}
+
+static void call_monitor(int worker_id, function<void(monitor &)> callback) {
+    try {
+        for (auto &monitor : monitors) callback(*monitor);
+    } catch (std::exception &ex) {
+        LOG(ERROR) << "Worker " << worker_id << " has crashed when reporting monitoring information, " << ex.what();
+    }
+}
+
+vector<unique_ptr<submission>> finished_submissions;
+
+/**
+ * @brief 提交结束，要求释放 submission 所占内存
+ */
+static void finish_submission(submission &submit) {
+    lock_guard<mutex> guard(server_mutex);
+    unsigned judge_id = submit.judge_id;
+    finished_submissions.push_back(move(submissions.at(judge_id)));
+    submissions.erase(judge_id);
 }
 
 static map<string, unique_ptr<judger>> judgers;
@@ -71,6 +93,7 @@ static bool fetch_submission_nolock(concurrent_queue<message::client_task> &task
                 if (judgers[submission->sub_type]->verify(*submission)) {
                     unsigned judge_id = global_judge_id++;
                     submission->judge_id = judge_id;
+                    call_monitor(0, [&](monitor &m) { m.start_submission(*submission); });
                     submissions[judge_id] = move(submission);
                     judgers[submissions[judge_id]->sub_type]->distribute(task_queue, *submissions[judge_id]);
                     success = true;
@@ -116,16 +139,7 @@ static bool fetch_submission(concurrent_queue<message::client_task> &task_queue)
  *     CACHE_DIR
  */
 static void worker_loop(int worker_id, const string &execcpuset, concurrent_queue<message::client_task> &task_queue) {
-#define REPORT_WORKER_STATE(state)                                                                                      \
-    do {                                                                                                                \
-        try {                                                                                                           \
-            for (auto &[category, server] : judge_servers) server->report_worker_state(worker_id, worker_state::state); \
-        } catch (std::exception & ex) {                                                                                 \
-            LOG(ERROR) << "Worker " << worker_id << " has crashed when reporting state to judge server, " << ex.what(); \
-        }                                                                                                               \
-    } while (0)
-
-    REPORT_WORKER_STATE(START);
+    call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::START, ""); });
 
     while (true) {
         try {
@@ -147,22 +161,39 @@ static void worker_loop(int worker_id, const string &execcpuset, concurrent_queu
                 }
             }
 
-            REPORT_WORKER_STATE(JUDGING);
+            call_monitor(worker_id, [&](monitor &m) { m.start_judge_task(worker_id, client_task); });
+            defer {
+                // 使用 defer 是希望即使评测崩溃也可以发送 end_judge_task 避免监控爆炸
+                call_monitor(worker_id, [&](monitor &m) { m.end_judge_task(worker_id, client_task); });
+            };
+            call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::JUDGING, ""); });
 
-            judger &j = get_judger_by_type(client_task.submit->sub_type);
-            j.judge(client_task, task_queue, execcpuset);
+            try {
+                judger &j = get_judger_by_type(client_task.submit->sub_type);
+                j.judge(client_task, task_queue, execcpuset);
+            } catch (...) {
+                // 崩溃后必须停止 submit 的监控
+                client_task.submit->result = "System Error: " + boost::current_exception_diagnostic_information();
+                finish_submission(*client_task.submit);
+                throw;
+            }
 
-            REPORT_WORKER_STATE(IDLE);
+            call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::IDLE, ""); });
         } catch (judge_exception &ex) {
             LOG(ERROR) << "Worker " << worker_id << " has crashed, " << ex;
-            REPORT_WORKER_STATE(CRASHED);
+            call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::CRASHED, boost::lexical_cast<string>(ex)); });
         } catch (...) {
             LOG(ERROR) << "Worker " << worker_id << " has crashed, " << boost::current_exception_diagnostic_information();
-            REPORT_WORKER_STATE(CRASHED);
+            call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::CRASHED, boost::lexical_cast<string>(boost::current_exception_diagnostic_information())); });
         }
+
+        lock_guard<mutex> guard(server_mutex);
+        for (auto &submit : finished_submissions)
+            call_monitor(0, [&](monitor &m) { m.end_submission(*submit); });
+        finished_submissions.clear();
     }
 
-    REPORT_WORKER_STATE(STOPPED);
+    call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::STOPPED, ""); });
 }
 
 thread start_worker(int worker_id, const cpu_set_t &set, const string &execcpuset, concurrent_queue<message::client_task> &task_queue) {

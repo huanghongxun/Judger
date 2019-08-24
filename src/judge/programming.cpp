@@ -439,7 +439,8 @@ bool programming_judger::distribute(concurrent_queue<message::client_task> &task
         if (sub.judge_tasks[i].depends_on < 0) {  // 不依赖任何任务的任务可以直接开始评测
             judge::message::client_task client_task = {
                 .submit = &submit,
-                .id = i};
+                .id = i,
+                .name = sub.judge_tasks[i].name};
             task_queue.push(client_task);
         }
     }
@@ -507,7 +508,8 @@ void process(const programming_judger &judger, concurrent_queue<message::client_
             if (satisfied) {
                 judge::message::client_task client_task = {
                     .submit = &submit,
-                    .id = i};
+                    .id = i,
+                    .name = kase.name};
                 testcase_queue.push(client_task);
             } else {
                 judge_task_result next_result = result;

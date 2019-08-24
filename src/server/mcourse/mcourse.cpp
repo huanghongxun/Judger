@@ -63,18 +63,10 @@ void configuration::init(const filesystem::path &config_path) {
     config.at("matrix_db").get_to(matrix_dbcfg);
     matrix_db.connect(matrix_dbcfg.host.c_str(), matrix_dbcfg.user.c_str(), matrix_dbcfg.password.c_str(), matrix_dbcfg.database.c_str());
 
-    config.at("monitor_db").get_to(monitor_dbcfg);
-    monitor_db.connect(monitor_dbcfg.host.c_str(), monitor_dbcfg.user.c_str(), monitor_dbcfg.password.c_str(), monitor_dbcfg.database.c_str());
-
     config.at("submission_queue").get_to(sub_queue);
     config.at("systemConfig").get_to(system);
-    config.at("host").get_to(host);
-    config.at("port").get_to(port);
 
     sub_fetcher = make_unique<rabbitmq>(sub_queue, false);
-
-    monitor_db.execute("INSERT INTO judge_node_config (host, port, thread_number, is_working, load_factor) VALUES (?, ?, 0, true, 0) ON DUPLICATE KEY UPDATE host=?, port=?, load_factor=0, thread_number=0",
-                       host, port, host, port);
 }
 
 string configuration::category() const {
@@ -306,6 +298,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
+        testcase.name = "CompileCheck";
         submit.judge_tasks.push_back(testcase);
     }
 
@@ -325,6 +318,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         testcase.memory_limit = memory_limit;
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
+        testcase.name = "RandomCheck";
 
         for (int i = 0; i < random_test_times; ++i) {
             testcase.testcase_id = -1;  // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
@@ -350,6 +344,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         testcase.memory_limit = memory_limit;
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
+        testcase.name = "StandardCheck";
 
         for (size_t i = 0; i < submit.test_data.size(); ++i) {
             testcase.testcase_id = i;
@@ -375,6 +370,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
+        testcase.name = "StaticCheck";
         submit.judge_tasks.push_back(testcase);
     }
 
@@ -394,6 +390,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         testcase.file_limit = file_limit;
         testcase.proc_limit = proc_limit;
         testcase.testcase_id = -1;
+        testcase.name = "GTestCheck";
         submit.judge_tasks.push_back(testcase);
     }
 
@@ -412,6 +409,7 @@ void from_json_programming(const json &config, const json &detail, judge_request
         testcase.memory_limit = judge::SCRIPT_MEM_LIMIT;
         testcase.file_limit = judge::SCRIPT_FILE_LIMIT;
         testcase.proc_limit = proc_limit;
+        testcase.name = "MemoryCheck";
 
         if (testcase.is_random) {
             if (!random_checks.empty()) {  // 如果存在随机测试，则依赖随机测试点的数据
@@ -960,41 +958,6 @@ void configuration::summarize(submission &submit) {
         summarize_program_output(*this, dynamic_cast<program_output_submission &>(submit));
     } else {
         throw runtime_error("Unrecognized submission type " + submit.sub_type);
-    }
-}
-
-void configuration::report_worker_state(int worker_id, worker_state state) {
-    switch (state) {
-        case worker_state::START:
-            monitor_db.execute("INSERT INTO judge_worker_status (host, worker_id, worker_type, is_running, worker_stage) VALUES (?, ?, 'Universal', true, 'idle') ON DUPLICATE KEY UPDATE is_running=true, worker_stage='idle', worker_type='Universal'",
-                               host, worker_id);
-            monitor_db.execute("UPDATE judge_node_config SET load_factor=load_factor+1 WHERE host=?",
-                               host);
-            break;
-        case worker_state::JUDGING:
-            monitor_db.execute("UPDATE judge_worker_status SET worker_stage='judging' WHERE host=? AND worker_id=?",
-                               host, worker_id);
-            monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number+1 WHERE host=?",
-                               host);
-            break;
-        case worker_state::IDLE:
-            monitor_db.execute("UPDATE judge_worker_status SET worker_stage='idle' WHERE host=? AND worker_id=?",
-                               host, worker_id);
-            monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number-1 WHERE host=?",
-                               host);
-            break;
-        case worker_state::STOPPED:
-            monitor_db.execute("UPDATE judge_worker_status SET is_running=false, worker_stage='down' WHERE host=? AND worker_id=?",
-                               host, worker_id);
-            monitor_db.execute("UPDATE judge_node_config SET load_factor=load_factor-1 WHERE host=?",
-                               host);
-            break;
-        case worker_state::CRASHED:
-            monitor_db.execute("UPDATE judge_worker_status SET is_running=false, worker_stage='crashed' WHERE host=? AND worker_id=?",
-                               host, worker_id);
-            monitor_db.execute("UPDATE judge_node_config SET thread_number=thread_number-1, load_factor=load_factor-1 WHERE host=?",
-                               host);
-            break;
     }
 }
 

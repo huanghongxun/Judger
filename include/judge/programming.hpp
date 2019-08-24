@@ -165,6 +165,12 @@ struct judge_task {
      * @brief 运行命令，传递给选手程序使用
      */
     std::vector<std::string> run_args;
+
+    /**
+     * @brief 该评测点的显示名称
+     * 用于监控系统查看
+     */
+    std::string name;
 };
 
 struct judge_task_result {

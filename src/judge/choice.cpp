@@ -36,7 +36,8 @@ bool choice_judger::distribute(concurrent_queue<message::client_task> &task_queu
     // 或者我们在 verify 的时候就评测完选择题然后返回 false 也行。
     judge::message::client_task client_task = {
         .submit = &submit,
-        .id = 0};
+        .id = 0,
+        .name = "Choice"};
     task_queue.push(client_task);
     return true;
 }

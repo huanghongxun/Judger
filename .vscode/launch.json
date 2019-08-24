@@ -134,23 +134,25 @@
             "request": "launch",
             "program": "${workspaceFolder}/bin/judge-system",
             "args": [
-                "--enable=/home/matrix6/config-forth-dev.json",
-                "--worker=1",
-                "--exec-dir=${workspaceFolder}/exec",
-                "--cache-dir=/tmp",
-                "--run-dir=/tmp",
-                "--log-dir=/tmp",
-                "--chroot-dir=/chroot",
-                "--cache-random-data=100",
-                "--run-user=domjudge-run",
-                "--run-group=domjudge-run",
-                "--debug"
+                "--enable-3=/home/matrix6/config-moj.json",
+                "--auto-workers",
+                "--cores=1"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/",
             "environment": [
                 { "name": "GLOG_alsologtostderr", "value": "1"},
-                { "name": "GLOG_colorlogtostderr", "value": "1"}
+                { "name": "GLOG_colorlogtostderr", "value": "1"},
+                { "name": "CACHEDIR", "value": "/tmp"},
+                { "name": "RUNDIR", "value": "/tmp"},
+                { "name": "CHROOTDIR", "value": "/chroot"},
+                { "name": "CACHERANDOMDATA", "value": "100"},
+                { "name": "RUNUSER", "value": "domjudge-run"},
+                { "name": "RUNGROUP", "value": "domjudge-run"},
+                { "name": "DEBUG", "value": "1"},
+                { "name": "ELASTIC_APM_SERVICE_NAME", "value": "judge-system"},
+                { "name": "ELASTIC_APM_SERVER_URL", "value": "http://192.168.1.113:31000"},
+                { "name": "ELASTIC_APM_ENVIRONMENT", "value": "test" }
             ],
             "externalConsole": false,
             "MIMode": "gdb",

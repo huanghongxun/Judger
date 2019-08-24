@@ -76,7 +76,11 @@
         "cfenv": "cpp",
         "scoped_allocator": "cpp",
         "cuchar": "cpp",
-        "shared_mutex": "cpp"
+        "shared_mutex": "cpp",
+        "algorithm": "cpp",
+        "iterator": "cpp",
+        "memory_resource": "cpp",
+        "random": "cpp"
     },
     "cmake.configureOnOpen": false,
     "python.pythonPath": "/usr/bin/python3"

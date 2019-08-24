@@ -229,6 +229,15 @@ sudo bash Judger/exec/chroot_run.sh -d /chroot
 ```
 的方式进入 chroot 环境。
 
+8. 设置环境变量
+如果你部署了 Elasticsearch 和 Kibana，那么你可以通过添加环境变量以允许评测系统向 APM 上报评测状态：
+```bash
+ELASTIC_APM_SERVICE_NAME="judge-system"
+ELASTIC_APM_SERVER_URL="http://localhost:8200"
+ELASTIC_APM_ENVIRONMENT="production"
+ELASTIC_APM_SECRET_TOKEN=<your token>
+```
+
 ## 调试
 
 ### 配置调试环境
