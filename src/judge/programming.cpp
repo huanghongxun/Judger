@@ -440,7 +440,8 @@ bool programming_judger::distribute(concurrent_queue<message::client_task> &task
             judge::message::client_task client_task = {
                 .submit = &submit,
                 .id = i,
-                .name = sub.judge_tasks[i].name};
+                .name = sub.judge_tasks[i].name,
+                .cores = sub.judge_tasks[i].cores};
             task_queue.push(client_task);
         }
     }
@@ -509,7 +510,8 @@ void process(const programming_judger &judger, concurrent_queue<message::client_
                 judge::message::client_task client_task = {
                     .submit = &submit,
                     .id = i,
-                    .name = kase.name};
+                    .name = kase.name,
+                    .cores = kase.cores};
                 testcase_queue.push(client_task);
             } else {
                 judge_task_result next_result = result;
@@ -554,7 +556,7 @@ void programming_judger::judge(const message::client_task &client_task, concurre
 
     auto end = chrono::system_clock::now();
 
-    lock_guard<mutex> guard(submit->mut);
+    scoped_lock guard(submit->mut);
     process(*this, task_queue, *submit, result, end - begin);
 }
 

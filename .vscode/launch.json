@@ -135,7 +135,6 @@
             "program": "${workspaceFolder}/bin/judge-system",
             "args": [
                 "--enable-3=/home/matrix6/config-moj.json",
-                "--auto-workers",
                 "--cores=1"
             ],
             "stopAtEntry": false,

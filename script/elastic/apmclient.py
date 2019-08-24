@@ -11,7 +11,6 @@ def start_submission():
     :returns 该提交对应的上下文对象，需要传递给其他的函数使用
     """
     ctx = contextvars.copy_context()
-    print(os.environ)
     def do_submission():
         return client.begin_transaction('Submission')
     ctx.run(do_submission)
@@ -28,7 +27,6 @@ def start_judge_task(ctx, name):
     def make_span():
         span = elasticapm.capture_span(name, leaf=True)
         span.__enter__()
-        print(span)
         return span
     return ctx.run(make_span)
 
@@ -40,7 +38,6 @@ def end_judge_task(ctx, span):
     :param span: 该评测子任务对应的 span 对象，由 start_judge_task 函数生成
     """
     def do_span():
-        print(span)
         span.__exit__(None, None, None)
     return ctx.run(do_span)
 

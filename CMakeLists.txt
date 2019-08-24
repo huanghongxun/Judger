@@ -25,7 +25,7 @@ option(BUILD_ENTRY "Build the Judge System main entry" OFF)
 ################################################################################
 find_package(Threads REQUIRED)
 find_package(PythonLibs 3.6 REQUIRED)
-find_package(Boost 1.65 REQUIRED COMPONENTS program_options python3)
+find_package(Boost 1.65 REQUIRED COMPONENTS program_options thread python3)
 
 # header directories
 ################################################################################

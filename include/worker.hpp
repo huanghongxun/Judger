@@ -53,14 +53,16 @@ void register_monitor(std::unique_ptr<monitor> &&monitor);
  * 注意评测服务端客户端收发消息直接通过发送指针实现，因此 worker 不能通过 fork
  * 生成。
  * 
- * @param set worker 运行的 cpuset（和 execcpuset 一致）
- * @param execcpuset 选手程序运行的 cpuset
+ * @param core_id worker 运行的 CPU 核心
  * @param task_queue 评测服务端发送评测信息的队列
+ * @param core_queue 核心申请队列，对于多核编程题，获取到提交的 worker 将发送核心获取申请，
+ * 其他 worker 发现申请后将当前 CPU 分配给之前申请的 worker，并阻塞当前 worker 的处理直到
+ * 该多核提交评测完成为止。
  * @return 产生的线程
  * 
  * 选手代码、测试数据、随机数据生成器、标准程序、SPJ 等资源的
  * 下载均由客户端完成。服务端只完成提交的拉取和数据点的分发。
  */
-std::thread start_worker(int worker_id, const cpu_set_t &set, const std::string &execcpuset, concurrent_queue<message::client_task> &task_queue);
+std::thread start_worker(size_t core_id, concurrent_queue<message::client_task> &task_queue, concurrent_queue<message::core_request> &core_queue);
 
 }  // namespace judge

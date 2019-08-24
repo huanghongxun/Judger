@@ -171,6 +171,11 @@ struct judge_task {
      * 用于监控系统查看
      */
     std::string name;
+
+    /**
+     * @brief 该评测点所需要的核心数
+     */
+    size_t cores = 1;
 };
 
 struct judge_task_result {

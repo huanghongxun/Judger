@@ -37,7 +37,8 @@ bool choice_judger::distribute(concurrent_queue<message::client_task> &task_queu
     judge::message::client_task client_task = {
         .submit = &submit,
         .id = 0,
-        .name = "Choice"};
+        .name = "Choice",
+        .cores = 1};
     task_queue.push(client_task);
     return true;
 }

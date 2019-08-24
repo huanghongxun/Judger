@@ -1,6 +1,7 @@
 #include "worker.hpp"
 #include <Python.h>
 #include <glog/logging.h>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/stacktrace.hpp>
 #include <functional>
@@ -50,7 +51,7 @@ vector<unique_ptr<submission>> finished_submissions;
  * @brief 提交结束，要求释放 submission 所占内存
  */
 static void finish_submission(submission &submit) {
-    lock_guard<mutex> guard(server_mutex);
+    scoped_lock guard(server_mutex);
     unsigned judge_id = submit.judge_id;
     finished_submissions.push_back(move(submissions.at(judge_id)));
     submissions.erase(judge_id);
@@ -120,7 +121,7 @@ static bool fetch_submission_nolock(concurrent_queue<message::client_task> &task
  * 限制拉取提交的总数
  */
 static bool fetch_submission(concurrent_queue<message::client_task> &task_queue) {
-    lock_guard<mutex> guard(server_mutex);
+    scoped_lock guard(server_mutex);
     return fetch_submission_nolock(task_queue);
 }
 
@@ -128,7 +129,7 @@ static bool fetch_submission(concurrent_queue<message::client_task> &task_queue)
  * @brief 评测客户端程序函数
  * 评测客户端负责从消息队列中获取评测服务端要求评测的数据点，
  * 数据点信息包括时间限制、测试数据、选手代码等信息。
- * @param execcpuset 选手程序运行的 cpuset
+ * @param core_id 当前 worker 占有的 CPU id
  * @param task_queue 评测服务端发送评测信息的队列
  * 
  * 选手代码、测试数据、随机数据生成器、标准程序、SPJ 等资源的
@@ -138,11 +139,24 @@ static bool fetch_submission(concurrent_queue<message::client_task> &task_queue)
  * 对于需要进行缓存的文件：
  *     CACHE_DIR
  */
-static void worker_loop(int worker_id, const string &execcpuset, concurrent_queue<message::client_task> &task_queue) {
-    call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::START, ""); });
+static void worker_loop(size_t core_id, concurrent_queue<message::client_task> &task_queue, concurrent_queue<message::core_request> &core_queue) {
+    call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::START, ""); });
 
     while (true) {
         try {
+            message::core_request core_request;
+            if (core_queue.try_pop(core_request)) {
+                {
+                    scoped_lock lock(*core_request.write_lock);
+                    core_request.core_ids->push_back(core_id);
+                    core_request.lock->count_down();
+                }
+                {
+                    unique_lock lock(*core_request.mut);
+                    core_request.cv->wait(lock);
+                }
+            }
+
             // 从队列中读取评测信息
             message::client_task client_task;
             {
@@ -161,16 +175,34 @@ static void worker_loop(int worker_id, const string &execcpuset, concurrent_queu
                 }
             }
 
-            call_monitor(worker_id, [&](monitor &m) { m.start_judge_task(worker_id, client_task); });
+            call_monitor(core_id, [&](monitor &m) { m.start_judge_task(core_id, client_task); });
             defer {
                 // 使用 defer 是希望即使评测崩溃也可以发送 end_judge_task 避免监控爆炸
-                call_monitor(worker_id, [&](monitor &m) { m.end_judge_task(worker_id, client_task); });
+                call_monitor(core_id, [&](monitor &m) { m.end_judge_task(core_id, client_task); });
             };
-            call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::JUDGING, ""); });
+            call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::JUDGING, ""); });
 
             try {
                 judger &j = get_judger_by_type(client_task.submit->sub_type);
-                j.judge(client_task, task_queue, execcpuset);
+                vector<size_t> cpus = {core_id};
+                if (client_task.cores > 1 /* TODO: check if cores <= workers */) {
+                    message::core_request request;
+                    boost::latch latch(client_task.cores - 1);
+                    std::mutex write_lock, mut;
+                    std::condition_variable cv;
+                    request.core_ids = &cpus;
+                    request.lock = &latch;
+                    request.write_lock = &write_lock;
+                    request.cv = &cv;
+                    request.mut = &mut;
+
+                    for (size_t i = 1; i < client_task.cores; ++i)
+                        core_queue.push(request);
+                    latch.wait();
+                }
+                vector<string> execcpuset;
+                for (size_t i : cpus) execcpuset.push_back(to_string(i));
+                j.judge(client_task, task_queue, boost::algorithm::join(execcpuset, ","));
             } catch (...) {
                 // 崩溃后必须停止 submit 的监控
                 client_task.submit->result = "System Error: " + boost::current_exception_diagnostic_information();
@@ -178,30 +210,33 @@ static void worker_loop(int worker_id, const string &execcpuset, concurrent_queu
                 throw;
             }
 
-            call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::IDLE, ""); });
+            call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::IDLE, ""); });
         } catch (judge_exception &ex) {
-            LOG(ERROR) << "Worker " << worker_id << " has crashed, " << ex;
-            call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::CRASHED, boost::lexical_cast<string>(ex)); });
+            LOG(ERROR) << "Worker " << core_id << " has crashed, " << ex;
+            call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::CRASHED, boost::lexical_cast<string>(ex)); });
         } catch (...) {
-            LOG(ERROR) << "Worker " << worker_id << " has crashed, " << boost::current_exception_diagnostic_information();
-            call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::CRASHED, boost::lexical_cast<string>(boost::current_exception_diagnostic_information())); });
+            LOG(ERROR) << "Worker " << core_id << " has crashed, " << boost::current_exception_diagnostic_information();
+            call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::CRASHED, boost::lexical_cast<string>(boost::current_exception_diagnostic_information())); });
         }
 
-        lock_guard<mutex> guard(server_mutex);
+        scoped_lock guard(server_mutex);
         for (auto &submit : finished_submissions)
             call_monitor(0, [&](monitor &m) { m.end_submission(*submit); });
         finished_submissions.clear();
     }
 
-    call_monitor(worker_id, [&](monitor &m) { m.worker_state_changed(worker_id, worker_state::STOPPED, ""); });
+    call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::STOPPED, ""); });
 }
 
-thread start_worker(int worker_id, const cpu_set_t &set, const string &execcpuset, concurrent_queue<message::client_task> &task_queue) {
-    thread thd([worker_id, execcpuset, &task_queue] {
-        worker_loop(worker_id, execcpuset, task_queue);
+thread start_worker(size_t core_id, concurrent_queue<message::client_task> &task_queue, concurrent_queue<message::core_request> &core_queue) {
+    thread thd([core_id, &task_queue, &core_queue] {
+        worker_loop(core_id, task_queue, core_queue);
     });
 
     // 设置当前线程（客户端线程）的 CPU 亲和性，要求操作系统将 thd 线程放在指定的 cpuset 上运行
+    cpu_set_t set;
+    CPU_ZERO(&set);
+    CPU_SET(core_id, &set);
     int ret = pthread_setaffinity_np(thd.native_handle(), sizeof(cpu_set_t), &set);
     if (ret < 0) throw std::system_error();
 

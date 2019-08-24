@@ -16,10 +16,10 @@
 #include "common/utils.hpp"
 #include "config.hpp"
 #include "env.hpp"
-#include "monitor/elastic_apm.hpp"
 #include "judge/choice.hpp"
 #include "judge/program_output.hpp"
 #include "judge/programming.hpp"
+#include "monitor/elastic_apm.hpp"
 #include "server/forth/forth.hpp"
 #include "server/mcourse/mcourse.hpp"
 #include "server/moj/moj.hpp"
@@ -28,7 +28,7 @@
 using namespace std;
 
 judge::concurrent_queue<judge::message::client_task> testcase_queue;
-set<int> worker_pid;
+judge::concurrent_queue<judge::message::core_request> core_acq_queue;
 
 struct cpuset {
     string literal;
@@ -113,8 +113,6 @@ int main(int argc, char* argv[]) {
 
     judge::put_error_codes();
 
-    unsigned cpus = std::thread::hardware_concurrency();
-
     namespace po = boost::program_options;
     po::options_description desc("judge-system options");
     po::variables_map vm;
@@ -125,10 +123,7 @@ int main(int argc, char* argv[]) {
         ("enable",   po::value<vector<string>>(), "run Matrix Judge System 4.0 submission fetcher, with configuration file path.")
         ("enable-3", po::value<vector<string>>(), "run Matrix Judge System 3.0 submission fetcher, with configuration file path.")
         ("enable-2", po::value<vector<string>>(), "run Matrix Judge System 2.0 submission fetcher, with configuration file path.")
-        ("workers", po::value<unsigned>(), "set number of single thread judge workers to be kept")
-        ("worker", po::value<vector<cpuset>>(), "run a judge worker which cpuset is given")
-        ("cores", po::value<unsigned>()->required(), "tell the judge-system that how many physical core are there")
-        ("auto-workers", "start workers with number of hardware concurrency")
+        ("cores", po::value<cpuset>()->required(), "set the cores the judge-system can make use of")
         ("exec-dir", po::value<string>(), "set the default predefined executables for falling back. You can either pass it from environ EXECDIR")
         ("script-dir", po::value<string>(), "set the directory with required scripts stored. You can either pass it from environ SCRIPTDIR")
         ("cache-dir", po::value<string>(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables. You can either pass it from environ CACHEDIR")
@@ -183,15 +178,6 @@ int main(int argc, char* argv[]) {
     if (getuid() != 0) {
         cerr << "You should run this program in privileged mode" << endl;
         if (!judge::DEBUG) return EXIT_FAILURE;
-    }
-
-    if (vm.count("cores")) {
-        unsigned cores = vm.at("cores").as<unsigned>();
-        if (cores > cpus) {
-            cerr << "Manually declared number of physical processors cannot be larger than logical processors" << endl;
-            return EXIT_FAILURE;
-        }
-        cpus = cores;
     }
 
     if (vm.count("exec-dir")) {
@@ -355,60 +341,13 @@ int main(int argc, char* argv[]) {
 
     judge::register_monitor(make_unique<judge::elastic>(judge::SCRIPT_DIR / "elastic"));
 
-    set<unsigned> cores;
     vector<thread> worker_threads;
-    size_t worker_id = 0;
 
-    if (vm.count("auto-workers")) {
-        // 对于自动设置客户端的情况，我们为每个 CPU 都生成一个 worker
-        cpu_set_t cpuset;
-        for (unsigned i = 0; i < cpus; ++i) {
-            CPU_ZERO(&cpuset);
-            CPU_SET(i, &cpuset);
-            worker_threads.push_back(move(judge::start_worker(worker_id++, cpuset, to_string(i), testcase_queue)));
-        }
-    } else {
-        // 对于手动设置客户端的情况，我们记录可以使用的核心
-        for (unsigned i = 0; i < cpus; ++i) {
-            cores.insert(i);
-        }
-    }
-
-    if (vm.count("worker")) {
-        auto workers = vm.at("worker").as<vector<cpuset>>();
-        for (auto& worker : workers) {
-            cpu_set_t cpuset;
-            CPU_ZERO(&cpuset);
-
-            for (unsigned id : worker.ids) {
-                auto it = cores.find(id);
-                if (it == cores.end()) {
-                    cerr << "Cpuset must be disjoint" << endl;
-                    return EXIT_FAILURE;
-                } else {
-                    cores.erase(it);
-                }
-                CPU_SET(id, &cpuset);
-            }
-
-            worker_threads.push_back(move(judge::start_worker(worker_id++, cpuset, worker.literal, testcase_queue)));
-        }
-    }
-
-    if (vm.count("workers")) {
-        auto workers = vm.at("workers").as<unsigned>();
-        if (cores.size() < workers) {
-            cerr << "Not enough cores" << endl;
-            return EXIT_FAILURE;
-        }
-        unsigned i = 0;
-        auto it = cores.begin();
-        for (; i < workers; ++i, ++it) {
-            int cpuid = *it;
-            cpu_set_t cpuset;
-            CPU_ZERO(&cpuset);
-            CPU_SET(cpuid, &cpuset);
-            worker_threads.push_back(move(judge::start_worker(worker_id++, cpuset, to_string(cpuid), testcase_queue)));
+    // 我们为每个注册的 CPU 核心 都生成一个 worker
+    if (vm.count("cores")) {
+        cpuset set = vm["cores"].as<cpuset>();
+        for (unsigned i : set.ids) {
+            worker_threads.push_back(move(judge::start_worker(i, testcase_queue, core_acq_queue)));
         }
     }
 
