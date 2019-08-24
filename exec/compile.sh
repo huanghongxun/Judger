@@ -137,7 +137,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --user "$RUNUSER" \
         --group "$RUNGROUP" \
         --memory-limit "$SCRIPTMEMLIMIT" \
-        --wall-time "$SCRIPTTIMELIMIT" \
+        --cpu-time "$SCRIPTTIMELIMIT" \
         --standard-output-file compile.tmp \
         --standard-error-file compile.tmp \
         --out-meta compile.meta \

@@ -48,12 +48,16 @@ cleanexit ()
 
 
 CPUSET=""
+OPTTIME="--cpu-time"
 CPUSET_OPT=""
 OPTIND=1
 while getopts "n:" opt; do
     case $opt in
         n)
             CPUSET="$OPTARG"
+            ;;
+        w)
+            OPTTIME="--wall-time"
             ;;
         :)
             >&2 echo "Option -$OPTARG requires an argument."
@@ -143,7 +147,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --user "$RUNUSER" \
         --group "$RUNGROUP" \
         --memory-limit "$SCRIPTMEMLIMIT" \
-        --wall-time "$SCRIPTTIMELIMIT" \
+        "$OPTTIME" "$SCRIPTTIMELIMIT" \
         --file-limit "$SCRIPTFILELIMIT" \
         --out-meta random.meta \
         -VONLINE_JUDGE=1 \

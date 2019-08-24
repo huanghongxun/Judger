@@ -53,7 +53,7 @@ for i in "${ASSIST_FILES_SPLITTED[@]}"; do INC+=(-I); INC+=("$WORKDIR/compile/$i
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
     --user "$RUNUSER" \
     --group "$RUNGROUP" \
-    --wall-time "$TIMELIMIT" \
+    "$OPTTIME" "$TIMELIMIT" \
     --standard-error-file program.err \
     --standard-output-file oclint.json \
     --out-meta program.meta -- \

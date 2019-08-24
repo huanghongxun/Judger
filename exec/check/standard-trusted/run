@@ -71,7 +71,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
     --no-core-dumps \
     --user "$RUNUSER" \
     --group "$RUNGROUP" \
-    --wall-time "$TIMELIMIT" \
+    "$OPTTIME" "$TIMELIMIT" \
     --standard-input-file "$TESTIN/testdata.in" \
     --standard-output-file run/testdata.out \
     --standard-error-file program.err \

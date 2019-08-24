@@ -214,11 +214,18 @@ cd ../runguard/build && CC=gcc-8 CXX=g++-8 cmake -DBUILD_ENTRY=ON .. && make
 6. 启动评测系统，评测系统允许通过命令行参数来对核心使用进行控制：
 请务必使用 systemd 部署。
 ```bash
-sudo ./judge-system --enable-sicily=/etc/judge-system/sicily.conf --enable-3=/etc/judge-system/moj.conf --enable-2=/etc/judge-system/mcourse.conf --enable-2=/etc/judge-system/mexam.conf --client=1 --exec-dir=/opt/judge-system/exec --cache-dir=/tmp/judge-system --run-dir=/tmp/judge-system --data-dir=/ramdisk/rundir --chroot-dir=/chroot --log-dir=/var/log/judge-system --cache-random-data=100 --run-user=domjudge-run --run-group=domjudge-run
+export CACHEDIR=/tmp/judge-system
+export RUNDIR=/tmp/judge-system
+export DATADIR=/ramdisk/rundir
+export CHROOTDIR=/chroot
+export CACHERANDOMDATA=100
+export RUNUSER=domjudge-run
+export RUNGROUP=domjudge-run
+sudo ./judge-system --enable-sicily=/etc/judge-system/sicily.conf --enable-3=/etc/judge-system/moj.conf --enable-2=/etc/judge-system/mcourse.conf --enable-2=/etc/judge-system/mexam.conf --cores=0-9
 ```
 
 由于评测系统可以直接通过系统服务部署，你同样可以构建 docker 镜像来一键部署评测系统（虽然我不推荐这么做，这样会使得选手程序的运行效率减慢 20%，降低评测速度），docker 的部署参见 docker/Dockerfile.run。
-为了减轻一台服务器 20 个评测队列一起抢 IO 从而导致评测结果不准确，我们使用内存盘来确保 IO 性能：程序的输入输出的 IO 操作全部在内存中完成，内存的速度显然比磁盘 IO 快，就算这导致了内存带宽的不足，也会比多核心抢 IO 要来的好；其次，选手程序是临时文件，并不需要写入磁盘，这样能减少评测系统对磁盘的消耗。
+为了减轻一台服务器 10 个评测队列一起抢 IO 从而导致评测结果不准确，我们使用内存盘来确保 IO 性能：程序的输入输出的 IO 操作全部在内存中完成，内存的速度显然比磁盘 IO 快，就算这导致了内存带宽的不足，也会比多核心抢 IO 要来的好；其次，选手程序是临时文件，并不需要写入磁盘，这样能减少评测系统对磁盘的消耗。
 
 评测系统必要时也可以运行在配置好的 chroot 环境下以避免 boost 的编译。
 

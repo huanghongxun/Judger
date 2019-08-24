@@ -173,11 +173,16 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
     if (task.file_limit > 0) env["FILELIMIT"] = to_string(task.file_limit);
     if (task.memory_limit > 0) env["MEMLIMIT"] = to_string(task.memory_limit);
     if (task.proc_limit > 0) env["PROCLIMIT"] = to_string(task.proc_limit);
+    
+    optional<string> walltime;
+    if (execcpuset.find(",") != string::npos || execcpuset.find("-") != string::npos)
+        walltime = "-w";
 
     // 调用 check script 来执行真正的评测，这里会调用 run script 运行选手程序，调用 compare script 运行比较器，并返回评测结果
     int ret = call_process_env(env,
                                check_script->get_run_path() / "run",
                                "-n", execcpuset,
+                               walltime,
                                datadir, task.time_limit, CHROOT_DIR, workdir,
                                uuid,
                                run_script->get_run_path(),

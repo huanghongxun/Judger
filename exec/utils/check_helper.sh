@@ -54,11 +54,15 @@ cleanexit ()
 . "$JUDGE_UTILS/runguard.sh" # read_metadata
 
 CPUSET=""
+OPTTIME="--cpu-time"
 OPTINT=1
-while getopts "n:" opt; do
+while getopts "n:w" opt; do
     case $opt in
         n)
             OPTSET="$OPTARG"
+            ;;
+        w)
+            OPTTIME="--wall-time"
             ;;
         :)
             >&2 echo "Option -$OPTARG requires an argument."

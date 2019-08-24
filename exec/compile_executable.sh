@@ -98,7 +98,7 @@ $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         --user "$RUNUSER" \
         --group "$RUNGROUP" \
         --memory-limit $SCRIPTMEMLIMIT \
-        --wall-time $SCRIPTTIMELIMIT \
+        --cpu-time $SCRIPTTIMELIMIT \
         --file-limit $SCRIPTFILELIMIT \
         --out-meta compile.meta \
         -- \

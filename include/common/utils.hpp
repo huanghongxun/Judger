@@ -5,6 +5,7 @@
 #include <boost/lexical_cast.hpp>
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -83,6 +84,14 @@ struct to_string_cont<std::vector<T>> {
     }
 };
 
+template <typename T>
+struct to_string_cont<std::optional<T>> {
+    template <typename ContainerT>
+    static void to_string(ContainerT &cont, const std::optional<T> &vec) {
+        if (vec) cont.push_back(*vec);
+    }
+};
+
 /**
  * @brief 将参数 args 的内容通过 to_string 转换为字符串并装入容器中
  * @param cont 字符串容器
@@ -156,7 +165,6 @@ std::string get_env(const std::string &key, const std::string &def_value);
 void set_env(const std::string &key, const std::string &value, bool replace = true);
 
 struct elapsed_time {
-
     elapsed_time();
 
     template <typename DurationT>
