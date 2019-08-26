@@ -128,5 +128,4 @@ mkdir -m 0777 -p "$RUNDIR"
 
 cd "$RUNDIR"
 
-exec >>system.out
-exec 2>&1
+exec >system.out 2>&1

@@ -37,4 +37,4 @@ export CHROOTDIR="/chroot"
 export CACHERANDOMDATA=100
 export RUNUSER=domjudge-run
 export RUNGROUP=domjudge-run
-"$DIR/bin/judge-system" $MOJ_OPT $MCOURSE_OPT $FORTH_OPT $SICILY_OPT --cores 0-9 --auto-workers "$@"
+"$DIR/bin/judge-system" $MOJ_OPT $MCOURSE_OPT $FORTH_OPT $SICILY_OPT --cores 0-9 "$@"

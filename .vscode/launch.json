@@ -129,12 +129,12 @@
             ]
         },
         {
-            "name": "(gdb) matrix6",
+            "name": "(gdb) matrix3",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/judge-system",
             "args": [
-                "--enable-3=/home/matrix6/config-moj.json",
+                "--enable-2=/home/matrix3/config/mcourse-dev.json",
                 "--cores=1"
             ],
             "stopAtEntry": false,
@@ -150,7 +150,7 @@
                 { "name": "RUNGROUP", "value": "domjudge-run"},
                 { "name": "DEBUG", "value": "1"},
                 { "name": "ELASTIC_APM_SERVICE_NAME", "value": "judge-system"},
-                { "name": "ELASTIC_APM_SERVER_URL", "value": "http://192.168.1.113:31000"},
+                { "name": "ELASTIC_APM_SERVER_URL", "value": "http://localhost:31000"},
                 { "name": "ELASTIC_APM_ENVIRONMENT", "value": "test" }
             ],
             "externalConsole": false,

@@ -1,5 +1,6 @@
 #include "common/status.hpp"
 #include <boost/assign.hpp>
+#include <unordered_map>
 
 namespace judge {
 using namespace std;

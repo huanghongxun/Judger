@@ -585,7 +585,7 @@ bool configuration::fetch_submission(unique_ptr<submission> &submit) {
 void configuration::summarize_invalid(submission &submit) {
     BOOST_THROW_EXCEPTION(judge_exception() << "Invalid submission " << submit);
 }
- 
+
 static json get_error_report(const judge_task_result &result) {
     error_report report;
     report.message = "SystemError: " + result.error_log;
@@ -735,7 +735,7 @@ static bool summarize_static_check(boost::rational<int> &total_score, programmin
                 static_check.report = json::parse(task_result.report);
             } catch (std::exception &e) {  // 非法 json 文件
                 task_result.status = status::SYSTEM_ERROR;
-                static_check.report = task_result.error_log = boost::diagnostic_information(e) + "\n" + task_result.report;
+                static_check.report = task_result.error_log = task_result.error_log + "\n" + boost::diagnostic_information(e) + "\n" + task_result.report;
             }
 
             static_check.cont = true;
@@ -791,7 +791,7 @@ static bool summarize_memory_check(boost::rational<int> &total_score, programmin
                 try {
                     kase.valgrindoutput = json::parse(task_result.report);
                 } catch (std::exception &e) {  // 非法 json 文件
-                    kase.message = boost::diagnostic_information(e) + "\n" + task_result.report;
+                    kase.message = task_result.error_log + "\n" + boost::diagnostic_information(e) + "\n" + task_result.report;
                 }
                 kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
                 memory_check.report.push_back(kase);

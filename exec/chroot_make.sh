@@ -309,7 +309,7 @@ chroot "$CHROOTDIR" /bin/sh -c "cd /usr/src/gtest && cmake . && make && cp *.a /
 #chroot "$CHROOTDIR" /bin/sh -c "curl -fsS https://dlang.org/install.sh | bash -s dmd"
 
 # Install testlib
-wget "https://github.com/MikeMirzayanov/testlib/blob/master/testlib.h" -P "$CHROOTDIR/usr/include"
+#wget "https://raw.githubusercontent.com/MikeMirzayanov/testlib/master/testlib.h" -P "$CHROOTDIR/usr/include"
 
 # Install oclint
 #wget "https://github.com/oclint/oclint/releases/download/v0.13.1/oclint-0.13.1-x86_64-linux-4.4.0-112-generic.tar.gz" -P "$CHROOTDIR/tmp"

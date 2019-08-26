@@ -87,6 +87,7 @@ if (BUILD_UNIT_TEST)
     cpp_redis
     boost_stacktrace_addr2line
     dl
+    stdc++fs
     ${Boost_LIBRARIES}
     ${PYTHON_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
@@ -126,6 +127,7 @@ if (BUILD_ENTRY)
     cpp_redis
     boost_stacktrace_addr2line
     dl
+    stdc++fs
     ${Boost_LIBRARIES}
     ${PYTHON_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}

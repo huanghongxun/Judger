@@ -57,7 +57,9 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
     --standard-error-file program.err \
     --standard-output-file oclint.json \
     --out-meta program.meta -- \
-    oclint "${SRC[@]}" --report-type=json -- -c -std=c++2a "${INC[@]}"
+    oclint "${SRC[@]}" --report-type=json --disable-rule=ShortVariableName -- -c "${INC[@]}"
+
+chmod 555 oclint.json
 
 # RUNDIR 还剩下 program.meta, program.err, system.out 供评测客户端检查
 # RUNDIR 由评测客户端删除

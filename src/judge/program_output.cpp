@@ -56,6 +56,7 @@ bool program_output_judger::distribute(concurrent_queue<message::client_task> &t
     judge::message::client_task client_task = {
         .submit = &submit,
         .id = 0,
+        .name = "ProgramOutput",
         .cores = 1};
     task_queue.push(client_task);
     return true;

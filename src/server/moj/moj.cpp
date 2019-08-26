@@ -749,7 +749,7 @@ static bool summarize_static_check(boost::rational<int> &total_score, programmin
                     oclint_violations.push_back(report.at("violation"));
             } catch (std::exception &e) {  // 非法 json 文件
                 task_result.status = status::SYSTEM_ERROR;
-                task_result.error_log = boost::diagnostic_information(e);
+                task_result.error_log = task_result.error_log + "\n" + boost::diagnostic_information(e);
                 static_check_json = get_error_report(task_result);
             }
 
@@ -808,7 +808,7 @@ static bool summarize_memory_check(boost::rational<int> &total_score, programmin
                 try {
                     kase.valgrindoutput = json::parse(task_result.report).at("error");
                 } catch (std::exception &e) {  // 非法 json 文件
-                    kase.message = boost::diagnostic_information(e) + "\n" + task_result.report;
+                    kase.message = task_result.error_log + "\n" + boost::diagnostic_information(e) + "\n" + task_result.report;
                 }
                 kase.stdin = read_file_content(task_result.data_dir / "input" / "testdata.in");
                 memory_check.report.push_back(kase);
