@@ -638,7 +638,8 @@ static bool summarize_random_check(boost::rational<int> &total_score, programmin
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == RANDOM_CHECK_TYPE) {
-            if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
+            if (task_result.status == status::PENDING) return false;
+            if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
             if (task_result.status == status::ACCEPTED) {
@@ -677,7 +678,8 @@ static bool summarize_standard_check(boost::rational<int> &total_score, programm
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == STANDARD_CHECK_TYPE) {
-            if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
+            if (task_result.status == status::PENDING) return false;
+            if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
             if (task_result.status == status::ACCEPTED) {
@@ -728,7 +730,8 @@ static bool summarize_static_check(boost::rational<int> &total_score, programmin
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == STATIC_CHECK_TYPE) {
-            if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
+            if (task_result.status == status::PENDING) return false;
+            if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
             try {
@@ -781,7 +784,8 @@ static bool summarize_memory_check(boost::rational<int> &total_score, programmin
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == MEMORY_CHECK_TYPE) {
             full_score += submit.judge_tasks[i].score;
-            if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
+            if (task_result.status == status::PENDING) return false;
+            if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
             if (task_result.status == status::ACCEPTED) {
@@ -822,7 +826,8 @@ static bool summarize_gtest_check(boost::rational<int> &total_score, programming
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
         if (submit.judge_tasks[i].check_type == GTEST_CHECK_TYPE) {
-            if (task_result.status == status::PENDING || task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
+            if (task_result.status == status::PENDING) return false;
+            if (task_result.status == status::DEPENDENCY_NOT_SATISFIED) continue;
             exists = true;
 
             score = submit.judge_tasks[i].score;

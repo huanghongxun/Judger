@@ -537,7 +537,8 @@ void process(const programming_judger &judger, concurrent_queue<message::client_
         LOG(ERROR) << "Test case exceeded [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "]";
         return;  // 跳过本次评测过程
     } else {
-        // TODO: 发送 incomplete 的评测报告
+        // 发送中途的评测报告
+        summarize(submit);
     }
 }
 
