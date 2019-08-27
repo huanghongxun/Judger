@@ -6,6 +6,7 @@
 #include <boost/lexical_cast.hpp>
 #include <fstream>
 #include "common/io_utils.hpp"
+#include "common/json_utils.hpp"
 #include "common/messages.hpp"
 #include "common/stl_utils.hpp"
 #include "common/utils.hpp"
@@ -822,6 +823,8 @@ static bool summarize_gtest_check(boost::rational<int> &total_score, programming
     gtest_check_report gtest_check;
     boost::rational<int> score;
     json config = any_cast<json>(submit.config);
+    if (!nlohmann::exists(config, "google tests info"))
+        return false;
     gtest_check.info = config.at("google tests info");
     for (size_t i = 0; i < submit.results.size(); ++i) {
         auto &task_result = submit.results[i];
