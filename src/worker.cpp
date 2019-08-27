@@ -186,7 +186,7 @@ static void worker_loop(size_t core_id, concurrent_queue<message::client_task> &
             };
             call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::JUDGING, ""); });
 
-            try {
+            {
                 judger &j = get_judger_by_type(client_task.submit->sub_type);
                 vector<size_t> cpus = {core_id};
                 if (client_task.cores > 1 /* TODO: check if cores <= workers */) {
@@ -207,11 +207,6 @@ static void worker_loop(size_t core_id, concurrent_queue<message::client_task> &
                 vector<string> execcpuset;
                 for (size_t i : cpus) execcpuset.push_back(to_string(i));
                 j.judge(client_task, task_queue, boost::algorithm::join(execcpuset, ","));
-            } catch (...) {
-                // 崩溃后必须停止 submit 的监控
-                client_task.submit->result = "System Error: " + boost::current_exception_diagnostic_information();
-                finish_submission(*client_task.submit);
-                throw;
             }
 
             call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::IDLE, ""); });

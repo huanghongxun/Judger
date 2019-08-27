@@ -941,7 +941,7 @@ void summarize_programming(configuration &server, programming_submission &submit
 
     report.grade = (int)round(boost::rational_cast<double>(total_score));
 
-    if (report_to_server(server, report.is_complete, report))
+    if (report_to_server(server, report.is_complete, report) && report.is_complete)
         server.programming_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.envelope));
 
     // DLOG(INFO) << "MOJ submission report: " << report_json.dump(4);
@@ -970,7 +970,7 @@ void summarize_choice(configuration &server, choice_submission &submit) {
                      {"full_grade", full_grade},
                      {"report", grades}};
 
-    if (report_to_server(server, report.is_complete, report))
+    if (report_to_server(server, report.is_complete, report) && report.is_complete)
         server.choice_fetcher->ack(any_cast<AmqpClient::Envelope::ptr_t>(submit.envelope));
 
     // DLOG(INFO) << "Matrix Course submission report: " << report_json.dump(4);
