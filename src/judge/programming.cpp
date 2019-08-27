@@ -538,7 +538,7 @@ void process(const programming_judger &judger, concurrent_queue<message::client_
         return;  // 跳过本次评测过程
     } else {
         // 发送中途的评测报告
-        summarize(submit);
+        submit.judge_server->summarize(submit);
     }
 }
 
