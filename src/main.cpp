@@ -354,6 +354,5 @@ int main(int argc, char* argv[]) {
     for (auto& th : worker_threads)
         th.join();
 
-    Py_Finalize();
     return 0;
 }
