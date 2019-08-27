@@ -263,10 +263,12 @@ void from_json_programming(const json &config, const json &detail, judge_request
         random_test_times = get_value<int>(random_json, "run_times");
 
         string compile_command;
-        if (random_json.count("complie_command"))
+        if (exists(random_json, "complie_command"))
             compile_command = random_json.at("complie_command").get<string>();
-        else
+        else if (exists(random_json, "compile_command"))
             compile_command = random_json.at("compile_command").get<string>();
+        else
+            compile_command = "cpp";
 
         if (boost::algorithm::starts_with(compile_command, "gcc") ||
             boost::algorithm::starts_with(compile_command, "g++") ||
@@ -558,12 +560,7 @@ static void from_json_mcourse(AmqpClient::Envelope::ptr_t envelope, const json &
         // 标记当前 submission 正在评测
         server.matrix_db.execute("UPDATE submission SET grade=-1 WHERE sub_id=?", request.sub_id);
     } catch (exception &e) {
-        judge_report report;
-        report.sub_id = to_string(request.sub_id);
-        report.prob_id = to_string(request.prob_id);
-        report.grade = 0;
-        report.report = "Invalid submission";
-        report_to_server(server, true, report);
+        LOG(WARNING) << "Submission [" << request.prob_id << "-" << request.sub_id << "] is not valid";
         throw;
     }
 }
