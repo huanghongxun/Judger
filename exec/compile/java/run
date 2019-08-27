@@ -7,10 +7,14 @@ DEST="$1"; shift
 MAINSOURCE="$1"
 
 if [ -z "$ENTRY_POINT" ]; then
-    MAINCLASS="Main"
+    MAINCLASS="Main.java"
 else
     MAINCLASS="$ENTRY_POINT"
 fi
+
+# 将类似 java/lang/String.java 转换为 java.lang.String
+MAINCLASS=${MAINCLASS%.*}
+MAINCLASS=${MAINCLASS//\//.}
 
 javac -encoding UTF-8 -sourcepath . -d . "$@"
 EXITCODE=$?

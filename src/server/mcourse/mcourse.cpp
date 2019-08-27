@@ -203,6 +203,11 @@ void from_json_programming(const json &config, const json &detail, judge_request
         submission->language = standard->language;
     }
 
+    if (exists(config, "entry_point")) {
+        string entry_point = get_value<string>(config, "entry_point");
+        submission->entry_point = standard->entry_point = entry_point;
+    }
+
     int memory_limit = get_value<int>(config, "limits", "memory") << 10;
     double time_limit = get_value<int>(config, "limits", "time") / 1000;
     int proc_limit = -1;
@@ -276,6 +281,9 @@ void from_json_programming(const json &config, const json &detail, judge_request
             random_ptr->language = "cpp";
         else
             random_ptr->language = compile_command;
+
+        if (exists(random_json, "entry_point"))
+            random_ptr->entry_point = get_value<string>(random_json, "entry_point");
 
         if (standard_json.count("random_source")) {
             auto src_url = standard_json.at("random_source").get<vector<string>>();
@@ -561,6 +569,15 @@ static void from_json_mcourse(AmqpClient::Envelope::ptr_t envelope, const json &
         server.matrix_db.execute("UPDATE submission SET grade=-1 WHERE sub_id=?", request.sub_id);
     } catch (exception &e) {
         LOG(WARNING) << "Submission [" << request.prob_id << "-" << request.sub_id << "] is not valid";
+        judge_report report;
+        report.sub_id = to_string(request.sub_id);
+        report.prob_id = to_string(request.prob_id);
+        report.grade = 0;
+        report.report = {{"compile check",
+                          {{"continue", false},
+                           {"grade", 0},
+                           {"compile check", "Invalid Submission"}}}};
+        report_to_server(server, true, report);
         throw;
     }
 }
