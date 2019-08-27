@@ -67,6 +67,7 @@ int main(int argc, const char* argv[]) {
         ("file-limit,f", po::value<size_t>(), "set maximum created file size of the command in KB")
         ("nproc,p", po::value<size_t>(), "set maximum process living simutanously")
         ("cpuset,P", po::value<string>(), "set the processor IDs that can only be used (e.g. \"0,2-3\")")
+        ("ptrace", "enable ptrace for protection instead of unshare")
         ("no-core-dumps,c", "disable core dumps")
         ("standard-input-file,i", po::value<string>(), "redirect command standard input fd to file")
         ("standard-output-file,o", po::value<string>(), "redirect command standard output fd to file")
@@ -150,6 +151,7 @@ int main(int argc, const char* argv[]) {
     if (vm.count("file-limit")) opt.file_limit = vm["file-limit"].as<size_t>();
     if (vm.count("nproc")) opt.nproc = vm["nproc"].as<size_t>();
     if (vm.count("no-core-dumps")) opt.no_core_dumps = true;
+    if (vm.count("ptrace")) opt.use_ptrace = true;
     if (vm.count("cpuset")) opt.cpuset = vm["cpuset"].as<string>();
     if (vm.count("standard-input-file")) opt.stdin_filename = vm["standard-input-file"].as<string>();
     if (vm.count("standard-output-file")) opt.stdout_filename = vm["standard-output-file"].as<string>();

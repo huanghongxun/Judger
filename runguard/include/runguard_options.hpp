@@ -27,6 +27,14 @@ struct runguard_options {
     int stream_size = -1;
     bool no_core_dumps = false;
 
+    /**
+     * Use ptrace or unshare.
+     * Using ptrace results in faster initialization and worse performance.
+     * Using unshare in contrast.
+     * If you are running apps with time limitation less than 10s, use ptrace.
+     */
+    bool use_ptrace = false;
+
     std::string stdin_filename;
     std::string stdout_filename;
     std::string stderr_filename;
