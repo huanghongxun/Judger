@@ -576,7 +576,7 @@ bool configuration::fetch_submission(unique_ptr<submission> &submit) {
             return true;
         } catch (exception &ex) {
             sub_fetcher->ack(envelope);
-            throw ex;
+            LOG(WARNING) << "Found invalid submission" << boost::diagnostic_information(ex);
         }
     }
 
