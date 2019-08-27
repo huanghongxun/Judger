@@ -1,8 +1,11 @@
 import logging
+import sys
 import logging.handlers
+import traceback
 import multiprocessing
 BlockingQueueHandlerLock = multiprocessing.Lock()
 LogQueue = multiprocessing.Queue(1000)
+
 
 def getLogger(loggerName, prefix=""):
     """Get a logger or a prefixLogger by logger name and prefix
@@ -37,6 +40,8 @@ class tornadoLogAdapter():
             logging.getLogger().critical("tornado got a ridiculous http status code")
         else:
             request_time = handler.request.request_time() * 1000.0
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            print('\n'.join(traceback.format_exception(exc_type, exc_obj, exc_tb)))
             self.logger.log(tornadoLogAdapter.LEVEL_MAP[level],
                             "%d %s %.2fms",
                             handler.get_status(),
@@ -49,12 +54,15 @@ class PrefixLogger(logging.LoggerAdapter):
     The adapter add ``prefix`` string in the log message.
     Format: "%(message)s" -> "prefix | %(message)s"
     """
+
     def process(self, msg, kwargs):
         return "%s | %s" % (self.extra, msg), kwargs
+
 
 class BlockingQueueHandler(logging.handlers.QueueHandler):
     """logging handler using blocking queue in multiprocessing
     """
+
     def __init__(self, tag, queue):
         super(BlockingQueueHandler, self).__init__(queue)
         self.tag = tag
@@ -67,5 +75,6 @@ class BlockingQueueHandler(logging.handlers.QueueHandler):
 
     def enqueue(self, record):
         self.queue.put(record)
+
 
 logging.handlers.BlockingQueueHandler = BlockingQueueHandler
