@@ -45,6 +45,10 @@ static void call_monitor(int worker_id, function<void(monitor &)> callback) {
     }
 }
 
+void report_error(const std::string &message) {
+    call_monitor(-1, [&](monitor &m) { m.report_error(message); });
+}
+
 vector<unique_ptr<submission>> finished_submissions;
 
 /**
@@ -81,7 +85,7 @@ static void report_failure(unique_ptr<submission> &submit) {
     judge_server->summarize_invalid(*submit.get());
 }
 
-static bool fetch_submission_nolock(concurrent_queue<message::client_task> &task_queue) {
+static bool fetch_submission_nolock(int worker_id, concurrent_queue<message::client_task> &task_queue) {
     bool success = false;  // 是否成功拉到评测任务
     // 尝试从服务器拉取提交，每次都向所有的评测服务器拉取评测任务
     for (auto &[category, server] : judge_servers) {
@@ -94,7 +98,7 @@ static bool fetch_submission_nolock(concurrent_queue<message::client_task> &task
                 if (judgers[submission->sub_type]->verify(*submission)) {
                     unsigned judge_id = global_judge_id++;
                     submission->judge_id = judge_id;
-                    call_monitor(0, [&](monitor &m) { m.start_submission(*submission); });
+                    call_monitor(worker_id, [&](monitor &m) { m.start_submission(*submission); });
                     submissions[judge_id] = move(submission);
                     judgers[submissions[judge_id]->sub_type]->distribute(task_queue, *submissions[judge_id]);
                     success = true;
@@ -120,9 +124,9 @@ static bool fetch_submission_nolock(concurrent_queue<message::client_task> &task
  * @return true 如果获取到了提交
  * 限制拉取提交的总数
  */
-static bool fetch_submission(concurrent_queue<message::client_task> &task_queue) {
+static bool fetch_submission(int worker_id, concurrent_queue<message::client_task> &task_queue) {
     scoped_lock guard(server_mutex);
-    return fetch_submission_nolock(task_queue);
+    return fetch_submission_nolock(worker_id, task_queue);
 }
 
 /**
@@ -143,7 +147,7 @@ static void worker_loop(size_t core_id, concurrent_queue<message::client_task> &
     call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::START, ""); });
 
     while (true) {
-        try {
+        {
             message::core_request core_request;
             if (core_queue.try_pop(core_request)) {
                 {
@@ -169,7 +173,7 @@ static void worker_loop(size_t core_id, concurrent_queue<message::client_task> &
                         break;
                     }
 
-                    if (!fetch_submission(task_queue))
+                    if (!fetch_submission(core_id, task_queue))
                         usleep(10 * 1000);  // 10ms，这里必须等待，不可以忙等，否则会挤占返回评测结果的执行权
                     continue;
                 }
@@ -211,17 +215,11 @@ static void worker_loop(size_t core_id, concurrent_queue<message::client_task> &
             }
 
             call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::IDLE, ""); });
-        } catch (judge_exception &ex) {
-            LOG(ERROR) << "Worker " << core_id << " has crashed, " << ex;
-            call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::CRASHED, boost::lexical_cast<string>(ex)); });
-        } catch (...) {
-            LOG(ERROR) << "Worker " << core_id << " has crashed, " << boost::current_exception_diagnostic_information();
-            call_monitor(core_id, [&](monitor &m) { m.worker_state_changed(core_id, worker_state::CRASHED, boost::lexical_cast<string>(boost::current_exception_diagnostic_information())); });
         }
 
         scoped_lock guard(server_mutex);
         for (auto &submit : finished_submissions)
-            call_monitor(0, [&](monitor &m) { m.end_submission(*submit); });
+            call_monitor(core_id, [&](monitor &m) { m.end_submission(*submit); });
         finished_submissions.clear();
     }
 

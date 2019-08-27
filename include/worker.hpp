@@ -49,6 +49,11 @@ void register_judger(std::unique_ptr<judger> &&judger);
 void register_monitor(std::unique_ptr<monitor> &&monitor);
 
 /**
+ * @brief 向所有的监控器报错
+ */
+void report_error(const std::string &message);
+
+/**
  * @brief 启动评测 worker 线程
  * 注意评测服务端客户端收发消息直接通过发送指针实现，因此 worker 不能通过 fork
  * 生成。

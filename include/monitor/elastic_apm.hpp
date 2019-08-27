@@ -15,7 +15,9 @@ struct elastic : public monitor {
 
     void end_judge_task(int worker_id, const message::client_task &client_task) override;
 
-    void worker_state_changed(int worker_id, worker_state state, const std::string &information) override;
+    void worker_state_changed(int worker_id, worker_state state, const std::string &message) override;
+
+    void report_error(const std::string &message) override;
 
     void end_submission(const submission &judge_id) override;
 

@@ -35,9 +35,15 @@ struct monitor {
      * @brief 监控上报当前某个 Worker 的状态
      * @param worker_id Worker 编号
      * @param state Worker 的新状态
-     * @param information 如果 Worker 崩溃，则为错误原因，用于日志记录
+     * @param message 如果 Worker 崩溃，则为错误原因，用于日志记录
      */
-    virtual void worker_state_changed(int worker_id, worker_state state, const std::string &information);
+    virtual void worker_state_changed(int worker_id, worker_state state, const std::string &message);
+
+    /**
+     * @brief 监控上报错误信息
+     * @param message 错误原因
+     */
+    virtual void report_error(const std::string &message);
 
     /**
      * @brief 监控上报当前已经完成一个提交的评测

@@ -48,13 +48,18 @@ void elastic::end_judge_task(int, const message::client_task &client_task) {
     apmclient_module.attr("end_judge_task")(ctx.ctx, ctx.spans[client_task.id]);
 }
 
-void elastic::worker_state_changed(int worker_id, worker_state state, const std::string &info) {
+void elastic::worker_state_changed(int worker_id, worker_state state, const std::string &message) {
     if (state == worker_state::CRASHED) {
         if (!apmclient_module) return;
-        GIL_guard guard;
-
-        apmclient_module.attr("report_crash")(fmt::format("Worker {} has crashed: {}", worker_id, info));
+        report_error(fmt::format("Worker {} has crashed: {}", worker_id, message));
     }
+}
+
+void elastic::report_error(const std::string &message) {
+    if (!apmclient_module) return;
+    GIL_guard guard;
+
+    apmclient_module.attr("report_crash")(message);
 }
 
 void elastic::end_submission(const submission &submit) {
