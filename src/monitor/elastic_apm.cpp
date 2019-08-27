@@ -1,5 +1,6 @@
 #include "monitor/elastic_apm.hpp"
 #include <fmt/core.h>
+#include <boost/exception/diagnostic_information.hpp>
 #include "common/python.hpp"
 
 namespace judge {
@@ -27,9 +28,13 @@ void elastic::start_submission(const submission &submit) {
     if (!apmclient_module) return;
     GIL_guard guard;
 
-    context ctx;
-    ctx.ctx = apmclient_module.attr("start_submission")();
-    contexts[submit.judge_id] = ctx;
+    try {
+        context ctx;
+        ctx.ctx = apmclient_module.attr("start_submission")();
+        contexts[submit.judge_id] = ctx;
+    } catch (const bp::error_already_set &e) {
+        LOG(WARNING) << "start_submission failed: " << boost::diagnostic_information(e);
+    }
 }
 
 void elastic::start_judge_task(int worker_id, const message::client_task &client_task) {
@@ -37,15 +42,23 @@ void elastic::start_judge_task(int worker_id, const message::client_task &client
     GIL_guard guard;
 
     context &ctx = contexts[client_task.submit->judge_id];
-    ctx.spans[client_task.id] = apmclient_module.attr("start_judge_task")(ctx.ctx, fmt::format("{}: {}", worker_id, client_task.name));
+    try {
+        ctx.spans[client_task.id] = apmclient_module.attr("start_judge_task")(ctx.ctx, fmt::format("{}: {}", worker_id, client_task.name));
+    } catch (const bp::error_already_set &e) {
+        LOG(WARNING) << "start_judge_task failed: " << boost::diagnostic_information(e);
+    }
 }
 
 void elastic::end_judge_task(int, const message::client_task &client_task) {
     if (!apmclient_module) return;
     GIL_guard guard;
 
-    context &ctx = contexts[client_task.submit->judge_id];
-    apmclient_module.attr("end_judge_task")(ctx.ctx, ctx.spans[client_task.id]);
+    try {
+        context &ctx = contexts[client_task.submit->judge_id];
+        apmclient_module.attr("end_judge_task")(ctx.ctx, ctx.spans[client_task.id]);
+    } catch (const bp::error_already_set &e) {
+        LOG(WARNING) << "end_judge_task failed: " << boost::diagnostic_information(e);
+    }
 }
 
 void elastic::worker_state_changed(int worker_id, worker_state state, const std::string &message) {
@@ -59,7 +72,11 @@ void elastic::report_error(const std::string &message) {
     if (!apmclient_module) return;
     GIL_guard guard;
 
-    apmclient_module.attr("report_crash")(message);
+    try {
+        apmclient_module.attr("report_crash")(message);
+    } catch (const bp::error_already_set &e) {
+        LOG(WARNING) << "report_error failed: " << boost::diagnostic_information(e);
+    }
 }
 
 void elastic::end_submission(const submission &submit) {

@@ -21,7 +21,8 @@ expectsuccess python3 -m py_compile "$@"
 rm -f -- *.pyc
 
 if [ ! -r "$MAINSOURCE" ]; then
-    error "Entry point or main source is not readable"
+    echo "Entry point '$MAINSOURCE' is not readable, falling to '$1'"
+    MAINSOURCE="$1"
 fi
 
 cat > "$DEST" <<EOF
