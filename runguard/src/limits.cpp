@@ -41,8 +41,6 @@ void cgroup_create(const struct runguard_options &opt) {
     cg.add_controller("cpuacct");
 
     cg.create_cgroup(1);
-
-    LOG(INFO) << "created cgroup '" << opt.cgroupname << "'";
 }
 
 void cgroup_attach(const struct runguard_options &opt) {
@@ -74,8 +72,6 @@ void cgroup_delete(const struct runguard_options &opt) {
     }
 
     cg.delete_cgroup();
-
-    LOG(INFO) << "deleted cgroup '" << opt.cgroupname << "'";
 }
 
 void set_rlimit(int resource, rlim_t cur, rlim_t max) {
