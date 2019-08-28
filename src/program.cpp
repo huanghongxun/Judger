@@ -133,6 +133,9 @@ source_code::source_code(executable_manager &exec_mgr)
 void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs::path &chrootdir) {
     vector<string> paths;
     auto compilepath = workdir / "compile";
+    auto compiledpath = compilepath / ".compiled";
+    scoped_file_lock lock = lock_directory(compilepath, false);
+    if (filesystem::exists(compiledpath)) return;
     fs::create_directories(compilepath);
     for (auto &file : source_files) {
         assert_safe_path(file->name);
@@ -167,6 +170,8 @@ void source_code::fetch(const string &cpuset, const fs::path &workdir, const fs:
                 BOOST_THROW_EXCEPTION(compilation_error(fmt::format("Unrecognized compile.sh exitcode: {}", ret), get_compilation_log(workdir)));
         }
     }
+
+    ofstream to_be_created(compiledpath);
 }
 
 string source_code::get_compilation_log(const fs::path &workdir) {
