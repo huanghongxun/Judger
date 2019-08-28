@@ -2,9 +2,10 @@
 #
 # 调用随机数据生成器生成随机数据的脚本
 #
-# 用法：$0 <random_gen> <std_program> <timelimit> <chrootdir> <datadir> <run>
+# 用法：$0 <testcase_id> <random_gen> <std_program> <timelimit> <chrootdir> <datadir> <run>
 #
 # <cpuset_opt>   编译使用的 CPU 集合
+# <testcase_id>  随机测试组号
 # <random_gen>   随机测试生成器所属文件夹，编译生成的可执行文件在该文件夹中
 # <std_program>  标准程序所属文件夹，编译生成的可执行文件在该文件夹中
 # <timelimit>    运行时间限制，格式为 %d:%d，如 1:3 表示测试点时间限制
@@ -97,7 +98,8 @@ else
     export VERBOSE=$LOG_ERR
 fi
 
-[ $# -ge 1 ] || error "Not enough arguments."
+[ $# -ge 7 ] || error "Not enough arguments."
+TESTID="$1"; shift
 RAN_GEN="$1"; shift
 STD_PROG="$1"; shift
 TIMELIMIT="$1"; shift
@@ -153,7 +155,7 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT -c \
         -VONLINE_JUDGE=1 \
         --standard-output-file "$WORKDIR/input/testdata.in" \
         --standard-error-file random.err -- \
-        /judge/run
+        /judge/run "$TESTID"
 
 # 删除挂载点，因为我们已经确保有用的数据在 $WORKDIR/random 中，因此删除挂载点即可。
 chroot_stop "$CHROOTDIR" "$RUNDIR/merged"

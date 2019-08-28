@@ -76,11 +76,14 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
         filesystem::path random_data_dir = cachedir / "random_data";
 
         if (father && father->is_random) {  // 如果父测试也是随机测试，那么使用同一个测试数据组
-            int number = father->testcase_id;
-            if (number < 0) LOG(FATAL) << "Unknown test case";
-            datadir = random_data_dir / to_string(number);
+            task.testcase_id = father->testcase_id;
+            task.subcase_id = father->subcase_id;
+            if (task.testcase_id < 0 || task.subcase_id < 0) LOG(FATAL) << "Unknown test case";
+            datadir = random_data_dir / to_string(task.testcase_id) / to_string(task.subcase_id);
         } else {
             // 创建一组随机数据
+            random_data_dir /= to_string(task.testcase_id);
+
             scoped_file_lock lock = lock_directory(random_data_dir, false);
             // 检查已经产生了多少组随机测试数据
             int number = count_directories_in_directory(random_data_dir);
@@ -95,9 +98,9 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
                 // 随机生成器和标准程序已经在编译阶段完成下载和编译
                 filesystem::path randomdir = cachedir / "random";
                 filesystem::path standarddir = cachedir / "standard";
-                task.testcase_id = number;  // 标记当前测试点使用了哪个随机测试点
-                // random_generator.sh <random_gen> <std_program> <timelimit> <chrootdir> <datadir> <run> <std_program run_args...>
-                int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), task.time_limit, CHROOT_DIR, datadir, run_script->get_run_path(), task.run_args);
+                task.subcase_id = number;  // 标记当前测试点使用了哪个随机测试点
+                // random_generator.sh <random_case> <random_gen> <std_program> <timelimit> <chrootdir> <datadir> <run> <std_program run_args...>
+                int ret = call_process(EXEC_DIR / "random_generator.sh", "-n", execcpuset, task.testcase_id, submit.random->get_run_path(randomdir), submit.standard->get_run_path(standarddir), task.time_limit, CHROOT_DIR, datadir, run_script->get_run_path(), task.run_args);
                 switch (ret) {
                     case E_SUCCESS: {
                         // 随机数据已经准备好
@@ -121,7 +124,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
                 LOG(INFO) << "Generated random data case [" << submit.category << "-" << submit.prob_id << "-" << submit.sub_id << "-" << number << "] in " << random_time.template duration<chrono::milliseconds>().count() << "ms";
             } else {
                 int number = random(0, MAX_RANDOM_DATA_NUM - 1);
-                task.testcase_id = number;  // 标记当前测试点使用了哪个随机测试
+                task.subcase_id = number;  // 标记当前测试点使用了哪个随机测试
                 datadir = random_data_dir / to_string(number);
                 // 加锁：可能出现某个进程正在生成随机数据的情况，此时需要等待数据生成完成。
                 scoped_file_lock case_lock = lock_directory(datadir, false);
@@ -173,7 +176,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
     if (task.file_limit > 0) env["FILELIMIT"] = to_string(task.file_limit);
     if (task.memory_limit > 0) env["MEMLIMIT"] = to_string(task.memory_limit);
     if (task.proc_limit > 0) env["PROCLIMIT"] = to_string(task.proc_limit);
-    
+
     optional<string> walltime;
     if (execcpuset.find(",") != string::npos || execcpuset.find("-") != string::npos)
         walltime = "-w";

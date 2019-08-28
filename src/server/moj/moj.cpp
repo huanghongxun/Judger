@@ -328,7 +328,7 @@ static void from_json_programming(const json &j, configuration &server, programm
         testcase.name = "RandomCheck";
 
         for (int i = 0; i < random_test_times; ++i) {
-            testcase.testcase_id = -1;  // 随机测试使用哪个测试数据点是未知的，需要实际运行时决定
+            testcase.testcase_id = i;
             // 将当前的随机测试点编号记录下来，给内存测试依赖
             random_checks.push_back(submit.judge_tasks.size());
             submit.judge_tasks.push_back(testcase);
