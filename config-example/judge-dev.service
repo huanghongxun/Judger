@@ -1,0 +1,16 @@
+[Unit]
+Description=judge-system-4.0-dev
+
+[Service]
+WorkingDirectory=/opt/Judger-dev
+Type=simple
+EnvironmentFile=/etc/systemd/system/judge-dev.service.d/env.conf
+ExecStart=/opt/Judger-dev/bin/judge-system --enable /etc/systemd/system/judge-dev.service.d/ --cores 10-19 --debug
+Restart=on-failure
+User=root
+Group=root
+LimitCORE=infinity
+LimitNOFILE=1000000
+
+[Install]
+WantedBy=multi-user.target

@@ -34,7 +34,7 @@ export ELASTIC_APM_TRANSPORT_CLASS="elasticapm.transport.http.Transport"
 export CACHEDIR="/tmp/judge/cache"
 export RUNDIR="/tmp/judge/run"
 export CHROOTDIR="/chroot"
-export CACHERANDOMDATA=100
+export CACHERANDOMDATA=4
 export RUNUSER=domjudge-run
 export RUNGROUP=domjudge-run
 "$DIR/bin/judge-system" $MOJ_OPT $MCOURSE_OPT $FORTH_OPT $SICILY_OPT --cores 0-9 "$@"
