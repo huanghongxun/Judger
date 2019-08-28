@@ -69,7 +69,16 @@ void from_json(const json &j, judge_request &report) {
     if (exists(j, "token")) j.at("token").get_to(report.token);
     if (exists(j, "config")) report.config = j.at("config");
     if (exists(j, "detail")) report.detail = j.at("detail");
-    if (exists(j, "updated_at")) report.updated_at = j.at("updated_at").get<double>();
+    if (exists(j, "updated_at")) {
+        if (j.at("updated_at").is_number())
+            report.updated_at = j.at("updated_at").get<double>();
+        else {
+            string time = j.at("updated_at").get<string>();
+            struct tm mytm;
+            strptime(time.c_str(), "%Y-%m-%d %H:%M:%S", &mytm);
+            report.updated_at = mktime(&mytm);
+        }
+    }
 }
 
 void to_json(json &j, const error_report &report) {
