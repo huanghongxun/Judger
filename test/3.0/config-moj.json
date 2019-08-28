@@ -1,4 +1,5 @@
 {
+    "type": "moj",
     "choiceSubmissionQueue": {
         "port": 25565,
         "hostname": "localhost",

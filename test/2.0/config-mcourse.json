@@ -1,4 +1,5 @@
 {
+    "type": "mcourse",
     "matrix_db": {
         "host": "localhost",
         "user": "test",

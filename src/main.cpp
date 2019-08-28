@@ -115,7 +115,8 @@ int main(int argc, char* argv[]) {
     // clang-format off
     desc.add_options()
         ("enable-sicily", po::value<vector<string>>(), "run Sicily Online Judge submission fetcher, with configuration file path.")
-        ("enable",   po::value<vector<string>>(), "run Matrix Judge System 4.0 submission fetcher, with configuration file path.")
+        ("enable", po::value<vector<string>>(), "load fetcher configurations in given directory with extension .json")
+        ("enable-4", po::value<vector<string>>(), "run Matrix Judge System 4.0 submission fetcher, with configuration file path.")
         ("enable-3", po::value<vector<string>>(), "run Matrix Judge System 3.0 submission fetcher, with configuration file path.")
         ("enable-2", po::value<vector<string>>(), "run Matrix Judge System 2.0 submission fetcher, with configuration file path.")
         ("cores", po::value<cpuset>()->required(), "set the cores the judge-system can make use of")
@@ -294,8 +295,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (vm.count("enable")) {
-        auto forth_servers = vm.at("enable").as<vector<string>>();
+    if (vm.count("enable-4")) {
+        auto forth_servers = vm.at("enable-4").as<vector<string>>();
         for (auto& forth_server : forth_servers) {
             CHECK(filesystem::is_regular_file(forth_server))
                 << "Configuration file " << forth_server << " does not exist";
@@ -327,6 +328,52 @@ int main(int argc, char* argv[]) {
             auto second_judger = make_unique<judge::server::mcourse::configuration>();
             second_judger->init(second_server);
             judge::register_judge_server(move(second_judger));
+        }
+    }
+
+    if (vm.count("enable")) {
+        auto servers = vm.at("enable").as<vector<string>>();
+        vector<filesystem::path> config;
+        for (auto& server : servers) {
+            if (filesystem::is_directory(server)) {
+                for (const auto& p : filesystem::directory_iterator(server)) {
+                    auto& path = p.path();
+                    if (path.extension() == ".json")
+                        config.push_back(path);
+                }
+            } else if (filesystem::is_regular_file(server)) {
+                config.emplace_back(server);
+            } else {
+                LOG(FATAL) << "Configuration file " << server << " does not exist";
+            }
+        }
+
+        for (const auto& p : config) {
+            try {
+                nlohmann::json j = nlohmann::json::parse(judge::read_file_content(p));
+                string type = j.at("type").get<string>();
+                if (type == "mcourse") {
+                    auto second_judger = make_unique<judge::server::mcourse::configuration>();
+                    second_judger->init(p);
+                    judge::register_judge_server(move(second_judger));
+                } else if (type == "moj") {
+                    auto third_judger = make_unique<judge::server::moj::configuration>();
+                    third_judger->init(p);
+                    judge::register_judge_server(move(third_judger));
+                } else if (type == "sicily") {
+                    auto sicily_judger = make_unique<judge::server::sicily::configuration>();
+                    sicily_judger->init(p);
+                    judge::register_judge_server(move(sicily_judger));
+                } else if (type == "forth") {
+                    auto forth_judger = make_unique<judge::server::forth::configuration>();
+                    forth_judger->init(p);
+                    judge::register_judge_server(move(forth_judger));
+                } else {
+                    LOG(FATAL) << "Unrecognized configuration type " << type << " in file " << p;
+                }
+            } catch (std::exception& e) {
+                LOG(FATAL) << "Configuration file " << p << " is malformed";
+            }
         }
     }
 
