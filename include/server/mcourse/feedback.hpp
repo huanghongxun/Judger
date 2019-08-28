@@ -100,11 +100,13 @@ struct judge_report {
  * @brief 错误检查报告
  * @code{json}
  * {
+ *   "result": "RG/IE", RG: Random Gen Error; IE: Internal Error
  *   "message": ""
  * }
  * @endcode
  */
 struct error_report {
+    std::string result;
     std::string message;
 };
 

@@ -34,6 +34,7 @@ const unordered_map<status, const char *> status_string = boost::assign::map_lis
     (status::RUNNING, "")
     (status::ACCEPTED, "OK")
     (status::COMPILATION_ERROR, "CE")
+    (status::EXECUTABLE_COMPILATION_ERROR, "CE")
     (status::WRONG_ANSWER, "WA")
     (status::RUNTIME_ERROR, "RE")
     (status::TIME_LIMIT_EXCEEDED, "TL")
@@ -43,8 +44,11 @@ const unordered_map<status, const char *> status_string = boost::assign::map_lis
     (status::RESTRICT_FUNCTION, "RF")
     (status::OUT_OF_CONTEST_TIME, "") // Too Late
     (status::COMPILING, "")
-    (status::SEGMENTATION_FAULT, "RE")
-    (status::FLOATING_POINT_ERROR, "RE");
+    (status::SEGMENTATION_FAULT, "SF")
+    (status::FLOATING_POINT_ERROR, "FPE")
+    (status::RANDOM_GEN_ERROR, "RG")
+    (status::COMPARE_ERROR, "CP")
+    (status::SYSTEM_ERROR, "IE");
 // clang-format on
 
 configuration::configuration()
@@ -604,8 +608,9 @@ void configuration::summarize_invalid(submission &submit) {
     BOOST_THROW_EXCEPTION(judge_exception() << "Invalid submission " << submit);
 }
 
-static json get_error_report(const judge_task_result &result) {
+static json get_error_report(const status &stat, const judge_task_result &result) {
     error_report report;
+    report.result = status_string.at(stat);
     report.message = "SystemError: " + result.error_log;
     return report;
 }
@@ -630,7 +635,7 @@ static bool summarize_compile_check(boost::rational<int> &total_score, programmi
         compile_check_json = compile_check;
     } else if (submit.results[0].status == status::SYSTEM_ERROR) {
         compile_check.grade = 0;
-        compile_check_json = get_error_report(submit.results[0]);
+        compile_check_json = get_error_report(status::SYSTEM_ERROR, submit.results[0]);
     } else {
         compile_check.grade = 0;
         compile_check_json = compile_check;
@@ -669,7 +674,7 @@ static bool summarize_random_check(boost::rational<int> &total_score, programmin
                        task_result.status == status::RANDOM_GEN_ERROR ||
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
                        task_result.status == status::COMPARE_ERROR) {
-                random_check_json = get_error_report(task_result);
+                random_check_json = get_error_report(task_result.status, task_result);
                 return true;
             }
 
@@ -709,7 +714,7 @@ static bool summarize_standard_check(boost::rational<int> &total_score, programm
                        task_result.status == status::RANDOM_GEN_ERROR ||
                        task_result.status == status::EXECUTABLE_COMPILATION_ERROR ||
                        task_result.status == status::COMPARE_ERROR) {
-                standard_check_json = get_error_report(task_result);
+                standard_check_json = get_error_report(task_result.status, task_result);
                 return true;
             }
 

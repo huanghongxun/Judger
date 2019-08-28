@@ -83,6 +83,7 @@ void from_json(const json &j, judge_request &report) {
 
 void to_json(json &j, const error_report &report) {
     j = {{"message", report.message},
+         {"result", report.result},
          {"continue", false},
          {"grade", 0}};
 }
