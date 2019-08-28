@@ -54,6 +54,9 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
     auto run_script = exec_mgr.get_run_script(task.run_script);
     run_script->fetch(execcpuset, CHROOT_DIR);
 
+    auto compile_script = exec_mgr.get_compile_script(submit.submission->language);
+    compile_script->fetch(execcpuset, CHROOT_DIR);
+
     unique_ptr<judge::program> exec_compare_script = task.compare_script.empty() ? nullptr : exec_mgr.get_compare_script(task.compare_script);
     auto &compare_script = task.compare_script.empty() ? submit.compare : exec_compare_script;
     if (!compare_script) {  // 没有 submit.compare，但却存在需求 submit.compare 的 task 时报错
@@ -188,6 +191,7 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
                                walltime,
                                datadir, task.time_limit, CHROOT_DIR, workdir,
                                uuid,
+                               compile_script->get_run_path(),
                                run_script->get_run_path(),
                                compare_script->get_run_path(cachedir / "compare"),
                                boost::algorithm::join(submit.submission->source_files | boost::adaptors::transformed([](auto &a) { return a->name; }), ":"),

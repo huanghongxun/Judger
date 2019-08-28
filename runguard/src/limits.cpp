@@ -10,6 +10,7 @@
 #include <system_error>
 #include "cgroup.hpp"
 #include "utils.hpp"
+#include <seccomp.h>
 
 using namespace std;
 
@@ -159,4 +160,11 @@ void set_restrictions(const struct runguard_options &opt) {
 
     if (geteuid() == 0 || getuid() == 0)
         throw runtime_error("you cannot run user command as root");
+}
+
+void set_seccomp(const struct runguard_options &opt) {
+    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_KILL);
+    for (int syscall : opt.syscalls)
+        seccomp_rule_add(ctx, SCMP_ACT_ALLOW, syscall, 0);
+    seccomp_load(ctx);
 }

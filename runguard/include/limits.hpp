@@ -29,3 +29,8 @@ void cgroup_delete(const struct runguard_options &);
  * Limit current process resources usage.
  */
 void set_restrictions(const struct runguard_options &opt);
+
+/**
+ * Limit syscalls
+ */
+void set_seccomp(const struct runguard_options &opt);
