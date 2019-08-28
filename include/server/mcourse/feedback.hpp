@@ -46,6 +46,8 @@ struct judge_request {
      */
     int prob_id;
 
+    time_t updated_at;
+
     /**
      * @brief 题目类型
      * 0. 编程题: programming

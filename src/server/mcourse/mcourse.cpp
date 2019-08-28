@@ -531,6 +531,7 @@ static void from_json_mcourse(AmqpClient::Envelope::ptr_t envelope, const json &
                 prog_submit->prob_id = to_string(request.prob_id);
                 prog_submit->envelope = envelope;
                 prog_submit->config = request.config;
+                prog_submit->updated_at = request.updated_at;
 
                 from_json_programming(request.config, request.detail, request.sub_type, server, *prog_submit.get());
                 submit = move(prog_submit);
@@ -542,6 +543,7 @@ static void from_json_mcourse(AmqpClient::Envelope::ptr_t envelope, const json &
                 choice_submit->prob_id = to_string(request.prob_id);
                 choice_submit->envelope = envelope;
                 choice_submit->config = request.config;
+                choice_submit->updated_at = request.updated_at;
 
                 from_json_choice(request.config, request.detail, request.sub_type, server, *choice_submit.get());
                 submit = move(choice_submit);
@@ -556,6 +558,7 @@ static void from_json_mcourse(AmqpClient::Envelope::ptr_t envelope, const json &
                 prog_submit->prob_id = to_string(request.prob_id);
                 prog_submit->envelope = envelope;
                 prog_submit->config = request.config;
+                prog_submit->updated_at = request.updated_at;
 
                 from_json_program_output(request.config, request.detail, request.sub_type, server, *prog_submit.get());
                 submit = move(prog_submit);

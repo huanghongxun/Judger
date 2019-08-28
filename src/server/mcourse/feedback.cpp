@@ -66,9 +66,10 @@ void from_json(const json &j, judge_request &report) {
             throw out_of_range("Unrecognized submission type " + sub_type);
     }
 
-    if (j.count("token")) j.at("token").get_to(report.token);
-    if (j.count("config")) report.config = j.at("config");
-    if (j.count("detail")) report.detail = j.at("detail");
+    if (exists(j, "token")) j.at("token").get_to(report.token);
+    if (exists(j, "config")) report.config = j.at("config");
+    if (exists(j, "detail")) report.detail = j.at("detail");
+    if (exists(j, "updated_at")) report.updated_at = j.at("updated_at").get<double>();
 }
 
 void to_json(json &j, const error_report &report) {
