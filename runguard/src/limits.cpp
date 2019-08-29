@@ -113,7 +113,7 @@ void set_restrictions(const struct runguard_options &opt) {
 
     set_rlimit(RLIMIT_STACK, RLIM_INFINITY, RLIM_INFINITY);
 
-    if (opt.file_limit > 0) set_rlimit(RLIMIT_FSIZE, opt.file_limit, opt.file_limit);
+    if (opt.file_limit > 0) set_rlimit(RLIMIT_FSIZE, opt.file_limit, opt.file_limit + 1);
     if (opt.nproc > 0) set_rlimit(RLIMIT_NPROC, opt.nproc, opt.nproc);
     if (opt.no_core_dumps) set_rlimit(RLIMIT_CORE, 0, 0);
 

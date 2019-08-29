@@ -20,7 +20,6 @@
 #include "cgroup.hpp"
 #include "limits.hpp"
 #include "runguard_options.hpp"
-#include "syscall_table.hpp"
 #include "system.hpp"
 #include "utils.hpp"
 
@@ -458,7 +457,8 @@ int run_unshare(runguard_options opt) {
 int run_seccomp(runguard_options opt) {
     switch (child_pid = fork()) {
         case -1:
-            error(errno, "unable to fork");
+            // using error results in warning: this statement may fall through
+            throw system_error(errno, generic_category(), "unable to fork");
         case 0: {  // child process, run the command
             if (opt.stdout_filename.size())
                 freopen(opt.stdout_filename.c_str(), "w", stdout);
