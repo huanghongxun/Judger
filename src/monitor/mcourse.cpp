@@ -11,7 +11,7 @@ mcourse_monitor::mcourse_monitor(const server::database &monitor_dbcfg, const st
                host, port, host, port);
 }
 
-void mcourse_monitor::worker_state_changed(int worker_id, worker_state state, const std::string &info) {
+void mcourse_monitor::worker_state_changed(int worker_id, worker_state state, const std::string & /* info */) {
     switch (state) {
         case worker_state::START:
             db.execute("INSERT INTO judge_worker_status (host, worker_id, worker_type, is_running, worker_stage) VALUES (?, ?, 'Universal', true, 'idle') ON DUPLICATE KEY UPDATE is_running=true, worker_stage='idle', worker_type='Universal'",

@@ -37,6 +37,13 @@ struct amqp {
      * @brief AMQP 消息队列的 Routing Key
      */
     std::string routing_key;
+
+    /**
+     * @brief AMQP 消息队列包含几个消费者
+     * 有多少个消费者，评测就可以同时评测最多相应个提交
+     * 默认为 4
+     */
+    int concurrency;
 };
 
 void from_json(const nlohmann::json &j, amqp &mq);

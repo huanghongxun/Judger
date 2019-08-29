@@ -14,8 +14,11 @@ void rabbitmq::connect() {
     channel->DeclareQueue(queue.queue, /* passive */ false, /* durable */ true, /* exclusive */ false, /* auto_delete */ false);
     channel->DeclareExchange(queue.exchange, queue.exchange_type, /* passive */ false, /* durable */ true);
     channel->BindQueue(queue.queue, queue.exchange, queue.routing_key);
-    if (!write)  // 对于从消息队列读取消息的情况，我们需要监听队列
-        channel->BasicConsume(queue.queue, /* consumer tag */ "", /* no_local */ true, /* no_ack */ false, /* exclusive */ false);
+    if (!write) {  // 对于从消息队列读取消息的情况，我们需要监听队列
+        for (int i = 0; i < queue.concurrency; ++i) {
+            channel->BasicConsume(queue.queue, /* consumer tag */ to_string(i), /* no_local */ true, /* no_ack */ false, /* exclusive */ false);
+        }
+    }
 }
 
 bool rabbitmq::fetch(AmqpClient::Envelope::ptr_t &envelope, unsigned int timeout) {
@@ -28,6 +31,7 @@ bool rabbitmq::fetch(AmqpClient::Envelope::ptr_t &envelope, unsigned int timeout
             sleep(5);
             connect();
         }
+    return false;
 }
 
 void rabbitmq::ack(const AmqpClient::Envelope::ptr_t &envelope) {

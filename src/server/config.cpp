@@ -7,16 +7,20 @@ using namespace nlohmann;
 void from_json(const json &j, amqp &mq) {
     j.at("port").get_to(mq.port);
     j.at("exchange").get_to(mq.exchange);
-    if (j.count("exchange_type"))
+    if (exists(j, "exchange_type"))
         j.at("exchange_type").get_to(mq.exchange_type);
     else
         mq.exchange_type = "direct";
     j.at("hostname").get_to(mq.hostname);
     j.at("queue").get_to(mq.queue);
-    if (j.count("routing_key"))
+    if (exists(j, "routing_key"))
         j.at("routing_key").get_to(mq.routing_key);
     else
         mq.routing_key = "";
+    if (exists(j, "concurrency"))
+        j.at("concurrency").get_to(mq.concurrency);
+    else
+        mq.concurrency = 4;
 }
 
 void from_json(const json &j, database &db) {

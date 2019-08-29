@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <mutex>
 #include "SimpleAmqpClient/SimpleAmqpClient.h"
 #include "server/config.hpp"
 
@@ -23,6 +24,7 @@ private:
     std::string tag;
     judge::server::amqp queue;
     bool write;
+    std::mutex mut;
 };
 
 }  // namespace judge::server
