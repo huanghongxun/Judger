@@ -155,6 +155,11 @@ if [ ! -z $signal ]; then
             echo "$resource_usage"
             cleanexit ${E_MEM_LIMIT:-1}
             ;;
+        31) # SIGSYS
+            echo "Restrict Function"
+            echo "$resource_usage"
+            cleanexit ${E_RESTRICT_FUNCTION:-1}
+            ;;
         *)
             echo "Runtime Error"
             echo "$resource_usage"

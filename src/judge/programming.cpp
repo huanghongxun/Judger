@@ -246,6 +246,9 @@ static judge_task_result judge_impl(const message::client_task &client_task, pro
         case E_MEM_LIMIT:
             result.status = status::MEMORY_LIMIT_EXCEEDED;
             break;
+        case E_RESTRICT_FUNCTION:
+            result.status = status::RESTRICT_FUNCTION;
+            break;
         default:
             result.status = status::SYSTEM_ERROR;
             break;

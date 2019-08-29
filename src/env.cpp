@@ -23,6 +23,7 @@ void put_error_codes() {
     set_env("E_OUTPUT_LIMIT", to_string(judge::error_codes::E_OUTPUT_LIMIT));
     set_env("E_TIME_LIMIT", to_string(judge::error_codes::E_TIME_LIMIT));
     set_env("E_MEM_LIMIT", to_string(judge::error_codes::E_MEM_LIMIT));
+    set_env("E_RESTRICT_FUNCTION", to_string(judge::error_codes::E_RESTRICT_FUNCTION));
 }
 
 }  // namespace judge
