@@ -2,7 +2,7 @@
 #
 # 测试脚本帮助文件，帮助处理命令行参数，避免重复代码
 #
-# 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <run> <compare> <source files> <assist files> <run args>
+# 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <compile> <run> <compare> <source files> <assist files> <run args>
 #
 # <datadir>      包含数据文件的文件夹的绝对路径
 # <timelimit>    运行时间限制，格式为 %d:%d，如 1:3 表示测试点时间限制
@@ -11,6 +11,7 @@
 # <workdir>      程序的工作文件夹，为了保证安全，请务必将运行路径设置
 #                为空文件夹，特别是保证不可以包含标准输出文件
 # <run-uuid>     运行的 uuid，用于索引运行文件夹位置
+# <compile>      编译程序的脚本的文件夹
 # <run>          运行程序的脚本的文件夹
 # <compare>      比较程序/脚本文件夹的文件夹
 # <source-files> 源文件集，使用 : 隔开，如 a.cpp:b.cpp:c.hpp
@@ -103,13 +104,14 @@ else
     export VERBOSE=$LOG_ERR
 fi
 
-[ $# -ge 9 ] || error "not enough arguments"
+[ $# -ge 10 ] || error "not enough arguments"
 
 DATADIR="$1"; shift
 TIMELIMIT="$1"; shift
 CHROOTDIR="$1"; shift
 WORKDIR="$1"; shift
 RUN_UUID="$1"; shift
+COMPILE_SCRIPT="$1"; shift
 RUN_SCRIPT="$1"; shift
 COMPARE_SCRIPT="$1"; shift
 SOURCE_FILES="$1"; shift
@@ -120,6 +122,11 @@ if [ ! -d "$WORKDIR" ] || [ ! -w "$WORKDIR" ] || [ ! -x "$WORKDIR" ]; then
 fi
 
 [ -x "$RUNGUARD" ] || error "runguard does not exist"
+
+SYSCALL_OPT=""
+if [ -f "$COMPILE_SCRIPT/.syscall64" ]; then
+    SYSCALL_OPT="--allowed_syscall=$COMPILE_SCRIPT/.syscall64"
+fi
 
 chmod a+x "$WORKDIR"
 

@@ -2,7 +2,7 @@
 #
 # 静态测试脚本
 #
-# 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <run> <compare> <program args> <source files> <assist files>
+# 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <compile> <run> <compare> <program args> <source files> <assist files>
 #
 # <datadir>      此程序不使用数据
 # <timelimit>    此程序受 SCRIPTTIMELIMIT 时限限制
@@ -10,6 +10,7 @@
 # <workdir>      程序的工作文件夹，为了保证安全，请务必将运行路径设置
 #                为空文件夹，特别是保证不可以包含标准输出文件
 # <run-uuid>     运行的 uuid，用于索引运行文件夹位置
+# <compile>      编译程序脚本文件夹，静态测试根据编译脚本进行静态测试
 # <run>          此项将被忽略，此程序不使用运行脚本
 # <compare>      此项将被忽略，此程序不使用比较脚本
 # <source-files> 源文件集，使用 : 隔开，如 a.cpp:b.cpp

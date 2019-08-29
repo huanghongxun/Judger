@@ -4,7 +4,7 @@
 # 与 standard 不同的是，该提交脚本会强制运行脚本是 standard，而且信任比较脚本，这代表不会限制比较脚本的运行环境以及运行时间、内存等资源
 # 好处是可以缓解 mount 命令的性能问题。比较脚本所需的运行环境必须在宿主机安装
 #
-# 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <run> <compare>
+# 用法：$0 <datadir> <timelimit> <chrootdir> <workdir> <run-uuid> <compile> <run> <compare>
 #
 # <datadir>      包含数据文件的文件夹的绝对路径
 # <timelimit>    运行时间限制，格式为 %d:%d，如 1:3 表示测试点时间限制
@@ -13,6 +13,7 @@
 # <workdir>      程序的工作文件夹，为了保证安全，请务必将运行路径设置
 #                为空文件夹，特别是保证不可以包含标准输出文件
 # <run-uuid>     运行的 uuid，用于索引运行文件夹位置
+# <compile>      编译程序的脚本的文件夹
 # <run>          运行程序的脚本的文件夹
 # <compare>      比较程序/脚本文件夹的文件夹
 #
@@ -65,7 +66,7 @@ $GAINROOT mount -t overlay overlay -olowerdir="$WORKDIR/compile":"$TESTIN",upper
 chroot_start "$CHROOTDIR" merged
 
 # 我们不检查选手程序的返回值，比如 C 程序的 main 函数没有写 return 会导致返回值非零，这种不是崩溃导致的
-runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
+runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT $SYSCALL_OPT \
     --root merged \
     --work /judge \
     --no-core-dumps \

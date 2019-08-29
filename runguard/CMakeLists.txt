@@ -44,6 +44,7 @@ target_link_libraries(${BUILD_TARGET}
     glog
     cgroup
     fmt
+    seccomp
     ${Boost_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )

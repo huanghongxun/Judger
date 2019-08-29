@@ -10,6 +10,7 @@
 #include <system_error>
 #include "cgroup.hpp"
 #include "utils.hpp"
+#include <seccomp.h>
 
 using namespace std;
 
@@ -112,7 +113,7 @@ void set_restrictions(const struct runguard_options &opt) {
 
     set_rlimit(RLIMIT_STACK, RLIM_INFINITY, RLIM_INFINITY);
 
-    if (opt.file_limit > 0) set_rlimit(RLIMIT_FSIZE, opt.file_limit, opt.file_limit);
+    if (opt.file_limit > 0) set_rlimit(RLIMIT_FSIZE, opt.file_limit, opt.file_limit + 1);
     if (opt.nproc > 0) set_rlimit(RLIMIT_NPROC, opt.nproc, opt.nproc);
     if (opt.no_core_dumps) set_rlimit(RLIMIT_CORE, 0, 0);
 
@@ -159,4 +160,11 @@ void set_restrictions(const struct runguard_options &opt) {
 
     if (geteuid() == 0 || getuid() == 0)
         throw runtime_error("you cannot run user command as root");
+}
+
+void set_seccomp(const struct runguard_options &opt) {
+    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_KILL);
+    for (int syscall : opt.syscalls)
+        seccomp_rule_add(ctx, SCMP_ACT_ALLOW, syscall, 0);
+    seccomp_load(ctx);
 }

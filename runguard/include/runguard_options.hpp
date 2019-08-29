@@ -28,12 +28,9 @@ struct runguard_options {
     bool no_core_dumps = false;
 
     /**
-     * Use ptrace or unshare.
-     * Using ptrace results in faster initialization and worse performance.
-     * Using unshare in contrast.
-     * If you are running apps with time limitation less than 10s, use ptrace.
+     * Allowed syscall numbers
      */
-    bool use_ptrace = false;
+    std::vector<int> syscalls;
 
     std::string stdin_filename;
     std::string stdout_filename;

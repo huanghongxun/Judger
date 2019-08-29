@@ -4,11 +4,11 @@
 #include <glog/logging.h>
 #include <math.h>
 #include <signal.h>
-#include <sys/ptrace.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/times.h>
 #include <sys/types.h>
+#include <seccomp.h>
 #include <sys/user.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -20,7 +20,6 @@
 #include "cgroup.hpp"
 #include "limits.hpp"
 #include "runguard_options.hpp"
-#include "syscall_table.hpp"
 #include "system.hpp"
 #include "utils.hpp"
 
@@ -96,8 +95,7 @@ void runguard_terminate_handler() {
 
 void summarize_cgroup(const runguard_options& opt, int exitcode,
                       struct timeval starttime, struct timeval endtime,
-                      struct tms startticks, struct tms endticks,
-                      bool restricted_function) {
+                      struct tms startticks, struct tms endticks) {
     static const char output_timelimit_str[4][16] = {
         "",
         "soft-timelimit",
@@ -140,11 +138,6 @@ void summarize_cgroup(const runguard_options& opt, int exitcode,
         append_meta("memory-result", "oom");
     else
         append_meta("memory-result", "");
-
-    if (restricted_function)
-        append_meta("restricted-function", "yes");
-    else
-        append_meta("restricted-function", "");
 
     // 杀死 cgroup 内所有的进程，以确保父进程结束后不会有
     // so our timing is correct: no child processes can survive longer than
@@ -231,7 +224,7 @@ static void child_handler(int /* signal */) {
     received_SIGCHLD = true;
 }
 
-int run_ptrace(runguard_options opt);
+int run_seccomp(runguard_options opt);
 int run_unshare(runguard_options opt);
 
 int runit(struct runguard_options opt) {
@@ -304,8 +297,8 @@ int runit(struct runguard_options opt) {
     // if (write(cfd, oom.data(), oom.size()) < 0) error(errno, "writing cgroup.event_control");
     // if (close(cfd) < 0) error(errno, "closing cgroup.event_control");
 
-    if (opt.use_ptrace)
-        return run_ptrace(opt);
+    if (!opt.syscalls.empty())
+        return run_seccomp(opt);
     else
         return run_unshare(opt);
 }
@@ -452,7 +445,7 @@ int run_unshare(runguard_options opt) {
             if (setuid(getuid()) != 0)
                 error(errno, "dropping root privileges");
 
-            summarize_cgroup(opt, exitcode, starttime, endtime, startticks, endticks, false);
+            summarize_cgroup(opt, exitcode, starttime, endtime, startticks, endticks);
 
             return exitcode;
         } break;
@@ -461,22 +454,11 @@ int run_unshare(runguard_options opt) {
     throw runtime_error("unexpected");
 }
 
-bool check_access(int pid, struct user_regs_struct regs) {
-    int syscall_number;
-#ifdef __i386__
-    syscall_number = regs.orig_eax;
-#else
-    syscall_number = regs.orig_rax;
-#endif
-    int systype = syscall_type(pid, regs);
-    if (systype < 0 || systype >= 2) return false;
-    return syscall_used[systype][syscall_number];
-}
-
-int run_ptrace(runguard_options opt) {
+int run_seccomp(runguard_options opt) {
     switch (child_pid = fork()) {
         case -1:
-            throw system_error(errno, system_category(), "unable to fork");
+            // using error results in warning: this statement may fall through
+            throw system_error(errno, generic_category(), "unable to fork");
         case 0: {  // child process, run the command
             if (opt.stdout_filename.size())
                 freopen(opt.stdout_filename.c_str(), "w", stdout);
@@ -492,7 +474,7 @@ int run_ptrace(runguard_options opt) {
             for (size_t i = 0; i < cmd.size(); ++i) args[i] = cmd[i].data();
             args[cmd.size()] = 0;
 
-            ptrace(PTRACE_TRACEME, 0, 0, 0);
+            set_seccomp(opt);
 
             execvp(args[0], args);
             error(errno, "unable to start command {}", cmd[0]);
@@ -501,8 +483,6 @@ int run_ptrace(runguard_options opt) {
             set_restrictions_parent(opt);
 
             int status, exitcode;
-            bool incall = false, ptrace_kill = false, rf = false;
-            struct user_regs_struct regs;
             struct rusage ru;
             struct tms startticks, endticks;
             struct timeval starttime, endtime;
@@ -510,37 +490,8 @@ int run_ptrace(runguard_options opt) {
                 error(errno, "getting start clock ticks");
             if (gettimeofday(&starttime, NULL))
                 error(errno, "getting time");
-
-            while (1) {
-                if (wait4(child_pid, &status, 0, &ru) == -1)
-                    error(errno, "wait4");
-                if (WIFEXITED(status) || WIFSIGNALED(status))
-                    break;
-                else if (WIFSTOPPED(status)) {
-                    received_signal = WSTOPSIG(status);
-                    if (received_signal != SIGTRAP) {
-                        ptrace(PTRACE_KILL, child_pid, 0, 0);
-                        ptrace_kill = true;
-                        waitpid(child_pid, NULL, 0);
-                        break;
-                    }
-
-                    if (ptrace(PTRACE_GETREGS, child_pid, NULL, &regs) == -1)
-                        error(errno, "ptrace_getregs");
-
-                    if (incall) {
-                        if (!check_access(child_pid, regs)) {
-                            ptrace(PTRACE_KILL, child_pid, NULL, NULL);
-                            waitpid(child_pid, NULL, 0);
-
-                            rf = true;
-                            break;
-                        }
-                    }
-                    incall = !incall;
-                    ptrace(PTRACE_SYSCALL, child_pid, NULL, NULL);
-                }
-            }
+            if (wait4(child_pid, &status, 0, &ru) == -1)
+                error(errno, "wait4");
 
             if (times(&endticks) == (clock_t)-1)
                 error(errno, "getting end clock ticks");
@@ -549,31 +500,31 @@ int run_ptrace(runguard_options opt) {
 
             if (WIFEXITED(status)) {
                 exitcode = WEXITSTATUS(status);
-            } else {
-                if (WIFSIGNALED(status)) {
-                    received_signal = WTERMSIG(status);
-                    LOG(WARNING) << "Command terminated with signal (" << received_signal << ", " << strsignal(received_signal) << ")";
-                } else if (WIFSTOPPED(status)) {
-                    received_signal = WSTOPSIG(status);
-                    LOG(WARNING) << "Command stopped with signal (" << received_signal << ", " << strsignal(received_signal) << ")";
-                } else {
-                    throw runtime_error(fmt::format("unknown status: {:x}", status));
-                }
-
+            } else if (WIFSIGNALED(status)) {
                 // In linux, exitcode is no larger than 127.
+                received_signal = WTERMSIG(status);
                 exitcode = received_signal + 128;
                 switch (received_signal) {
                     case SIGXCPU:
                         cpulimit |= TIMELIMIT_HARD;
                         LOG(WARNING) << "Time Limit Exceeded (hard limit)";
                         break;
+                    default:
+                        LOG(WARNING) << "Command terminated with signal (" << received_signal << ", " << strsignal(received_signal) << ")";
+                        break;
                 }
+            } else if (WIFSTOPPED(status)) {
+                received_signal = WSTOPSIG(status);
+                exitcode = received_signal + 128;
+                LOG(WARNING) << "Command stopped with signal (" << received_signal << ", " << strsignal(received_signal) << ")";
+            } else {
+                throw runtime_error(fmt::format("unknown status: {:x}", status));
             }
 
             if (setuid(getuid()) != 0)
                 error(errno, "dropping root privileges");
 
-            summarize_cgroup(opt, exitcode, starttime, endtime, startticks, endticks, rf);
+            summarize_cgroup(opt, exitcode, starttime, endtime, startticks, endticks);
 
             return exitcode;
         } break;
