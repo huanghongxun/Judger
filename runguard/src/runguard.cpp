@@ -69,7 +69,7 @@ int main(int argc, const char* argv[]) {
         ("file-limit,f", po::value<size_t>(), "set maximum created file size of the command in KB")
         ("nproc,p", po::value<size_t>(), "set maximum process living simutanously")
         ("cpuset,P", po::value<string>(), "set the processor IDs that can only be used (e.g. \"0,2-3\")")
-        ("allowed_syscall", po::value<string>(), "set the limited syscall numbers in file separated by spaces")
+        ("allowed-syscall", po::value<string>(), "set the limited syscall numbers in file separated by spaces")
         ("no-core-dumps,c", "disable core dumps")
         ("standard-input-file,i", po::value<string>(), "redirect command standard input fd to file")
         ("standard-output-file,o", po::value<string>(), "redirect command standard output fd to file")

@@ -147,9 +147,11 @@ void to_json(json &j, const gtest_check_report &report) {
     } else {
         failure += {{"error", report.error_message}};
     }
+    if (failure.empty()) failure = json();
     json gtest = {{"info", report.info},
                   {"grade", report.grade},
                   {"failure", failure}};
+    gtest = {{"gtest", gtest}};
     j = {{"grade", report.grade},
          {"continue", report.cont},
          {"google tests", json::array({gtest})}};

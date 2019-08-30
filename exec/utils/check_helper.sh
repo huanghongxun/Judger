@@ -125,7 +125,7 @@ fi
 
 SYSCALL_OPT=""
 if [ -f "$COMPILE_SCRIPT/.syscall64" ]; then
-    SYSCALL_OPT="--allowed_syscall=$COMPILE_SCRIPT/.syscall64"
+    SYSCALL_OPT="--allowed-syscall=$COMPILE_SCRIPT/.syscall64"
 fi
 
 chmod a+x "$WORKDIR"
