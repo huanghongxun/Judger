@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# Python 静态测试脚本
+#
+# 用法：$0 <workdir> <feedback> <source_files> <assist_files>
+#
+# <source_files> 参与编译的源文件，可能包含 .c 和 .h 文件
+# <assist_files> 不直接传给编译器的头文件，只能包含 .h 文件
+
+PROGNAME="$(basename "$0")"
+PROGDIR="$(dirname "$0")"
+
+WORKDIR="$1"; shift
+FEEDBACK="$1"; shift
+SOURCE_FILES="$1"; shift
+ASSIST_FILES="$1"; shift
+
+IFS=':' read -ra SOURCE_FILES_SPLITTED <<< "$SOURCE_FILES"
+
+# 假如 SOURCE_FILES 为 main.py，那么 SRC 为 $WORKDIR/compile/main.py
+SRC=()
+for i in "${SOURCE_FILES_SPLITTED[@]}"; do
+    if [[ "$i" == *.py ]]; then
+        SRC+=("$WORKDIR/compile/$i")
+    fi
+done
+
+pylint "--rcfile=$PROGDIR/pylintrc" -f json --disable=missing-docstring "${SRC[@]}" > pylint.json
+
+exec python3 "$PROGDIR/process.py" pylint.json "${#SRC[@]}" "$FEEDBACK/report.txt" "$FEEDBACK/score.txt"

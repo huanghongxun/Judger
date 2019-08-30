@@ -20,19 +20,20 @@ if len(sys.argv) != 5:
 xml_file = open(os.path.join(sys.argv[2], 'valgrind.xml'), 'r')
 result_file = open(os.path.join(sys.argv[4], 'report.txt'), 'w')
 
+def as_list(obj, field):
+    if field not in obj:
+        obj[field] = []
+    if not isinstance(obj[field], list):
+        obj[field] = [obj[field]]
+
 xml_result = xmltodict.parse(xml_file.read())
 try:
     xml_result = xml_result["valgrindoutput"]
-    if not xml_result["error"]:
-        xml_result["error"] = []
-    if not isinstance(xml_result["error"], list):
-        xml_result["error"] = [xml_result["error"]]
+    as_list(xml_result, "error")
     for err in xml_result["error"]:
-        if not isinstance(err["stack"], list):
-            err["stack"] = [err["stack"]]
+        as_list(err, "stack")
         for stack in err["stack"]:
-            if not isinstance(stack["frame"], list):
-                stack["frame"] = [stack["frame"]]
+            as_list(stack, "frame")
             for item in stack["frame"]:
                 item.pop("obj", None)
                 item.pop("dir", None)

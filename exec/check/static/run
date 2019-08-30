@@ -32,23 +32,6 @@
 touch program.meta program.err
 
 mkdir -m 0777 -p feedback
-# 将测试数据文件夹（内含输入数据，且其中 testdata.in 为标准输入数据文件名），编译好的程序，运行文件夹通过 overlayfs 绑定
-
-IFS=':' read -ra SOURCE_FILES_SPLITTED <<< "$SOURCE_FILES"
-IFS=':' read -ra ASSIST_FILES_SPLITTED <<< "$ASSIST_FILES"
-
-# 假如 SOURCE_FILES 为 a.cpp:b.cpp:c.hpp，那么 SRC, INC 为 $WORKDIR/compile/a.cpp $WORKDIR/compile/b.cpp
-SRC=()
-INC=()
-for i in "${SOURCE_FILES_SPLITTED[@]}"; do
-    if [[ "$i" == *.c* ]]; then
-        SRC+=("$WORKDIR/compile/$i")
-    else
-        INC+=(-I); INC+=("$WORKDIR/compile/$i")
-    fi
-done
-
-for i in "${ASSIST_FILES_SPLITTED[@]}"; do INC+=(-I); INC+=("$WORKDIR/compile/$i"); done
 
 # oclint 是安全的，不需要挂载也可以完成评测
 runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT_OPT $PROCLIMIT_OPT \
@@ -57,11 +40,9 @@ runcheck $GAINROOT "$RUNGUARD" ${DEBUG:+-v} $CPUSET_OPT $MEMLIMIT_OPT $FILELIMIT
     --no-core-dumps \
     "$OPTTIME" "$TIMELIMIT" \
     --standard-error-file program.err \
-    --standard-output-file oclint.json \
-    --out-meta program.meta -- \
-    oclint "${SRC[@]}" --report-type=json --disable-rule=ShortVariableName -- -c "${INC[@]}"
-
-chmod 555 oclint.json
+    --out-meta program.meta \
+    -VHOME=/what/the/fuck -- \
+    "$COMPILE_SCRIPT/static" "$WORKDIR" feedback "$SOURCE_FILES" "$ASSIST_FILES"
 
 # RUNDIR 还剩下 program.meta, program.err, system.out 供评测客户端检查
 # RUNDIR 由评测客户端删除
@@ -92,8 +73,6 @@ if grep -E '^output-truncated: ([a-z]+,)*stdout(,[a-z]+)*' program.meta >/dev/nu
     cleanexit ${E_OUTPUT_LIMIT:-1}
 fi
 
-# 脚本将读入 oclint.json 并生成 report.txt 和 score.txt
-runcheck python3 "$PROGDIR/process.py" oclint.json feedback/report.txt feedback/score.txt
 case $exitcode in
     $RESULT_AC)
         echo "Accepted"

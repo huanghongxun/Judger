@@ -1,0 +1,36 @@
+#!/bin/bash
+#
+# C 语言静态测试脚本
+#
+# 用法：$0 <workdir> <feedback> <source_files> <assist_files>
+#
+# <source_files> 参与编译的源文件，可能包含 .c 和 .h 文件
+# <assist_files> 不直接传给编译器的头文件，只能包含 .h 文件
+
+PROGNAME="$(basename "$0")"
+PROGDIR="$(dirname "$0")"
+
+WORKDIR="$1"; shift
+FEEDBACK="$1"; shift
+SOURCE_FILES="$1"; shift
+ASSIST_FILES="$1"; shift
+
+IFS=':' read -ra SOURCE_FILES_SPLITTED <<< "$SOURCE_FILES"
+IFS=':' read -ra ASSIST_FILES_SPLITTED <<< "$ASSIST_FILES"
+
+# 假如 SOURCE_FILES 为 a.cpp:b.cpp:c.hpp，那么 SRC, INC 为 $WORKDIR/compile/a.cpp $WORKDIR/compile/b.cpp
+SRC=()
+INC=()
+for i in "${SOURCE_FILES_SPLITTED[@]}"; do
+    if [[ "$i" == *.c* ]]; then
+        SRC+=("$WORKDIR/compile/$i")
+    else
+        INC+=(-I); INC+=("$WORKDIR/compile/$i")
+    fi
+done
+
+for i in "${ASSIST_FILES_SPLITTED[@]}"; do INC+=(-I); INC+=("$WORKDIR/compile/$i"); done
+
+oclint "${SRC[@]}" --report-type=json --disable-rule=ShortVariableName -- -c "${INC[@]}" > oclint.json
+
+exec python3 "$PROGDIR/process.py" oclint.json $((${#SOURCE_FILES_SPLITTED[@]}+${#ASSIST_FILES_SPLITTED[@]})) "$FEEDBACK/report.txt" "$FEEDBACK/score.txt"
