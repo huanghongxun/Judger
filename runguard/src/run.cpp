@@ -253,11 +253,17 @@ int runit(struct runguard_options opt) {
         }
     }
 
+    LOG(INFO) << "Initializing cgroup";
+
     cgroup_guard::init();
 
     opt.cgroupname = fmt::format("/judger/cgroup_{}_{}", getpid(), (int)time(NULL));
 
+    LOG(INFO) << "Creating cgroup";
+
     cgroup_create(opt);
+
+    LOG(INFO) << "Fixing Linux OOM killer";
 
     {
         /* Check if any Linux Out-Of-Memory killer adjustments have to
@@ -359,6 +365,8 @@ void set_restrictions_parent(const runguard_options& opt) {
 }
 
 int run_unshare(runguard_options opt) {
+    LOG(INFO) << "Isolating user program by unshare";
+
     /*
      * unshare 函数可以用来进行进程隔离。通常情况下，POSIX 系统的 fork 或 clone 函数
      * 在产生子进程时会共享父进程的资源，比如打开的文件描述符表等。我们通过 unshare 来
@@ -378,6 +386,8 @@ int run_unshare(runguard_options opt) {
      * CLONE_SYSVSEM：
      */
     unshare(CLONE_FILES | CLONE_FS | CLONE_NEWIPC | CLONE_NEWNET | CLONE_NEWNS | CLONE_NEWUTS | CLONE_SYSVSEM);
+
+    LOG(INFO) << "Starting user program";
 
     switch (child_pid = fork()) {
         case -1:
@@ -455,6 +465,7 @@ int run_unshare(runguard_options opt) {
 }
 
 int run_seccomp(runguard_options opt) {
+    LOG(INFO) << "Monitoring user program by seccomp";
     switch (child_pid = fork()) {
         case -1:
             // using error results in warning: this statement may fall through

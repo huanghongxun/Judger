@@ -212,7 +212,7 @@ sudo bash $EXEC_DIR/create_cgroups.sh domjudge-run
 4. 安装评测系统所需依赖
 请确保你的操作系统至少是 Ubuntu 18.04！！！！！否则配置依赖会很麻烦哦。
 
-然后安装评测系统所需的依赖库，比如 cgroup 用来控制 CPU 和 内存使用；libcurl 用来从远程服务器下载文件；libboost 是 boost 库，注意 boost 的版本至少为 1.65；python3 是评测脚本依赖环境，允许评测脚本使用 python3 编写；python3-pip 方便评测脚本按需下载依赖代码；libmysqlclient-dev 用来连接 MySQL 数据库（Sicily 和 2.0 接口需要数据库访问支持）。其中 gcc 和 g++ 版本至少是 8，并不一定必须安装 8.
+然后安装评测系统所需的依赖库，比如 cgroup 用来控制 CPU 和 内存使用；libcurl 用来从远程服务器下载文件；libboost 是 boost 库，注意 boost 的版本至少为 1.65；python3 是评测脚本依赖环境，允许评测脚本使用 python3 编写；python3-pip 方便评测脚本按需下载依赖代码；libmysqlclient-dev 用来连接 MySQL 数据库（Sicily 和 2.0 接口需要数据库访问支持）。其中 gcc 和 g++ 版本至少是 9.
 ```bash
 sudo apt update
 sudo apt install pylint pylint3 cabal libcgroup-dev clang libclang-dev libcurl4-openssl-dev curl make xz-utils python3 python3-pip libboost-all-dev cmake libgtest-dev gcc-8 g++-8 libmysqlclient-dev libseccomp-dev
@@ -239,7 +239,7 @@ export CACHEDIR=/tmp/judge-system
 export RUNDIR=/tmp/judge-system
 export DATADIR=/ramdisk/rundir
 export CHROOTDIR=/chroot
-export CACHERANDOMDATA=100
+export CACHERANDOMDATA=4
 export RUNUSER=domjudge-run
 export RUNGROUP=domjudge-run
 sudo ./judge-system --enable-sicily=/etc/judge-system/sicily.conf --enable-3=/etc/judge-system/moj.conf --enable-2=/etc/judge-system/mcourse.conf --enable-2=/etc/judge-system/mexam.conf --cores=0-9

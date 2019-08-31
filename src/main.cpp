@@ -36,15 +36,12 @@ struct cpuset {
     cpu_set_t cpuset;
 };
 
-void validate(boost::any& v, const vector<string>& values, cpuset*, int) {
+cpuset parse_cpuset(const string s) {
     using namespace boost::program_options;
     static regex matcher("^([0-9]+)(-([0-9]+))?$");
-    validators::check_first_occurrence(v);
-
     cpuset result;
     CPU_ZERO(&result.cpuset);
 
-    string const& s = validators::get_single_string(values);
     result.literal = s;
     vector<string> splitted;
     boost::split(splitted, s, boost::is_any_of(","));
@@ -65,11 +62,19 @@ void validate(boost::any& v, const vector<string>& values, cpuset*, int) {
                     CPU_SET(i, &result.cpuset);
                 }
             }
-            v = result;
+            return result;
         } else {
             throw validation_error(validation_error::invalid_option_value);
         }
     }
+}
+
+void validate(boost::any& v, const vector<string>& values, cpuset*, int) {
+    using namespace boost::program_options;
+    validators::check_first_occurrence(v);
+
+    string const& s = validators::get_single_string(values);
+    v = parse_cpuset(s);
 }
 
 void sigintHandler(int /* signum */) {
@@ -119,7 +124,7 @@ int main(int argc, char* argv[]) {
         ("enable-4", po::value<vector<string>>(), "run Matrix Judge System 4.0 submission fetcher, with configuration file path.")
         ("enable-3", po::value<vector<string>>(), "run Matrix Judge System 3.0 submission fetcher, with configuration file path.")
         ("enable-2", po::value<vector<string>>(), "run Matrix Judge System 2.0 submission fetcher, with configuration file path.")
-        ("cores", po::value<cpuset>()->required(), "set the cores the judge-system can make use of")
+        ("cores", po::value<cpuset>(), "set the cores the judge-system can make use of")
         ("exec-dir", po::value<string>(), "set the default predefined executables for falling back. You can either pass it from environ EXECDIR")
         ("script-dir", po::value<string>(), "set the directory with required scripts stored. You can either pass it from environ SCRIPTDIR")
         ("cache-dir", po::value<string>(), "set the directory to store cached test data, compiled spj, random test generator, compiled executables. You can either pass it from environ CACHEDIR")
@@ -331,49 +336,56 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    vector<string> servers;
     if (vm.count("enable")) {
-        auto servers = vm.at("enable").as<vector<string>>();
-        vector<filesystem::path> config;
-        for (auto& server : servers) {
-            if (filesystem::is_directory(server)) {
-                for (const auto& p : filesystem::directory_iterator(server)) {
-                    auto& path = p.path();
-                    if (path.extension() == ".json")
-                        config.push_back(path);
-                }
-            } else if (filesystem::is_regular_file(server)) {
-                config.emplace_back(server);
-            } else {
-                LOG(FATAL) << "Configuration file " << server << " does not exist";
-            }
-        }
+        servers = vm.at("enable").as<vector<string>>();
+    }
 
-        for (const auto& p : config) {
-            try {
-                nlohmann::json j = nlohmann::json::parse(judge::read_file_content(p));
-                string type = j.at("type").get<string>();
-                if (type == "mcourse") {
-                    auto second_judger = make_unique<judge::server::mcourse::configuration>();
-                    second_judger->init(p);
-                    judge::register_judge_server(move(second_judger));
-                } else if (type == "moj") {
-                    auto third_judger = make_unique<judge::server::moj::configuration>();
-                    third_judger->init(p);
-                    judge::register_judge_server(move(third_judger));
-                } else if (type == "sicily") {
-                    auto sicily_judger = make_unique<judge::server::sicily::configuration>();
-                    sicily_judger->init(p);
-                    judge::register_judge_server(move(sicily_judger));
-                } else if (type == "forth") {
-                    auto forth_judger = make_unique<judge::server::forth::configuration>();
-                    forth_judger->init(p);
-                    judge::register_judge_server(move(forth_judger));
-                } else {
-                    LOG(FATAL) << "Unrecognized configuration type " << type << " in file " << p;
-                }
-            } catch (std::exception& e) {
-                LOG(FATAL) << "Configuration file " << p << " is malformed";
+    if (getenv("CONFIGDIR")) {
+        string configdir = getenv("CONFIGDIR");
+        boost::split(servers, configdir, boost::is_any_of(":"));
+    }
+
+    vector<filesystem::path> config;
+    for (auto& server : servers) {
+        if (filesystem::is_directory(server)) {
+            for (const auto& p : filesystem::directory_iterator(server)) {
+                auto& path = p.path();
+                if (path.extension() == ".json")
+                    config.push_back(path);
             }
+        } else if (filesystem::is_regular_file(server)) {
+            config.emplace_back(server);
+        } else {
+            LOG(FATAL) << "Configuration file " << server << " does not exist";
+        }
+    }
+
+    for (const auto& p : config) {
+        try {
+            nlohmann::json j = nlohmann::json::parse(judge::read_file_content(p));
+            string type = j.at("type").get<string>();
+            if (type == "mcourse") {
+                auto second_judger = make_unique<judge::server::mcourse::configuration>();
+                second_judger->init(p);
+                judge::register_judge_server(move(second_judger));
+            } else if (type == "moj") {
+                auto third_judger = make_unique<judge::server::moj::configuration>();
+                third_judger->init(p);
+                judge::register_judge_server(move(third_judger));
+            } else if (type == "sicily") {
+                auto sicily_judger = make_unique<judge::server::sicily::configuration>();
+                sicily_judger->init(p);
+                judge::register_judge_server(move(sicily_judger));
+            } else if (type == "forth") {
+                auto forth_judger = make_unique<judge::server::forth::configuration>();
+                forth_judger->init(p);
+                judge::register_judge_server(move(forth_judger));
+            } else {
+                LOG(FATAL) << "Unrecognized configuration type " << type << " in file " << p;
+            }
+        } catch (std::exception& e) {
+            LOG(FATAL) << "Configuration file " << p << " is malformed";
         }
     }
 
@@ -386,11 +398,16 @@ int main(int argc, char* argv[]) {
     vector<thread> worker_threads;
 
     // 我们为每个注册的 CPU 核心 都生成一个 worker
+    cpuset set;
     if (vm.count("cores")) {
-        cpuset set = vm["cores"].as<cpuset>();
-        for (unsigned i : set.ids) {
-            worker_threads.push_back(move(judge::start_worker(i, testcase_queue, core_acq_queue)));
-        }
+        set = vm["cores"].as<cpuset>();
+    } else {
+        CHECK(getenv("CORES")) << "you must specifiy usable CPU cores by adding option --cores or environ CORES";
+        set = parse_cpuset(getenv("CORES"));
+    }
+
+    for (unsigned i : set.ids) {
+        worker_threads.push_back(move(judge::start_worker(i, testcase_queue, core_acq_queue)));
     }
 
     for (auto& th : worker_threads)

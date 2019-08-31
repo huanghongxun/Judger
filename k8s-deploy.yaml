@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: judge-system
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: <DEPLOY_NAME>-deployment
+  labels:
+    app: <DEPLOY_NAME>
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: <DEPLOY_NAME>
+  template:
+    metadata:
+      labels:
+        app: <DEPLOY_NAME>
+    spec:
+      volumes:
+        - name: tz-config
+          hostPath:
+            path: /usr/share/zoneinfo/Asia/Shanghai
+      containers:
+        - name: <DEPLOY_NAME>
+          image: <IMAGE_NAME>
+          env:
+            - name: ELASTIC_APM_ENVIRONMENT
+              value: <ENVIRONMENT>
+            - name: ELASTIC_APM_SERVICE_NAME
+              value: <DEPLOY_NAME>
+            - name: ELASTIC_APM_SERVER_URL
+              value: http://apm-server.kube-logging:8200
+          volumeMounts:
+            - name: tz-config
+              mountPath: /etc/localtime
+

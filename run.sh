@@ -1,6 +1,7 @@
 #!/bin/bash
 #
 # 提供给 Docker 的运行脚本
+# 必须以特权模式运行
 
 DIR="$(realpath "$(dirname "$0")")"
 
@@ -24,12 +25,14 @@ if [ -n "$SICILY_CONF" ]; then
     SICILY_OPT="--enable-sicily $SICILY_CONF"
 fi
 
-export GLOG_log_dir=/var/log/matrix
+mkdir -p /tmp/judge/cache
+mkdir -p /tmp/judge/run
+
+bash "$DIR/exec/create_cgroups.sh" domjudge-run
+
+export GLOG_log_dir=/var/log/judge-system
 export GLOG_alsologtostderr=1
 export GLOG_colorlogtostderr=1
-export ELASTIC_APM_SERVICE_NAME="judge-system"
-export ELASTIC_APM_SERVER_URL="http://localhost:31000"
-export ELASTIC_APM_ENVIRONMENT="test"
 export ELASTIC_APM_TRANSPORT_CLASS="elasticapm.transport.http.Transport"
 export CACHEDIR="/tmp/judge/cache"
 export RUNDIR="/tmp/judge/run"
@@ -37,4 +40,4 @@ export CHROOTDIR="/chroot"
 export CACHERANDOMDATA=4
 export RUNUSER=domjudge-run
 export RUNGROUP=domjudge-run
-"$DIR/bin/judge-system" $MOJ_OPT $MCOURSE_OPT $FORTH_OPT $SICILY_OPT --cores 0-9 "$@"
+"$DIR/bin/judge-system" $MOJ_OPT $MCOURSE_OPT $FORTH_OPT $SICILY_OPT "$@"

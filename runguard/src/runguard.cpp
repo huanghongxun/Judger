@@ -153,8 +153,8 @@ int main(int argc, const char* argv[]) {
     if (vm.count("file-limit")) opt.file_limit = vm["file-limit"].as<size_t>();
     if (vm.count("nproc")) opt.nproc = vm["nproc"].as<size_t>();
     if (vm.count("no-core-dumps")) opt.no_core_dumps = true;
-    if (vm.count("allowed_syscall")) {
-        filesystem::path p = vm["allowed_syscall"].as<string>();
+    if (vm.count("allowed-syscall")) {
+        filesystem::path p = vm["allowed-syscall"].as<string>();
         if (filesystem::exists(p)) {
             ifstream fin(p);
             for (int no; fin >> no; ) opt.syscalls.push_back(no);

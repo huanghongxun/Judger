@@ -1,79 +1,46 @@
-variables:
-  VERSION: "4.0"
-
 stages:
-  - prepare
-  - host-build
-  - host-test
-  - docker-build
-  - docker-deploy
-  - docker-clean
+  - build
+  - deploy
 
-project-prepare-302:
+variables:
+  DOCKER_IMAGE_NAME: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHA}
+  DEPLOY_NAME: ${CI_PROJECT_NAME}-${CI_COMMIT_REF_SLUG}
+
+cache:
+  paths:
+    - ext # GitHub 连接速度太慢了。。
+
+build-docker:
+  stage: build
+  only:
+    - master
+    - development
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
     - chmod +x .install_dependence.sh
     - ./.install_dependence.sh
-  stage: prepare
-  only:
-    - ProgrammingWorker
-    - ChoiceWorker
-    - framework
-    - develop
-    - master
-  tags:
-    - test
+    - docker build --pull -t "$DOCKER_IMAGE_NAME" .
+    - docker push "$DOCKER_IMAGE_NAME"
+  tags: ["shell"]
 
-project-prepare:
-  script:
-    - chmod +x .install_dependence.sh
-    - ./.install_dependence.sh
-  stage: prepare
-  only:
+deploy-prod:
+  stage: deploy
+  only: 
     - master
-  tags:
-    - judge-builder
-
-project-docker-build-302:
+  image: dtzar/helm-kubectl
   script:
-    - docker build -f=docker/Dockerfile.run -t=matrix-docker-registry:5000/matrix-judge:${VERSION} .
-  stage: docker-build
-  only:
-    - master
-  tags:
-    - test
+    - sed -i "s~<ENVIRONMENT>~production~g" k8s-deploy.yaml
+    - ./deploy.sh
+  tags: ["docker"]
 
-project-docker-build:
-  script:
-    - docker build -f=docker/Dockerfile.run -t=matrix-docker-registry:5000/matrix-judge:${VERSION} .
-  stage: docker-build
-  only:
-    - master
-  tags:
-    - judge-builder
 
-project-docker-deploy-302:
+deploy-dev:
+  stage: deploy
+  only: 
+    - development
+  image: dtzar/helm-kubectl
   script:
-    - docker push matrix-docker-registry:5000/matrix-judge:${VERSION}
-  stage: docker-deploy
-  only:
-    - master
-  tags:
-    - test
-
-project-docker-deploy:
-  script:
-    - docker push matrix-docker-registry:5000/matrix-judge:${VERSION}
-  stage: docker-deploy
-  only:
-    - master
-  tags:
-    - judge-builder
-
-project-docker-test-clean-302:
-  script:
-    - docker rmi $(docker images -aqf "dangling=true") || true
-  stage: docker-clean
-  only:
-    - develop
-  tags:
-    - test
+    - sed -i "s~<ENVIRONMENT>~test~g" k8s-deploy.yaml
+    - ./deploy.sh
+  tags: ["docker"]
